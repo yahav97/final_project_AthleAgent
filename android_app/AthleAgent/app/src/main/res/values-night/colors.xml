@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gradient_top_blue">#07142F</color>
+    <color name="gradient_bottom_grey_white">#121212</color>
+    <color name="text_color_primary">#B0BCD5</color>
+    <color name="gray">#B0BCD5</color>
+    <color name="aa_button_primary_bg">#00B1DA</color>
+    <color name="background_gray_smoke">#212121</color>
+</resources>

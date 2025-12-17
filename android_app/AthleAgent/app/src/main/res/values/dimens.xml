@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- new x4 -->
+    <dimen name="spacing_4">4dp</dimen>
+    <dimen name="spacing_8">8dp</dimen>
+    <dimen name="spacing_12">12dp</dimen>
+    <dimen name="spacing_16">16dp</dimen>
+    <dimen name="spacing_20">20dp</dimen>
+    <dimen name="spacing_24">24dp</dimen>
+    <dimen name="spacing_28">28dp</dimen>
+    <dimen name="spacing_32">32dp</dimen>
+    <dimen name="spacing_36">36dp</dimen>
+    <dimen name="spacing_40">40dp</dimen>
+    <dimen name="spacing_44">44dp</dimen>
+    <dimen name="spacing_48">48dp</dimen>
+    <dimen name="spacing_52">52dp</dimen>
+    <dimen name="spacing_56">56dp</dimen>
+    <dimen name="spacing_60">60dp</dimen>
+    <dimen name="spacing_64">64dp</dimen>
+    <dimen name="spacing_68">68dp</dimen>
+    <dimen name="spacing_72">72dp</dimen>
+    <dimen name="spacing_76">76dp</dimen>
+    <dimen name="spacing_80">80dp</dimen>
+    <dimen name="spacing_84">84dp</dimen>
+    <dimen name="spacing_88">88dp</dimen>
+    <dimen name="spacing_92">92dp</dimen>
+    <dimen name="spacing_96">96dp</dimen>
+    <dimen name="spacing_100">100dp</dimen>
+    <dimen name="spacing_104">104dp</dimen>
+    <dimen name="spacing_108">108dp</dimen>
+    <dimen name="spacing_112">112dp</dimen>
+    <dimen name="spacing_120">120dp</dimen>
+    <dimen name="spacing_132">132dp</dimen>
+    <dimen name="spacing_144">144dp</dimen>
+    <dimen name="spacing_152">152dp</dimen>
+    <dimen name="spacing_160">160dp</dimen>
+    <dimen name="spacing_176">176dp</dimen>
+    <dimen name="spacing_212">212dp</dimen>
+    <dimen name="spacing_220">220dp</dimen>
+
+
+    <dimen name="logo_size">224dp</dimen>
+    <dimen name="logo_height">148dp</dimen>
+    <dimen name="logo_corner_radius">16dp</dimen>
+    <dimen name="logo_elevation">8dp</dimen>
+
+    <dimen name="button_width">320dp</dimen>
+    <dimen name="new_button_width">220dp</dimen>
+    <dimen name="new_button_height">220dp</dimen>
+    <dimen name="new_button_space">5dp</dimen>
+    <dimen name="button_stroke_width">2dp</dimen>
+    <dimen name="button_corner_radius">8dp</dimen>
+
+    <dimen name="min_height">48dp</dimen>
+    <dimen name="text_max_width">352dp</dimen>
+    <dimen name="text_input_width">288dp</dimen>
+    <dimen name="text_input_corner_radius">12dp</dimen>
+    <dimen name="text_height">32dp</dimen>
+
+    <dimen name="text_size_body">15sp</dimen>
+    <dimen name="text_small">10sp</dimen>
+    <dimen name="text_size_input">16sp</dimen>
+    <dimen name="login_text_size">18sp</dimen>
+
+    <dimen name="logo_radius">16dp</dimen>
+    <dimen name="logo_shadow">12dp</dimen>
+    <dimen name="google_icon_padding">13dp</dimen>
+
+
+</resources>

@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">AthleAgent</string>
+    <string name="my_image_description">My image</string>
+    <string name="google_login">Log in with Google</string>
+    <string name="user_name_or_email_address">User name or email address</string>
+    <string name="password">Password</string>
+    <string name="forgotten_password">Forgot password?</string>
+    <string name="create_account_text">Create an account</string>
+    <string name="login_account_text">Log in</string>
+    <string name="Remember_me_text">Remember me</string>
+    <string name="New_to_AthleAgent_text">New to AthleAgent?</string>
+    <string name="User_name_text">User name or Email </string>
+    <string name="Password_text">Password</string>
+    <string name="Or">OR</string>
+
+
 </resources>
