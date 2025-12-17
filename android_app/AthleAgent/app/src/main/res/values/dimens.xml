@@ -58,10 +58,12 @@
     <dimen name="text_input_corner_radius">12dp</dimen>
     <dimen name="text_height">32dp</dimen>
 
-    <dimen name="text_size_body">15sp</dimen>
+    <dimen name="text_size_body">16sp</dimen>
+    <dimen name="forgot_password_text_size">20sp</dimen>
+    <dimen name="text_medium">15sp</dimen>
     <dimen name="text_small">10sp</dimen>
     <dimen name="text_size_input">16sp</dimen>
-    <dimen name="login_text_size">18sp</dimen>
+    <dimen name="login_text_size">20sp</dimen>
 
     <dimen name="logo_radius">16dp</dimen>
     <dimen name="logo_shadow">12dp</dimen>
