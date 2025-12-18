@@ -4,6 +4,7 @@
     <!-- new x4 -->
     <dimen name="spacing_4">4dp</dimen>
     <dimen name="spacing_8">8dp</dimen>
+    <dimen name="spacing_10">10dp</dimen>
     <dimen name="spacing_12">12dp</dimen>
     <dimen name="spacing_16">16dp</dimen>
     <dimen name="spacing_20">20dp</dimen>
@@ -51,6 +52,8 @@
     <dimen name="new_button_space">5dp</dimen>
     <dimen name="button_stroke_width">2dp</dimen>
     <dimen name="button_corner_radius">8dp</dimen>
+    <dimen name="empty_space">0dp</dimen>
+    <dimen name="button_stroke_unpressed">1dp</dimen>
 
     <dimen name="min_height">48dp</dimen>
     <dimen name="text_max_width">352dp</dimen>

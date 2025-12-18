@@ -12,13 +12,10 @@ import com.google.android.material.textview.MaterialTextView
 import com.yahav.athleagent.logic.LoginManager
 
 
-private fun MainActivity.refreshUi() {
-    TODO("Not yet implemented")
-}
+
 
 class MainActivity : AppCompatActivity() {
-
-
+    
     private lateinit var googleSignInButton : MaterialButton
 
     private lateinit var editTextUsername : TextInputEditText
@@ -31,7 +28,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var newAccountLink : MaterialTextView
 
-    private lateinit var loginManager: LoginManager
+    //private lateinit var loginManager: LoginManager
 
 
 
@@ -78,13 +75,20 @@ class MainActivity : AppCompatActivity() {
 //        text user name and password
 
 
-            refreshUi()
-        }
-
-
-        fun refreshUi() {
-            TODO()
+            //refreshUi()
         }
     }
+
+
+
+    fun refreshUi() {
+        TODO()
+    }
+
+
+
+
+
+
 }
 

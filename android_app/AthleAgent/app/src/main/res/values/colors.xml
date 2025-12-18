@@ -23,6 +23,7 @@
     <color name="lm_text_secondary">#4B5563</color>
     <color name="lm_text_muted">#9CA3AF</color>
     <color name="text_color_primary">#212121</color>
+    <color name="stroke_color_primary">#212121</color>
     <color name="text_color_secondary">#757575</color>
     <color name="charcoal_black">#333333</color>
 
