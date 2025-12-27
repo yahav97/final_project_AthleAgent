@@ -5,7 +5,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_white_ghost"
+    android:background="@color/background_white_alice_blue"
     android:fillViewport="true"
     tools:context=".MainActivity">
 
@@ -41,7 +41,7 @@
             android:layout_centerHorizontal="true"
             android:fontFamily="@font/roboto_bold"
             android:text="@string/google_login"
-            android:textColor="@color/lm_text_secondary"
+            android:textColor="@color/charcoal_black"
             android:textSize="@dimen/login_text_size"
             app:backgroundTint="@color/background_white_ghost"
             app:cornerRadius="@dimen/button_corner_radius"
@@ -57,7 +57,7 @@
             android:id="@+id/or"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_12"
+            android:layout_marginTop="@dimen/spacing_24"
             android:layout_below="@id/GoogleSignInButton"
             android:layout_centerHorizontal="true"
             android:fontFamily="@font/roboto_bold"
@@ -157,7 +157,7 @@
             android:id="@+id/footer_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_44"
+            android:layout_marginTop="@dimen/spacing_48"
             android:layout_below="@id/forgotPassword"
             android:layout_centerHorizontal="true"
             android:orientation="horizontal">

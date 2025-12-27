@@ -15,7 +15,7 @@ import com.yahav.athleagent.logic.LoginManager
 
 
 class MainActivity : AppCompatActivity() {
-    
+
     private lateinit var googleSignInButton : MaterialButton
 
     private lateinit var editTextUsername : TextInputEditText
@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var newAccountLink : MaterialTextView
 
-    //private lateinit var loginManager: LoginManager
+    private lateinit var loginManager: LoginManager
 
 
 

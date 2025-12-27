@@ -50,7 +50,7 @@
     <dimen name="new_button_width">220dp</dimen>
     <dimen name="new_button_height">220dp</dimen>
     <dimen name="new_button_space">5dp</dimen>
-    <dimen name="button_stroke_width">2dp</dimen>
+    <dimen name="button_stroke_width">1.5dp</dimen>
     <dimen name="button_corner_radius">8dp</dimen>
     <dimen name="empty_space">0dp</dimen>
     <dimen name="button_stroke_unpressed">1dp</dimen>
