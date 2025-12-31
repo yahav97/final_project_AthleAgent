@@ -114,9 +114,10 @@ print("-" * 60)
 for idx, row in feature_importance_prelim.iterrows():
     print(f"{row['feature']:30s} {row['importance']:.4f} ({row['importance']*100:.2f}%)")
 
-# Identify weak features (importance < 0.01 or bottom 20%)
+# Identify weak features - only remove VERY weak ones (more conservative)
+# Only remove features with importance < 0.01 (very weak) or bottom 10% (not 20%)
 threshold = 0.01
-bottom_percentile = 0.20
+bottom_percentile = 0.10  # More conservative - only bottom 10%
 weak_features = feature_importance_prelim[
     (feature_importance_prelim['importance'] < threshold) |
     (feature_importance_prelim['importance'] < feature_importance_prelim['importance'].quantile(bottom_percentile))
@@ -140,16 +141,18 @@ if len(weak_features) > 0:
         elif 'bmi' in feature_name.lower():
             print(f"    -> Reason: Less relevant for injury prediction than load metrics")
     
-    print("\n[ACTION] Removing weak features to improve model performance...")
+    print("\n[ACTION] Removing only VERY weak features (conservative approach)...")
     weak_feature_names = weak_features['feature'].tolist()
     
-    # Remove weak features from datasets
+    # Only remove features that are truly weak (importance < 0.01 or bottom 10%)
+    # This is more conservative - keeps features that might still contribute
     X_train = X_train.drop(columns=weak_feature_names, errors='ignore')
     X_test = X_test.drop(columns=weak_feature_names, errors='ignore')
     X_train_scaled = X_train_scaled.drop(columns=weak_feature_names, errors='ignore')
     X_test_scaled = X_test_scaled.drop(columns=weak_feature_names, errors='ignore')
     
-    print(f"[OK] Removed {len(weak_feature_names)} weak features: {', '.join(weak_feature_names)}")
+    print(f"[OK] Removed {len(weak_feature_names)} very weak features: {', '.join(weak_feature_names)}")
+    print(f"[INFO] Keeping other features even if low importance - they may still contribute")
 else:
     print("\n[OK] No obviously weak features detected.")
 
@@ -165,7 +168,7 @@ models = {
     'Random Forest': {
         'model': RandomForestClassifier(
             n_estimators=200,  # More trees for better performance
-            max_depth=15,  # Deeper trees
+            max_depth=12,  # Balanced depth (not too deep to avoid overfitting)
             min_samples_split=10,  # Prevent overfitting
             min_samples_leaf=5,  # Prevent overfitting
             random_state=42,
@@ -203,8 +206,8 @@ if XGBOOST_AVAILABLE:
             n_estimators=100,
             max_depth=6,
             random_state=42,
-            eval_metric='logloss',
-            use_label_encoder=False
+            eval_metric='logloss'
+            # Removed use_label_encoder (deprecated in newer versions)
         ),
         'use_scaled': False  # Tree-based models don't need scaling
     }
@@ -280,12 +283,27 @@ print("=" * 60)
 print("Priority: Balanced Recall and Precision (catch injuries but minimize false alarms)")
 print("Using safety threshold: 0.4 (instead of default 0.5)")
 
-# Balanced score: 40% Recall, 40% Precision, 20% F1-Score
+# Balanced score: 30% Accuracy, 30% Precision, 25% Recall, 15% F1-Score
 # This ensures we catch injuries but don't have too many false positives
-results_df['Balanced_Score'] = 0.4 * results_df['Recall'] + 0.4 * results_df['Precision'] + 0.2 * results_df['F1-Score']
+# Accuracy is important to avoid too many false alarms
+results_df['Balanced_Score'] = (
+    0.30 * results_df['Accuracy'] + 
+    0.30 * results_df['Precision'] + 
+    0.25 * results_df['Recall'] + 
+    0.15 * results_df['F1-Score']
+)
 results_df['Safety_Score'] = results_df['Balanced_Score']  # Keep for compatibility
+
 # Find best model - prioritize balanced performance
-best_model_idx = results_df['Balanced_Score'].idxmax()
+# Also check that Accuracy is reasonable (at least 0.5)
+valid_models = results_df[results_df['Accuracy'] >= 0.5]
+if len(valid_models) > 0:
+    best_model_idx = valid_models['Balanced_Score'].idxmax()
+    print(f"\n[INFO] Filtered models with Accuracy < 0.5. Best from {len(valid_models)} valid models.")
+else:
+    # If no model has good accuracy, use balanced score anyway
+    best_model_idx = results_df['Balanced_Score'].idxmax()
+    print(f"\n[WARNING] No model has Accuracy >= 0.5. Using best Balanced Score.")
 best_model_name = results_df.loc[best_model_idx, 'Model']
 best_model_config = list(models.values())[best_model_idx]
 best_model = best_model_config['model']
@@ -454,10 +472,14 @@ validation_df = generate_validation_data()
 X_val = validation_df.drop('injury_tomorrow', axis=1)
 y_val = validation_df['injury_tomorrow']
 
-# Remove weak features if they were removed
+# Remove weak features if they were removed (MUST match training features)
 if len(weak_features) > 0:
     weak_feature_names = weak_features['feature'].tolist()
     X_val = X_val.drop(columns=weak_feature_names, errors='ignore')
+
+# Ensure validation set has same features as training set (in same order)
+# This is critical for scaling to work correctly
+X_val = X_val[X_train.columns]  # Reorder and ensure same features
 
 # Scale if needed
 if best_use_scaled:

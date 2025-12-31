@@ -61,9 +61,14 @@ def generate_synthetic_data():
             # ============================================================
             # PHYSICAL LOAD METRICS
             # ============================================================
-            # Daily training distance (km) - Gamma distribution for realistic training patterns
-            daily_distance = np.random.gamma(shape=2, scale=3)
-            if daily_distance < 1: daily_distance = 0  # Rest days
+            # Daily training distance (km) - More realistic training patterns
+            # Athletes have training cycles: some days high, some low, some rest
+            day_in_week = day % 7
+            if day_in_week == 0 or day_in_week == 6:  # Weekend - often rest or light
+                daily_distance = np.random.gamma(shape=1.5, scale=2) if np.random.rand() > 0.3 else 0
+            else:  # Weekday - more training
+                daily_distance = np.random.gamma(shape=2.5, scale=3.5)
+            if daily_distance < 0.5: daily_distance = 0  # Rest days
             
             # Workout intensity (minutes) - correlated with distance
             workout_intensity = int(daily_distance * np.random.randint(4, 7)) if daily_distance > 0 else 0
@@ -77,11 +82,20 @@ def generate_synthetic_data():
             # Sleep hours - normal distribution around 7 hours, bounded 3-10
             sleep_hours = max(3, min(10, np.random.normal(7, 1.5)))
             
-            # HRV (Heart Rate Variability) - affected by sleep quality
-            hrv_fluctuation = np.random.normal(0, 5)
-            if sleep_hours < 5:  # Poor sleep reduces HRV
-                hrv_fluctuation -= 10
+            # HRV (Heart Rate Variability) - strongly affected by sleep, training load, and stress
+            # More realistic correlation with other factors
+            hrv_fluctuation = np.random.normal(0, 4)
+            if sleep_hours < 5:  # Poor sleep reduces HRV significantly
+                hrv_fluctuation -= 12
+            elif sleep_hours < 6:
+                hrv_fluctuation -= 6
+            # High training load reduces HRV
+            if daily_distance > 12:
+                hrv_fluctuation -= 8
+            elif daily_distance > 8:
+                hrv_fluctuation -= 4
             hrv_score = int(base_hrv + hrv_fluctuation)
+            hrv_score = max(20, min(100, hrv_score))  # Keep in reasonable range
             
             # Resting heart rate - slight daily variation
             resting_hr = int(base_resting_hr + (np.random.normal(0, 2)))
@@ -101,13 +115,32 @@ def generate_synthetic_data():
             # ============================================================
             # SUBJECTIVE METRICS
             # ============================================================
-            # Stress level (1-10 scale)
-            stress_level = np.random.randint(1, 11)
+            # Stress level (1-10 scale) - correlated with training load and sleep
+            # Higher training load + poor sleep = higher stress
+            base_stress = 3.0
+            if daily_distance > 10:
+                base_stress += 2.0
+            if sleep_hours < 6:
+                base_stress += 1.5
+            if hrv_score < base_hrv - 10:
+                base_stress += 1.0
+            stress_level = max(1, min(10, int(np.random.normal(base_stress, 1.5))))
             
-            # Muscle soreness (1-10 scale) - increases with high training load
-            muscle_soreness = np.random.randint(1, 11)
-            if daily_distance > 10:  # High training load increases soreness
-                muscle_soreness += 2
+            # Muscle soreness (1-10 scale) - strongly correlated with training load
+            base_soreness = 2.0
+            if daily_distance > 12:
+                base_soreness += 4.0
+            elif daily_distance > 8:
+                base_soreness += 2.5
+            elif daily_distance > 5:
+                base_soreness += 1.0
+            # Poor recovery increases soreness
+            if sleep_hours < 6:
+                base_soreness += 1.0
+            # HRV drop will be calculated later, but we can estimate from current HRV
+            if hrv_score < base_hrv - 10:
+                base_soreness += 0.5
+            muscle_soreness = max(1, min(10, int(np.random.normal(base_soreness, 1.0))))
 
             row = {
                 'athlete_id': athlete_id, 'date': dates[day], 'age': age, 'bmi': bmi,
@@ -155,40 +188,59 @@ def generate_synthetic_data():
     df['hrv_drop'] = df['hrv_score'] - df['hrv_rolling_7d']
 
     # ============================================================================
-    # INJURY RISK CALCULATION
+    # INJURY RISK CALCULATION (IMPROVED - More Realistic)
     # ============================================================================
     # Based on research-validated risk factors
-    # Risk is cumulative - multiple factors increase probability
+    # Uses multiplicative/weighted approach instead of simple addition
     def calculate_injury_risk(row):
-        base_risk = 0.05  # Base injury probability (5%)
-        risk = base_risk  # Initialize risk with base value
+        base_risk = 0.03  # Lower base risk (3%)
+        
+        # Calculate risk multipliers (more realistic than addition)
+        risk_multiplier = 1.0
         
         # ACWR > 1.4: High acute-to-chronic workload (Gabbett, 2016)
-        # This is the strongest predictor - adds 35% risk
-        if row['acwr_ratio'] > 1.4:
-            risk += 0.35
+        # Strongest predictor - multiplies risk by 3-5x
+        if row['acwr_ratio'] > 1.5:
+            risk_multiplier *= 4.0  # Very high ACWR
+        elif row['acwr_ratio'] > 1.4:
+            risk_multiplier *= 2.5  # High ACWR
         
         # Sleep debt > 5 hours: Significant sleep deprivation
-        # Impacts recovery and increases injury risk
-        if row['sleep_debt_3d'] > 5:
-            risk += 0.15
+        # Multiplies risk by 1.5-2x
+        if row['sleep_debt_3d'] > 8:
+            risk_multiplier *= 2.0  # Very high sleep debt
+        elif row['sleep_debt_3d'] > 5:
+            risk_multiplier *= 1.5  # High sleep debt
         
         # HRV drop < -8: Significant autonomic nervous system stress
-        # Indicates poor recovery state
-        if row['hrv_drop'] < -8:
-            risk += 0.15
+        # Multiplies risk by 1.5-2x
+        if row['hrv_drop'] < -12:
+            risk_multiplier *= 2.0  # Very large HRV drop
+        elif row['hrv_drop'] < -8:
+            risk_multiplier *= 1.5  # Significant HRV drop
         
         # High stress level (>=8/10): Psychological stress
-        # Affects recovery and decision-making
-        if row['stress_level'] >= 8:
-            risk += 0.10
+        # Multiplies risk by 1.3-1.6x
+        if row['stress_level'] >= 9:
+            risk_multiplier *= 1.6  # Very high stress
+        elif row['stress_level'] >= 8:
+            risk_multiplier *= 1.3  # High stress
         
         # Previous injuries (>1): History is a risk factor
-        if row['history_injury_count'] > 1:
-            risk += 0.05
+        # Adds base risk increase
+        history_risk = 0.0
+        if row['history_injury_count'] >= 3:
+            history_risk = 0.08  # High history
+        elif row['history_injury_count'] >= 2:
+            history_risk = 0.05  # Medium history
+        elif row['history_injury_count'] >= 1:
+            history_risk = 0.02  # Low history
         
-        # Cap risk between 0% and 95% (never 100% certain)
-        return min(0.95, max(0.0, risk))
+        # Calculate final risk: base * multiplier + history
+        risk = (base_risk * risk_multiplier) + history_risk
+        
+        # Cap risk between 2% and 75% (more realistic range)
+        return min(0.75, max(0.02, risk))
 
     # Generate injury labels based on calculated risk probability
     # Each row has a probability of injury, we sample from it
