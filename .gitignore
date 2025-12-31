@@ -2,6 +2,7 @@
 backend/venv/
 __pycache__/
 *.pyc
-
+*.pkl
+backend/*.pkl
 # Editor ignores
 .vscode/
