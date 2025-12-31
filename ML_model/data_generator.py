@@ -32,6 +32,10 @@ NUM_ATHLETES = 100          # Number of synthetic athletes
 DAYS_PER_ATHLETE = 90       # Days of data per athlete (~3 months)
 START_DATE = '2025-01-01'   # Starting date for data generation
 
+# For validation set generation
+VALIDATION_ATHLETES = 30    # Number of athletes for validation set
+VALIDATION_DAYS = 60        # Days per athlete for validation
+
 # ============================================================================
 # DATA GENERATION FUNCTION
 # ============================================================================
@@ -207,6 +211,30 @@ def generate_synthetic_data():
     
     return final_df
 
+def generate_validation_data():
+    """
+    Generate a separate validation dataset with different athletes and time period.
+    This ensures the model is tested on truly unseen data.
+    """
+    global NUM_ATHLETES, DAYS_PER_ATHLETE, START_DATE
+    # Temporarily change settings for validation
+    original_athletes = NUM_ATHLETES
+    original_days = DAYS_PER_ATHLETE
+    original_start = START_DATE
+    
+    NUM_ATHLETES = VALIDATION_ATHLETES
+    DAYS_PER_ATHLETE = VALIDATION_DAYS
+    START_DATE = '2025-04-01'  # Different time period
+    
+    validation_df = generate_synthetic_data()
+    
+    # Restore original settings
+    NUM_ATHLETES = original_athletes
+    DAYS_PER_ATHLETE = original_days
+    START_DATE = original_start
+    
+    return validation_df
+
 if __name__ == "__main__":
     import os
     df = generate_synthetic_data()
@@ -215,3 +243,9 @@ if __name__ == "__main__":
     output_path = os.path.join(script_dir, 'athlete_injury_data.csv')
     df.to_csv(output_path, index=False)
     print(f"SUCCESS: Created {output_path}")
+    
+    # Also generate validation set
+    val_df = generate_validation_data()
+    val_output_path = os.path.join(script_dir, 'athlete_injury_validation.csv')
+    val_df.to_csv(val_output_path, index=False)
+    print(f"SUCCESS: Created validation set {val_output_path}")

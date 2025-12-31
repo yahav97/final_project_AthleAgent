@@ -127,7 +127,29 @@ if len(weak_features) > 0:
     print("-" * 60)
     for idx, row in weak_features.iterrows():
         print(f"  - {row['feature']:30s} (importance: {row['importance']:.4f})")
-    print("\n[TIP] Consider removing these features to reduce overfitting and improve model performance.")
+        # Explain why each feature might be weak
+        feature_name = row['feature']
+        if 'cadence' in feature_name.lower():
+            print(f"    -> Reason: Cadence is often redundant with distance/intensity")
+        elif 'calories' in feature_name.lower() and 'balance' not in feature_name.lower():
+            print(f"    -> Reason: Raw calories less predictive than calorie balance")
+        elif 'resting_hr' in feature_name.lower():
+            print(f"    -> Reason: HRV is more sensitive indicator than resting HR")
+        elif 'vo2_max' in feature_name.lower():
+            print(f"    -> Reason: Static metric, doesn't change daily")
+        elif 'bmi' in feature_name.lower():
+            print(f"    -> Reason: Less relevant for injury prediction than load metrics")
+    
+    print("\n[ACTION] Removing weak features to improve model performance...")
+    weak_feature_names = weak_features['feature'].tolist()
+    
+    # Remove weak features from datasets
+    X_train = X_train.drop(columns=weak_feature_names, errors='ignore')
+    X_test = X_test.drop(columns=weak_feature_names, errors='ignore')
+    X_train_scaled = X_train_scaled.drop(columns=weak_feature_names, errors='ignore')
+    X_test_scaled = X_test_scaled.drop(columns=weak_feature_names, errors='ignore')
+    
+    print(f"[OK] Removed {len(weak_feature_names)} weak features: {', '.join(weak_feature_names)}")
 else:
     print("\n[OK] No obviously weak features detected.")
 
@@ -142,8 +164,10 @@ print("=" * 60)
 models = {
     'Random Forest': {
         'model': RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
+            n_estimators=200,  # More trees for better performance
+            max_depth=15,  # Deeper trees
+            min_samples_split=10,  # Prevent overfitting
+            min_samples_leaf=5,  # Prevent overfitting
             random_state=42,
             class_weight='balanced'
         ),
@@ -154,7 +178,8 @@ models = {
             max_iter=2000,  # Increased iterations
             random_state=42,
             class_weight='balanced',
-            solver='lbfgs'  # Good default solver
+            solver='lbfgs',  # Good default solver
+            C=1.0  # Regularization strength
         ),
         'use_scaled': True  # Needs scaling
     },
@@ -163,7 +188,9 @@ models = {
             probability=True,
             random_state=42,
             class_weight='balanced',
-            kernel='rbf'
+            kernel='rbf',
+            C=1.0,  # Regularization
+            gamma='scale'  # Better default
         ),
         'use_scaled': True  # Needs scaling
     }
@@ -196,16 +223,27 @@ for name, model_config in models.items():
     print(f"\nTraining {name}...")
     model.fit(X_train_model, y_train)
     
-    # Predictions
-    y_pred = model.predict(X_test_model)
+    # Predictions with probability
     y_pred_proba = model.predict_proba(X_test_model)[:, 1]
     
-    # Calculate metrics
+    # For safety-focused model: Use balanced threshold (0.4 instead of 0.5)
+    # This means: "Better to warn about injury risk even if uncertain, but not too many false alarms"
+    # Threshold 0.4 balances Recall and Precision better than 0.3
+    safety_threshold = 0.4
+    y_pred = (y_pred_proba >= safety_threshold).astype(int)
+    
+    # Also calculate with default threshold for comparison
+    y_pred_default = model.predict(X_test_model)
+    
+    # Calculate metrics with safety threshold
     accuracy = accuracy_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred, zero_division=0)
     recall = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
     roc_auc = roc_auc_score(y_test, y_pred_proba)
+    
+    # Calculate default threshold metrics for comparison
+    recall_default = recall_score(y_test, y_pred_default, zero_division=0)
     
     # Cross-validation (use appropriate data scaling)
     cv_scores = cross_val_score(model, X_train_model, y_train, cv=5, scoring='f1')
@@ -216,14 +254,15 @@ for name, model_config in models.items():
         'Model': name,
         'Accuracy': accuracy,
         'Precision': precision,
-        'Recall': recall,
+        'Recall': recall,  # With safety threshold (0.3)
+        'Recall_Default': recall_default,  # With default threshold (0.5)
         'F1-Score': f1,
         'ROC-AUC': roc_auc,
         'CV F1-Mean': cv_mean,
         'CV F1-Std': cv_std
     })
     
-    print(f"  ✓ F1-Score: {f1:.4f}, ROC-AUC: {roc_auc:.4f}")
+    print(f"  ✓ F1-Score: {f1:.4f}, Recall (safety): {recall:.4f}, ROC-AUC: {roc_auc:.4f}")
 
 # Create comparison DataFrame
 results_df = pd.DataFrame(results)
@@ -233,16 +272,32 @@ print("MODEL COMPARISON RESULTS")
 print("=" * 60)
 print("\n" + results_df.to_string(index=False))
 
-# Find best model
-best_model_idx = results_df['F1-Score'].idxmax()
+# Find best model - prioritize Recall (safety) over F1-Score
+# For injury prediction, we want to catch as many injuries as possible
+print("\n" + "=" * 60)
+print("SELECTING BEST MODEL (Safety-Focused)")
+print("=" * 60)
+print("Priority: Balanced Recall and Precision (catch injuries but minimize false alarms)")
+print("Using safety threshold: 0.4 (instead of default 0.5)")
+
+# Balanced score: 40% Recall, 40% Precision, 20% F1-Score
+# This ensures we catch injuries but don't have too many false positives
+results_df['Balanced_Score'] = 0.4 * results_df['Recall'] + 0.4 * results_df['Precision'] + 0.2 * results_df['F1-Score']
+results_df['Safety_Score'] = results_df['Balanced_Score']  # Keep for compatibility
+# Find best model - prioritize balanced performance
+best_model_idx = results_df['Balanced_Score'].idxmax()
 best_model_name = results_df.loc[best_model_idx, 'Model']
 best_model_config = list(models.values())[best_model_idx]
 best_model = best_model_config['model']
 best_use_scaled = best_model_config['use_scaled']
 
 print(f"\n[BEST MODEL] {best_model_name}")
-print(f"   F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
-print(f"   ROC-AUC: {results_df.loc[best_model_idx, 'ROC-AUC']:.4f}")
+print(f"  Balanced Score: {results_df.loc[best_model_idx, 'Balanced_Score']:.4f}")
+print(f"  Accuracy: {results_df.loc[best_model_idx, 'Accuracy']:.4f}")
+print(f"  Precision: {results_df.loc[best_model_idx, 'Precision']:.4f}")
+print(f"  Recall: {results_df.loc[best_model_idx, 'Recall']:.4f}")
+print(f"  F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
+print(f"  ROC-AUC: {results_df.loc[best_model_idx, 'ROC-AUC']:.4f}")
 
 # ============================================================================
 # DETAILED EVALUATION OF BEST MODEL
@@ -267,8 +322,10 @@ print("MODEL EVALUATION - TEST SET PERFORMANCE")
 print("=" * 60)
 
 # Predictions (using appropriate scaled/unscaled data)
-y_pred = model.predict(X_test_best)
+# Use safety threshold for final predictions
+safety_threshold = 0.4  # Balanced threshold
 y_pred_proba = model.predict_proba(X_test_best)[:, 1]
+y_pred = (y_pred_proba >= safety_threshold).astype(int)
 
 # Calculate metrics
 accuracy = accuracy_score(y_test, y_pred)
@@ -311,7 +368,9 @@ print("\n" + "=" * 60)
 print("CROSS-VALIDATION (5-fold)")
 print("=" * 60)
 
-cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='f1')
+# Use appropriate data for cross-validation
+X_train_cv = X_train_scaled if best_use_scaled else X_train
+cv_scores = cross_val_score(model, X_train_cv, y_train, cv=5, scoring='f1')
 print(f"F1-Score: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
 print(f"Individual fold scores: {cv_scores}")
 
@@ -379,13 +438,87 @@ comparison_path = os.path.join(script_dir, 'model_comparison.csv')
 results_df.to_csv(comparison_path, index=False)
 print(f"[OK] Model comparison saved to {comparison_path}")
 
+# ============================================================================
+# EVALUATION ON NEW DATA (Validation Set)
+# ============================================================================
+
+print("\n" + "=" * 60)
+print("EVALUATION ON NEW DATA (Validation Set)")
+print("=" * 60)
+
+# Generate new validation data
+print("\nGenerating new validation dataset...")
+from data_generator import generate_validation_data
+
+validation_df = generate_validation_data()
+X_val = validation_df.drop('injury_tomorrow', axis=1)
+y_val = validation_df['injury_tomorrow']
+
+# Remove weak features if they were removed
+if len(weak_features) > 0:
+    weak_feature_names = weak_features['feature'].tolist()
+    X_val = X_val.drop(columns=weak_feature_names, errors='ignore')
+
+# Scale if needed
+if best_use_scaled:
+    X_val_scaled = scaler.transform(X_val)
+    X_val_scaled = pd.DataFrame(X_val_scaled, columns=X_val.columns, index=X_val.index)
+    X_val_model = X_val_scaled
+else:
+    X_val_model = X_val
+
+# Predictions on new data with safety threshold
+safety_threshold = 0.4  # Balanced threshold
+y_val_proba = model.predict_proba(X_val_model)[:, 1]
+y_val_pred = (y_val_proba >= safety_threshold).astype(int)
+
+# Calculate metrics on new data
+val_accuracy = accuracy_score(y_val, y_val_pred)
+val_precision = precision_score(y_val, y_val_pred, zero_division=0)
+val_recall = recall_score(y_val, y_val_pred, zero_division=0)
+val_f1 = f1_score(y_val, y_val_pred, zero_division=0)
+val_roc_auc = roc_auc_score(y_val, y_val_proba)
+
+print(f"\nValidation Set Performance (New Data):")
+print(f"  Accuracy:  {val_accuracy:.4f} ({val_accuracy*100:.2f}%)")
+print(f"  Precision: {val_precision:.4f} ({val_precision*100:.2f}%)")
+print(f"  Recall:    {val_recall:.4f} ({val_recall*100:.2f}%)")
+print(f"  F1-Score:  {val_f1:.4f} ({val_f1*100:.2f}%)")
+print(f"  ROC-AUC:   {val_roc_auc:.4f} ({val_roc_auc*100:.2f}%)")
+
+# Confusion Matrix on validation
+val_cm = confusion_matrix(y_val, y_val_pred)
+print(f"\nValidation Confusion Matrix:")
+print(f"  True Negatives:  {val_cm[0,0]}")
+print(f"  False Positives: {val_cm[0,1]} (warned but no injury - acceptable)")
+print(f"  False Negatives: {val_cm[1,0]} (missed injury - CRITICAL)")
+print(f"  True Positives:  {val_cm[1,1]}")
+
+# Calculate injury risk percentage for sample predictions
+print(f"\n[INJURY RISK PREDICTION EXAMPLES]")
+print("-" * 60)
+sample_indices = np.random.choice(len(X_val), min(5, len(X_val)), replace=False)
+for idx in sample_indices:
+    risk_percent = y_val_proba[idx] * 100
+    actual = y_val.iloc[idx]
+    predicted = y_val_pred[idx]
+    status = "CORRECT" if predicted == actual else "MISSED" if actual == 1 else "FALSE ALARM"
+    print(f"  Sample {idx}: {risk_percent:.1f}% risk | Actual: {'Injury' if actual else 'No Injury'} | {status}")
+
 print("\n" + "=" * 60)
 print("TRAINING COMPLETE!")
 print("=" * 60)
 print(f"\n[SUMMARY]")
 print(f"   Best Model: {best_model_name}")
-print(f"   F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
-print(f"   ROC-AUC: {results_df.loc[best_model_idx, 'ROC-AUC']:.4f}")
+print(f"   Safety Threshold: {safety_threshold} (balanced for Recall and Precision)")
+print(f"   Test Accuracy: {results_df.loc[best_model_idx, 'Accuracy']:.4f}")
+print(f"   Test Precision: {results_df.loc[best_model_idx, 'Precision']:.4f}")
+print(f"   Test Recall: {results_df.loc[best_model_idx, 'Recall']:.4f}")
+print(f"   Test F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
+print(f"   Validation Accuracy: {val_accuracy:.4f}")
+print(f"   Validation Precision: {val_precision:.4f}")
+print(f"   Validation Recall: {val_recall:.4f}")
+print(f"   Validation F1-Score: {val_f1:.4f}")
 if len(weak_features) > 0:
-    print(f"   [WARNING] {len(weak_features)} weak features identified - consider removal")
+    print(f"   [INFO] {len(weak_features)} weak features removed")
 print("=" * 60)
