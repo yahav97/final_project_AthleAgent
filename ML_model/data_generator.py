@@ -188,59 +188,86 @@ def generate_synthetic_data():
     df['hrv_drop'] = df['hrv_score'] - df['hrv_rolling_7d']
 
     # ============================================================================
-    # INJURY RISK CALCULATION (IMPROVED - More Realistic)
+    # INJURY RISK CALCULATION (Optimized for Balanced Learning)
     # ============================================================================
     # Based on research-validated risk factors
-    # Uses multiplicative/weighted approach instead of simple addition
+    # Adjusted to create balanced dataset (25-30% injuries) for better model learning
+    # Uses multiplicative/weighted approach - more aggressive to create more injuries
     def calculate_injury_risk(row):
-        base_risk = 0.03  # Lower base risk (3%)
+        base_risk = 0.08  # Higher base risk (8%) to create more injuries for learning
         
-        # Calculate risk multipliers (more realistic than addition)
+        # Calculate risk multipliers (more aggressive to create balanced dataset)
         risk_multiplier = 1.0
         
-        # ACWR > 1.4: High acute-to-chronic workload (Gabbett, 2016)
+        # ACWR > 1.2: High acute-to-chronic workload (Gabbett, 2016)
+        # Lowered threshold significantly to catch more cases
         # Strongest predictor - multiplies risk by 3-5x
         if row['acwr_ratio'] > 1.5:
-            risk_multiplier *= 4.0  # Very high ACWR
+            risk_multiplier *= 5.0  # Very high ACWR
         elif row['acwr_ratio'] > 1.4:
-            risk_multiplier *= 2.5  # High ACWR
+            risk_multiplier *= 3.5  # High ACWR
+        elif row['acwr_ratio'] > 1.3:
+            risk_multiplier *= 2.5  # Moderate-high ACWR
+        elif row['acwr_ratio'] > 1.2:  # Even lower threshold
+            risk_multiplier *= 1.8  # Moderate ACWR
         
-        # Sleep debt > 5 hours: Significant sleep deprivation
-        # Multiplies risk by 1.5-2x
+        # Sleep debt > 3 hours: Significant sleep deprivation
+        # Lowered threshold significantly to catch more cases
+        # Multiplies risk by 1.5-2.5x
         if row['sleep_debt_3d'] > 8:
-            risk_multiplier *= 2.0  # Very high sleep debt
+            risk_multiplier *= 2.5  # Very high sleep debt
         elif row['sleep_debt_3d'] > 5:
-            risk_multiplier *= 1.5  # High sleep debt
+            risk_multiplier *= 2.0  # High sleep debt
+        elif row['sleep_debt_3d'] > 3:  # Lower threshold
+            risk_multiplier *= 1.5  # Moderate sleep debt
         
-        # HRV drop < -8: Significant autonomic nervous system stress
-        # Multiplies risk by 1.5-2x
+        # HRV drop < -5: Significant autonomic nervous system stress
+        # Lowered threshold significantly to catch more cases
+        # Multiplies risk by 1.5-2.5x
         if row['hrv_drop'] < -12:
-            risk_multiplier *= 2.0  # Very large HRV drop
+            risk_multiplier *= 2.5  # Very large HRV drop
         elif row['hrv_drop'] < -8:
-            risk_multiplier *= 1.5  # Significant HRV drop
+            risk_multiplier *= 2.0  # Significant HRV drop
+        elif row['hrv_drop'] < -5:  # Lower threshold
+            risk_multiplier *= 1.5  # Moderate HRV drop
         
-        # High stress level (>=8/10): Psychological stress
-        # Multiplies risk by 1.3-1.6x
+        # High stress level (>=6/10): Psychological stress
+        # Lowered threshold significantly to catch more cases
+        # Multiplies risk by 1.2-1.8x
         if row['stress_level'] >= 9:
-            risk_multiplier *= 1.6  # Very high stress
+            risk_multiplier *= 1.8  # Very high stress
         elif row['stress_level'] >= 8:
-            risk_multiplier *= 1.3  # High stress
+            risk_multiplier *= 1.5  # High stress
+        elif row['stress_level'] >= 6:  # Lower threshold
+            risk_multiplier *= 1.3  # Moderate-high stress
         
-        # Previous injuries (>1): History is a risk factor
+        # Previous injuries (>=1): History is a risk factor
+        # Any injury history significantly increases risk
         # Adds base risk increase
         history_risk = 0.0
         if row['history_injury_count'] >= 3:
-            history_risk = 0.08  # High history
+            history_risk = 0.12  # High history
         elif row['history_injury_count'] >= 2:
-            history_risk = 0.05  # Medium history
+            risk_multiplier *= 1.3  # Medium history - also multiplies
+            history_risk = 0.08
         elif row['history_injury_count'] >= 1:
-            history_risk = 0.02  # Low history
+            risk_multiplier *= 1.2  # Low history - also multiplies
+            history_risk = 0.05
+        
+        # Additional factors that increase risk
+        # High training load without proper recovery
+        if row['daily_distance_km'] > 10 and row['sleep_hours'] < 6:
+            risk_multiplier *= 1.4  # High load + poor sleep
+        
+        # Poor calorie balance (negative = not enough fuel)
+        if row['calorie_balance'] < -500:
+            risk_multiplier *= 1.3  # Significant calorie deficit
         
         # Calculate final risk: base * multiplier + history
         risk = (base_risk * risk_multiplier) + history_risk
         
-        # Cap risk between 2% and 75% (more realistic range)
-        return min(0.75, max(0.02, risk))
+        # Cap risk between 5% and 90% (allows more injuries for learning)
+        return min(0.90, max(0.05, risk))
 
     # Generate injury labels based on calculated risk probability
     # Each row has a probability of injury, we sample from it

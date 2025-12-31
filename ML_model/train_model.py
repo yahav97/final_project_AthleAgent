@@ -148,11 +148,18 @@ if len(weak_features) > 0:
     # This is more conservative - keeps features that might still contribute
     X_train = X_train.drop(columns=weak_feature_names, errors='ignore')
     X_test = X_test.drop(columns=weak_feature_names, errors='ignore')
-    X_train_scaled = X_train_scaled.drop(columns=weak_feature_names, errors='ignore')
-    X_test_scaled = X_test_scaled.drop(columns=weak_feature_names, errors='ignore')
     
     print(f"[OK] Removed {len(weak_feature_names)} very weak features: {', '.join(weak_feature_names)}")
     print(f"[INFO] Keeping other features even if low importance - they may still contribute")
+    
+    # Recreate scaler with remaining features only (critical for validation set)
+    # This ensures scaler only knows about features that remain after removal
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns, index=X_train.index)
+    X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns, index=X_test.index)
+    print("[OK] Scaler recreated with remaining features only")
 else:
     print("\n[OK] No obviously weak features detected.")
 
@@ -229,10 +236,10 @@ for name, model_config in models.items():
     # Predictions with probability
     y_pred_proba = model.predict_proba(X_test_model)[:, 1]
     
-    # For safety-focused model: Use balanced threshold (0.4 instead of 0.5)
-    # This means: "Better to warn about injury risk even if uncertain, but not too many false alarms"
-    # Threshold 0.4 balances Recall and Precision better than 0.3
-    safety_threshold = 0.4
+    # For safety-focused model: Use lower threshold to catch more injuries
+    # With severe class imbalance, need lower threshold to detect injuries
+    # Threshold 0.2-0.25 is better for imbalanced data
+    safety_threshold = 0.25  # Lower threshold to catch more injuries
     y_pred = (y_pred_proba >= safety_threshold).astype(int)
     
     # Also calculate with default threshold for comparison
@@ -280,17 +287,17 @@ print("\n" + results_df.to_string(index=False))
 print("\n" + "=" * 60)
 print("SELECTING BEST MODEL (Safety-Focused)")
 print("=" * 60)
-print("Priority: Balanced Recall and Precision (catch injuries but minimize false alarms)")
-print("Using safety threshold: 0.4 (instead of default 0.5)")
+print("Priority: High Recall (catch injuries) - class imbalance requires lower threshold")
+print("Using safety threshold: 0.25 (lower to detect more injuries in imbalanced data)")
 
-# Balanced score: 30% Accuracy, 30% Precision, 25% Recall, 15% F1-Score
-# This ensures we catch injuries but don't have too many false positives
-# Accuracy is important to avoid too many false alarms
+# For imbalanced data: Prioritize Recall and F1-Score over Accuracy
+# High Accuracy with low Recall means model predicts "no injury" always
+# Better to have lower Accuracy but catch injuries (higher Recall)
 results_df['Balanced_Score'] = (
-    0.30 * results_df['Accuracy'] + 
-    0.30 * results_df['Precision'] + 
-    0.25 * results_df['Recall'] + 
-    0.15 * results_df['F1-Score']
+    0.15 * results_df['Accuracy'] +  # Lower weight - can be misleading with imbalance
+    0.25 * results_df['Precision'] + 
+    0.35 * results_df['Recall'] +    # Higher weight - must catch injuries
+    0.25 * results_df['F1-Score']    # F1 balances Precision and Recall
 )
 results_df['Safety_Score'] = results_df['Balanced_Score']  # Keep for compatibility
 
@@ -341,7 +348,7 @@ print("=" * 60)
 
 # Predictions (using appropriate scaled/unscaled data)
 # Use safety threshold for final predictions
-safety_threshold = 0.4  # Balanced threshold
+safety_threshold = 0.25  # Lower threshold for imbalanced data
 y_pred_proba = model.predict_proba(X_test_best)[:, 1]
 y_pred = (y_pred_proba >= safety_threshold).astype(int)
 
@@ -473,13 +480,22 @@ X_val = validation_df.drop('injury_tomorrow', axis=1)
 y_val = validation_df['injury_tomorrow']
 
 # Remove weak features if they were removed (MUST match training features)
+# This ensures validation set has same features as training set
 if len(weak_features) > 0:
     weak_feature_names = weak_features['feature'].tolist()
     X_val = X_val.drop(columns=weak_feature_names, errors='ignore')
 
 # Ensure validation set has same features as training set (in same order)
 # This is critical for scaling to work correctly
-X_val = X_val[X_train.columns]  # Reorder and ensure same features
+# Only keep features that exist in both sets and in same order
+missing_features = [f for f in X_train.columns if f not in X_val.columns]
+if missing_features:
+    print(f"[WARNING] Missing features in validation set: {missing_features}")
+    print("[INFO] Adding missing features with zero values...")
+    for f in missing_features:
+        X_val[f] = 0
+
+X_val = X_val[X_train.columns]  # Ensure exact same order as training
 
 # Scale if needed
 if best_use_scaled:
@@ -490,7 +506,7 @@ else:
     X_val_model = X_val
 
 # Predictions on new data with safety threshold
-safety_threshold = 0.4  # Balanced threshold
+safety_threshold = 0.25  # Lower threshold for imbalanced data
 y_val_proba = model.predict_proba(X_val_model)[:, 1]
 y_val_pred = (y_val_proba >= safety_threshold).astype(int)
 
@@ -516,16 +532,70 @@ print(f"  False Positives: {val_cm[0,1]} (warned but no injury - acceptable)")
 print(f"  False Negatives: {val_cm[1,0]} (missed injury - CRITICAL)")
 print(f"  True Positives:  {val_cm[1,1]}")
 
-# Calculate injury risk percentage for sample predictions
-print(f"\n[INJURY RISK PREDICTION EXAMPLES]")
+# Calculate injury risk percentage for all validation samples
+print(f"\n[INJURY RISK PREDICTION - ALL VALIDATION SAMPLES]")
 print("-" * 60)
-sample_indices = np.random.choice(len(X_val), min(5, len(X_val)), replace=False)
-for idx in sample_indices:
+print(f"Total validation samples: {len(X_val)}")
+print(f"\nRisk Distribution:")
+print(f"  Low risk (0-30%):    {np.sum((y_val_proba < 0.3))} samples ({np.sum((y_val_proba < 0.3))/len(y_val_proba)*100:.1f}%)")
+print(f"  Medium risk (30-60%): {np.sum((y_val_proba >= 0.3) & (y_val_proba < 0.6))} samples ({np.sum((y_val_proba >= 0.3) & (y_val_proba < 0.6))/len(y_val_proba)*100:.1f}%)")
+print(f"  High risk (60-100%):  {np.sum((y_val_proba >= 0.6))} samples ({np.sum((y_val_proba >= 0.6))/len(y_val_proba)*100:.1f}%)")
+
+# Show detailed examples with risk percentages
+print(f"\n[DETAILED RISK PREDICTIONS - SAMPLE EXAMPLES]")
+print("-" * 60)
+print(f"{'Sample':<8} {'Risk %':<10} {'Predicted':<12} {'Actual':<12} {'Status':<15}")
+print("-" * 60)
+
+# Show examples from different risk ranges
+sample_indices = []
+# High risk examples
+high_risk_indices = np.where(y_val_proba >= 0.6)[0]
+if len(high_risk_indices) > 0:
+    sample_indices.extend(np.random.choice(high_risk_indices, min(3, len(high_risk_indices)), replace=False))
+# Medium risk examples
+medium_risk_indices = np.where((y_val_proba >= 0.3) & (y_val_proba < 0.6))[0]
+if len(medium_risk_indices) > 0:
+    sample_indices.extend(np.random.choice(medium_risk_indices, min(3, len(medium_risk_indices)), replace=False))
+# Low risk examples
+low_risk_indices = np.where(y_val_proba < 0.3)[0]
+if len(low_risk_indices) > 0:
+    sample_indices.extend(np.random.choice(low_risk_indices, min(3, len(low_risk_indices)), replace=False))
+
+for idx in sample_indices[:10]:  # Show up to 10 examples
     risk_percent = y_val_proba[idx] * 100
     actual = y_val.iloc[idx]
     predicted = y_val_pred[idx]
+    actual_label = "Injury" if actual == 1 else "No Injury"
+    predicted_label = "Injury" if predicted == 1 else "No Injury"
     status = "CORRECT" if predicted == actual else "MISSED" if actual == 1 else "FALSE ALARM"
-    print(f"  Sample {idx}: {risk_percent:.1f}% risk | Actual: {'Injury' if actual else 'No Injury'} | {status}")
+    print(f"{idx:<8} {risk_percent:>6.1f}%    {predicted_label:<12} {actual_label:<12} {status:<15}")
+
+# Summary statistics
+print(f"\n[RISK PERCENTAGE STATISTICS]")
+print("-" * 60)
+print(f"  Mean risk: {np.mean(y_val_proba)*100:.2f}%")
+print(f"  Median risk: {np.median(y_val_proba)*100:.2f}%")
+print(f"  Min risk: {np.min(y_val_proba)*100:.2f}%")
+print(f"  Max risk: {np.max(y_val_proba)*100:.2f}%")
+print(f"  Std deviation: {np.std(y_val_proba)*100:.2f}%")
+
+# Save validation predictions with risk percentages to CSV
+validation_results = pd.DataFrame({
+    'sample_index': range(len(X_val)),
+    'injury_risk_percentage': y_val_proba * 100,
+    'predicted_injury': y_val_pred,
+    'actual_injury': y_val.values,
+    'correct': (y_val_pred == y_val.values).astype(int)
+})
+validation_results['risk_level'] = validation_results['injury_risk_percentage'].apply(
+    lambda x: 'High' if x >= 60 else 'Medium' if x >= 30 else 'Low'
+)
+
+validation_results_path = os.path.join(script_dir, 'validation_risk_predictions.csv')
+validation_results.to_csv(validation_results_path, index=False)
+print(f"\n[OK] Validation risk predictions saved to {validation_results_path}")
+print(f"     This file contains risk percentage for each validation sample (0-100%)")
 
 print("\n" + "=" * 60)
 print("TRAINING COMPLETE!")
