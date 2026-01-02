@@ -1,57 +1,81 @@
+"""
+AthleAgent FastAPI Backend
+Main application entry point.
+"""
+
 from fastapi import FastAPI
-from pydantic import BaseModel
-import joblib
-import pandas as pd
-import os
+from fastapi.middleware.cors import CORSMiddleware
+from config import settings
+from utils.logging import logger
 
-app = FastAPI()
+# Import all models to register them
+from models import (
+    User, Team, TeamMember, JoinRequest,
+    DailyRecord, Prediction, NutritionRecord,
+    StressSurvey, HealthConnectPermission, Injury
+)
 
-# Load the model
-script_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(script_dir, 'injury_model.pkl')
-model = None
+# Initialize FastAPI app
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="Smart injury risk prediction system using ML"
+)
 
-if os.path.exists(model_path):
-    model = joblib.load(model_path)
-    print("Model loaded successfully!")
-else:
-    print(f"WARNING: Model file not found at {model_path}. Please run train_model.py first.")
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class AthleteData(BaseModel):
-    age: int
-    bmi: float
-    history_injury_count: int
-    vo2_max: int
-    daily_distance_km: float
-    workout_intensity_minutes: int
-    avg_cadence: int
-    sleep_hours: float
-    hrv_score: int
-    resting_hr: int
-    daily_calories: int
-    total_calories_burned: int
-    calorie_balance: int
-    stress_level: int
-    muscle_soreness: int
-    acute_load_7d: float
-    chronic_load_21d: float
-    acwr_ratio: float
-    sleep_debt_3d: float
-    hrv_drop: float
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize on startup."""
+    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
+    logger.info("Database models loaded")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down server")
+
 
 @app.get("/")
-def read_root():
-    return {"status": "Server is running"}
-
-@app.post("/predict")
-def predict_injury(data: AthleteData):
-    if model is None:
-        return {"error": "Model not loaded"}
-    
-    input_df = pd.DataFrame([data.model_dump()])
-    risk_probability = model.predict_proba(input_df)[0][1]
-    
+async def root():
+    """Root endpoint - health check."""
     return {
-        "risk_percentage": round(risk_probability * 100, 1),
-        "risk_level": "High" if risk_probability > 0.6 else "Medium" if risk_probability > 0.3 else "Low"
+        "status": "ok",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION
     }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+# TODO: Add route imports when ready
+# from api.routes import auth, predictions, daily_data, nutrition, teams
+# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+# app.include_router(predictions.router, prefix="/api/v1/predictions", tags=["Predictions"])
+# app.include_router(daily_data.router, prefix="/api/v1/daily-data", tags=["Daily Data"])
+# app.include_router(nutrition.router, prefix="/api/v1/nutrition", tags=["Nutrition"])
+# app.include_router(teams.router, prefix="/api/v1/teams", tags=["Teams"])
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
