@@ -61,13 +61,22 @@ async def health_check():
     return {"status": "healthy"}
 
 
-# TODO: Add route imports when ready
-# from api.routes import auth, predictions, daily_data, nutrition, teams
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-# app.include_router(predictions.router, prefix="/api/v1/predictions", tags=["Predictions"])
-# app.include_router(daily_data.router, prefix="/api/v1/daily-data", tags=["Daily Data"])
-# app.include_router(nutrition.router, prefix="/api/v1/nutrition", tags=["Nutrition"])
-# app.include_router(teams.router, prefix="/api/v1/teams", tags=["Teams"])
+# Import and register API routes
+from api.routes import auth
+
+# Register authentication routes
+app.include_router(
+    auth.router,
+    prefix=settings.API_V1_PREFIX + "/auth",
+    tags=["Authentication"],
+)
+
+# TODO: Add other route imports when ready
+# from api.routes import predictions, daily_data, nutrition, teams
+# app.include_router(predictions.router, prefix=settings.API_V1_PREFIX + "/predictions", tags=["Predictions"])
+# app.include_router(daily_data.router, prefix=settings.API_V1_PREFIX + "/daily-data", tags=["Daily Data"])
+# app.include_router(nutrition.router, prefix=settings.API_V1_PREFIX + "/nutrition", tags=["Nutrition"])
+# app.include_router(teams.router, prefix=settings.API_V1_PREFIX + "/teams", tags=["Teams"])
 
 
 if __name__ == "__main__":
@@ -76,6 +85,8 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
-        log_level="info"
+        # reload=True causes the watchfiles spam; we keep it off for cleaner logs
+        reload=False,
+        # show only warnings/errors from uvicorn & watchfiles
+        log_level="warning",
     )

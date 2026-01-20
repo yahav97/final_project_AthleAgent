@@ -44,3 +44,4 @@ class User(Base):
     team_memberships = relationship("TeamMember", back_populates="athlete", foreign_keys="TeamMember.athlete_id")
     join_requests = relationship("JoinRequest", back_populates="athlete", foreign_keys="JoinRequest.athlete_id")
 
+
