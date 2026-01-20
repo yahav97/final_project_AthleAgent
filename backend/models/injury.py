@@ -30,3 +30,4 @@ class Injury(Base):
     # Relationships
     user = relationship("User", back_populates="injuries")
 
+

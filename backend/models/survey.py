@@ -36,3 +36,4 @@ class StressSurvey(Base):
     # Constraint: one survey per user per day
     __table_args__ = (UniqueConstraint("user_id", "date", name="unique_user_date_survey"),)
 
+

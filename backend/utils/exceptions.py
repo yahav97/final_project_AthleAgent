@@ -42,3 +42,4 @@ class ExternalAPIError(AthleAgentException):
     """External API call failed."""
     pass
 
+

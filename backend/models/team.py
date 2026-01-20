@@ -64,3 +64,4 @@ class JoinRequest(Base):
     # Constraint: one pending request per team per athlete
     __table_args__ = (UniqueConstraint("team_id", "athlete_id", name="unique_team_athlete_request"),)
 
+

@@ -38,3 +38,4 @@ class NutritionRecord(Base):
     # Relationships
     user = relationship("User", back_populates="nutrition_records")
 
+

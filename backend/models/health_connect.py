@@ -30,3 +30,4 @@ class HealthConnectPermission(Base):
     # Relationships
     user = relationship("User", back_populates="health_connect_permission")
 
+
