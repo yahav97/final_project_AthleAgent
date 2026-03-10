@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_daily"
+    android:fillViewport="true">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_24">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="@dimen/spacing_24"
+            android:layout_marginBottom="@dimen/spacing_64">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/daily_check_in"
+                android:textSize="@dimen/headline_text_survey"
+                android:fontFamily="@font/roboto_bold"
+                android:textColor="@color/text"/>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/how_is_your_energy_level_today"
+            android:textSize="@dimen/login_text_size"
+            android:textColor="@color/text"
+            android:fontFamily="@font/roboto_bold"
+            android:layout_marginBottom="@dimen/spacing_20"/>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/checkin_SLD_energy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:value="60"
+            android:valueFrom="0"
+            android:valueTo="100"
+            app:thumbColor="@color/gray"
+            app:trackColorActive="@color/brand_button_light_muted"
+            app:trackColorInactive="@color/inactive" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="@dimen/spacing_8"
+            android:layout_marginBottom="@dimen/spacing_32">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/emoji_very_sad"
+                android:textSize="@dimen/stickers_size"
+                android:gravity="center"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/emoji_sad"
+                android:textSize="@dimen/stickers_size"
+                android:gravity="center"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/emoji_neutral"
+                android:textSize="@dimen/stickers_size"
+                android:gravity="center"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/emoji_happy"
+                android:textSize="@dimen/stickers_size"
+                android:gravity="center"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/emoji_very_happy"
+                android:textSize="@dimen/stickers_size"
+                android:gravity="center"/>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1.5dp"
+            android:background="@color/text_color_secondary"
+            android:layout_marginBottom="@dimen/spacing_32"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/daily_check_in_muscle"
+            android:textSize="@dimen/login_text_size"
+            android:textColor="@color/text"
+            android:fontFamily="@font/roboto_bold"
+            android:layout_marginBottom="@dimen/spacing_20"/>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="@dimen/spacing_32">
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/checkin_BTN_1"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:text="@string/number_1"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/brand_button_dark_muted"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:strokeColor="@color/brand_button_dark_muted"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="@dimen/spacing_8"
+                />
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/checkin_BTN_2"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:text="@string/number_2"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/brand_button_dark_muted"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:strokeColor="@color/brand_button_dark_muted"
+                app:cornerRadius="@dimen/spacing_8"
+                app:strokeWidth="1.5dp"
+                />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/checkin_BTN_3"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:text="@string/number_3"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/white"
+                android:background="@drawable/btn_gradient"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:backgroundTint="@null"
+                app:strokeWidth="1.5dp"
+                />
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/checkin_BTN_4"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:text="@string/number_4"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/brand_button_dark_muted"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:strokeColor="@color/brand_button_dark_muted"
+                app:cornerRadius="@dimen/spacing_8"
+                app:strokeWidth="1.5dp"
+                />
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/checkin_BTN_5"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:text="@string/number_5"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/brand_button_dark_muted"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:strokeColor="@color/brand_button_dark_muted"
+                app:cornerRadius="@dimen/spacing_8"
+                app:strokeWidth="1.5dp"
+                />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1.5dp"
+            android:background="@color/text_color_secondary"
+            android:layout_marginBottom="@dimen/spacing_32"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/stress_level_question"
+            android:textSize="@dimen/login_text_size"
+            android:textColor="@color/text"
+            android:fontFamily="@font/roboto_bold"
+            android:layout_marginBottom="@dimen/spacing_20"/>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/checkin_SLD_stress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:value="30"
+            android:valueFrom="0"
+            android:valueTo="100"
+            app:thumbColor="@color/gray"
+            app:trackColorActive="@color/brand_button_light_muted"
+            app:trackColorInactive="@color/inactive" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/spacing_4"
+            android:layout_marginBottom="@dimen/spacing_48">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/low"
+                android:textSize="@dimen/text_size_body"
+                android:textColor="@color/text"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/high"
+                android:textSize="@dimen/text_size_body"
+                android:textColor="@color/text"/>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dailyCheckIn_BTN_submit"
+            android:layout_width="@dimen/button_width"
+            android:layout_height="@dimen/min_height"
+            android:layout_marginTop="@dimen/spacing_20"
+            android:layout_gravity="center"
+            android:text="@string/submit"
+            android:textAllCaps="false"
+            android:background="@drawable/btn_gradient"
+            android:fontFamily="@font/roboto_bold"
+            android:textColor="@color/background_gray_smoke"
+            android:textSize="@dimen/login_text_size"
+            app:backgroundTint="@null"
+            app:strokeColor="@color/aa_button_primary_bg"
+            app:strokeWidth="@dimen/button_stroke_width"
+            app:cornerRadius="@dimen/button_corner_radius"
+            />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+</ScrollView>

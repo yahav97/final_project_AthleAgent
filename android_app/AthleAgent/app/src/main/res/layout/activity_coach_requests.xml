@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_ghost"
+    android:orientation="vertical">
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/background_white_snow"
+        android:elevation="@dimen/spacing_4"
+        android:padding="@dimen/spacing_20"
+        android:text="@string/pending_requests"
+        android:textColor="@color/text"
+        android:textSize="@dimen/team_text_size"
+        android:fontFamily="@font/roboto_bold"
+         />
+
+    <ProgressBar
+        android:id="@+id/requests_progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="@dimen/spacing_32" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/requests_LBL_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_64"
+        android:gravity="center"
+        android:text="@string/no_pending_requests_at_the_moment"
+        android:textColor="@color/brand_button_dark_muted"
+        android:textSize="@dimen/text_size_input"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/requests_recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingTop="@dimen/spacing_8"
+        android:paddingBottom="@dimen/spacing_16"/>
+
+</androidx.appcompat.widget.LinearLayoutCompat>

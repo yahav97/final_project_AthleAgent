@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dash"
+    android:baselineAligned="false"
+    android:orientation="horizontal">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:background="@color/background_white_snow"
+        android:elevation="@dimen/spacing_4">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/team_roster"
+            android:textSize="@dimen/team_text_size"
+            android:fontFamily="@font/roboto_bold"
+            android:textColor="@color/text"
+            android:padding="@dimen/spacing_20"
+            android:background="@color/background_white_snow"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1.5dp"
+            android:background="@color/charcoal_black"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/coachDash_RV_athletes"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/spacing_16"/>
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/coachDash_layout_details"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="2.2"
+        android:orientation="vertical"
+        android:padding="@dimen/spacing_24"
+        android:visibility="invisible">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/coachDash_TXT_athleteName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/select_an_athlete"
+            android:textSize="@dimen/headline_text_size"
+            android:fontFamily="@font/roboto_bold"
+            android:textColor="@color/text"
+            android:layout_marginBottom="@dimen/spacing_16"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/spacing_16"
+            app:cardBackgroundColor="@color/background_white_snow"
+            app:cardCornerRadius="@dimen/spacing_24"
+            app:cardElevation="2dp">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_24"
+                android:gravity="center">
+
+                <RelativeLayout
+                    android:layout_width="@dimen/new_button_width"
+                    android:layout_height="@dimen/new_button_width">
+
+                    <ProgressBar
+                        android:id="@+id/coachDash_PRG_riskScore"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:indeterminate="false"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressDrawable="@drawable/progress_drawable_green" />
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_centerInParent="true"
+                        android:gravity="center">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/daily_risk_score1"
+                            android:textSize="@dimen/text_size_input"
+                            android:fontFamily="@font/roboto_bold"
+                            android:textColor="@color/text"/>
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/coachDash_TXT_score"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/pers1"
+                            android:textSize="@dimen/text_score"
+                            android:fontFamily="@font/roboto_bold"
+                            android:textColor="@color/orange_red"/>
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+                </RelativeLayout>
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/coachDash_TXT_aiRecommendation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/analyzing_data"
+                    android:textSize="@dimen/text_size_body"
+                    android:textColor="@color/text"
+                    android:textAlignment="center"
+                    android:fontFamily="@font/roboto_bold"
+                    android:lineSpacingExtra="@dimen/spacing_4"
+                    android:layout_marginTop="@dimen/spacing_16"/>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            app:cardBackgroundColor="@color/background_white_snow"
+            app:cardCornerRadius="@dimen/spacing_24"
+            app:cardElevation="2dp">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_20">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    tools:ignore="UseCompoundDrawables">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="@dimen/spacing_20"
+                        android:layout_height="@dimen/spacing_20"
+                        android:contentDescription="@string/risk_logo1"
+                        android:src="@android:drawable/ic_dialog_info"
+                        app:tint="@color/fui_bgTwitter"
+                        android:layout_marginEnd="@dimen/spacing_8"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/risk_score_last_7_days1"
+                        android:fontFamily="@font/roboto_bold"
+                        android:textSize="@dimen/text_size_body"
+                        android:textColor="@color/text"/>
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/risk_long_text"
+                    android:textSize="@dimen/text_medium"
+                    android:textColor="@color/text_color_secondary"
+                    android:fontFamily="@font/roboto_regular"
+                    android:layout_marginStart="@dimen/spacing_28"
+                    android:layout_marginBottom="@dimen/spacing_16"/>
+
+                <com.github.mikephil.charting.charts.LineChart
+                    android:id="@+id/coachDash_CHART_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</androidx.appcompat.widget.LinearLayoutCompat>

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "911171051713",
+    "project_id": "athleagent",
+    "storage_bucket": "athleagent.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:911171051713:android:4eef909296678c7556f440",
+        "android_client_info": {
+          "package_name": "com.yahav.athleagent"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "911171051713-hdgrhmscm5qgir6saklch2lehbn878u5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yahav.athleagent",
+            "certificate_hash": "9fa80823a1b007167a3b5322788b01654a061a60"
+          }
+        },
+        {
+          "client_id": "911171051713-4fet6ru7anta8lefffic8luv1eke33av.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1AGtXAVk6otWvIFZnsu0LGuU9lW-FAdU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "911171051713-4fet6ru7anta8lefffic8luv1eke33av.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

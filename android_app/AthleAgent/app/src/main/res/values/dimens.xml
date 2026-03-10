@@ -39,13 +39,15 @@
     <dimen name="spacing_176">176dp</dimen>
     <dimen name="spacing_212">212dp</dimen>
     <dimen name="spacing_220">220dp</dimen>
+    <dimen name="spacing_240">240dp</dimen>
+    <dimen name="spacing_600">600dp</dimen>
 
 
     <dimen name="logo_size">224dp</dimen>
     <dimen name="logo_height">148dp</dimen>
     <dimen name="logo_corner_radius">16dp</dimen>
     <dimen name="logo_elevation">8dp</dimen>
-
+    <dimen name="special_width">11dp</dimen>
     <dimen name="button_width">320dp</dimen>
     <dimen name="new_button_width">220dp</dimen>
     <dimen name="new_button_height">220dp</dimen>
@@ -61,12 +63,22 @@
     <dimen name="text_input_corner_radius">12dp</dimen>
     <dimen name="text_height">32dp</dimen>
 
-    <dimen name="text_size_body">16sp</dimen>
+    <dimen name="text_size_body">17sp</dimen>
+
     <dimen name="forgot_password_text_size">20sp</dimen>
     <dimen name="text_medium">15sp</dimen>
     <dimen name="text_small">10sp</dimen>
+    <dimen name="text_risk">12sp</dimen>
     <dimen name="text_size_input">16sp</dimen>
+    <dimen name="text_size_input_bigger">18sp</dimen>
     <dimen name="login_text_size">20sp</dimen>
+    <dimen name="team_text_size">22sp</dimen>
+    <dimen name="team_text">24sp</dimen>
+    <dimen name="headline_text_size">28sp</dimen>
+    <dimen name="headline_text_survey">36sp</dimen>
+
+    <dimen name="stickers_size">30sp</dimen>
+    <dimen name="text_score">46sp</dimen>
 
     <dimen name="logo_radius">16dp</dimen>
     <dimen name="logo_shadow">12dp</dimen>

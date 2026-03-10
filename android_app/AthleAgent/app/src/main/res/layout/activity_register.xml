@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_alice_blue"
+    android:fillViewport="true"
+    tools:context=".ui.auth.RegisterActivity">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/spacing_16">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:minHeight="@dimen/spacing_600"
+            app:cardBackgroundColor="@color/white"
+            app:cardCornerRadius="@dimen/spacing_28"
+            app:cardElevation="@dimen/spacing_12"
+            app:strokeWidth="0dp">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_32">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:fontFamily="@font/roboto_bold"
+                    android:text="@string/set_your_account"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/team_text_size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="@dimen/spacing_40" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/register_TOGGLE_role"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/spacing_72"
+                    app:checkedButton="@id/register_BTN_athlete_role"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/register_BTN_athlete_role"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/spacing_64"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/roboto_bold"
+                        android:text="@string/athlete"
+                        android:textAllCaps="false"
+                        android:textSize="@dimen/text_size_input_bigger"
+                        app:strokeColor="@color/charcoal_black"
+                        app:strokeWidth="2dp"
+                        android:textColor="@color/text" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/register_BTN_coach_role"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/spacing_64"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/roboto_bold"
+                        android:text="@string/coach"
+                        android:textAllCaps="false"
+                        android:textSize="@dimen/text_size_input_bigger"
+                        app:strokeColor="@color/charcoal_black"
+                        app:strokeWidth="2dp"
+                        android:textColor="@color/text" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/spacing_20"
+                    app:boxCornerRadiusBottomEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusBottomStart="@dimen/spacing_16"
+                    app:boxCornerRadiusTopEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusTopStart="@dimen/spacing_16">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/register_ET_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_bold"
+                        android:hint="@string/full_name_hint"
+                        android:inputType="textPersonName"
+                        android:padding="@dimen/spacing_16" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/spacing_20"
+                    app:boxCornerRadiusBottomEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusBottomStart="@dimen/spacing_16"
+                    app:boxCornerRadiusTopEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusTopStart="@dimen/spacing_16">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/register_ET_email"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_bold"
+                        android:hint="@string/email_address_hint"
+                        android:inputType="textEmailAddress"
+                        android:padding="@dimen/spacing_16" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/spacing_48"
+                    app:boxCornerRadiusBottomEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusBottomStart="@dimen/spacing_16"
+                    app:boxCornerRadiusTopEnd="@dimen/spacing_16"
+                    app:boxCornerRadiusTopStart="@dimen/spacing_16"
+                    app:passwordToggleEnabled="true">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/register_ET_password"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_bold"
+                        android:hint="@string/Password_text"
+                        android:inputType="textPassword"
+                        android:padding="@dimen/spacing_16" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/register_BTN_register"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/min_height"
+                    android:background="@drawable/btn_gradient"
+                    android:fontFamily="@font/roboto_bold"
+                    android:text="@string/create_account_text"
+                    android:textColor="@color/background_gray_smoke"
+                    android:textSize="@dimen/login_text_size"
+                    app:backgroundTint="@null"
+                    app:cornerRadius="@dimen/button_corner_radius"
+                    app:strokeColor="@color/aa_button_primary_bg" />
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
+    </RelativeLayout>
+</ScrollView>

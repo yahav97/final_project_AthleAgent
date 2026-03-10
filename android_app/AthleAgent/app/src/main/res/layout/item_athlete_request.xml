@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="@dimen/spacing_16"
+    android:layout_marginVertical="@dimen/spacing_8"
+    app:cardBackgroundColor="@color/background_white_snow"
+    app:cardCornerRadius="@dimen/spacing_12"
+    app:cardElevation="2dp">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_16">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_16"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/itemRequest_LBL_email"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/athlete_test_com"
+                android:textColor="@color/text"
+                android:textSize="@dimen/text_size_input_bigger"
+                android:fontFamily="@font/roboto_bold" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wants_to_join_your_team"
+                android:textColor="@color/brand_button_dark_muted"
+                android:textSize="@dimen/text_size_input" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/itemRequest_BTN_reject"
+            android:layout_width="@dimen/spacing_48"
+            android:layout_height="@dimen/spacing_48"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="@string/reject_request"
+            app:tint="@color/red" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/itemRequest_BTN_approve"
+            android:layout_width="@dimen/spacing_48"
+            android:layout_height="@dimen/spacing_48"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/baseline_done_outline_24"
+            android:contentDescription="@string/approve_request"
+            app:tint="@color/green" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+</com.google.android.material.card.MaterialCardView>

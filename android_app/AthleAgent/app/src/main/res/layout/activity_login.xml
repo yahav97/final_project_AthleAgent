@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/login_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_alice_blue"
+    tools:context=".ui.auth.LoginActivity">
+
+    <ScrollView
+        android:id="@+id/login_layout_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="@dimen/spacing_16">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/login_IMG_logo"
+                android:layout_width="@dimen/logo_size"
+                android:layout_height="@dimen/logo_height"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_68"
+                app:cardCornerRadius="@dimen/logo_radius"
+                app:cardElevation="@dimen/logo_shadow"
+                app:strokeWidth="@dimen/empty_space">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@string/my_image_description"
+                    android:scaleType="centerCrop"
+                    app:srcCompat="@drawable/logon" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/login_BTN_google"
+                android:layout_width="@dimen/button_width"
+                android:layout_height="@dimen/spacing_56"
+                android:layout_below="@id/login_IMG_logo"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_108"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/google_login"
+                android:textColor="@color/text"
+                android:textSize="@dimen/login_text_size"
+                app:backgroundTint="@color/background_white_ghost"
+                app:cornerRadius="@dimen/button_corner_radius"
+                app:icon="@drawable/google"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/google_icon_padding"
+                app:iconSize="@dimen/spacing_24"
+                app:iconTint="@null"
+                app:strokeColor="@color/text"
+                app:strokeWidth="@dimen/button_stroke_width" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/login_LBL_or"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/login_BTN_google"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_24"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/Or"
+                android:textColor="@color/lm_text_secondary"
+                android:textSize="@dimen/text_size_body" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/login_TIL_username"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="@dimen/button_width"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/login_LBL_or"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_24"
+                app:boxCornerRadiusBottomEnd="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusBottomStart="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusTopEnd="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusTopStart="@dimen/text_input_corner_radius"
+                app:boxStrokeColor="@color/box_stroke_selector"
+                app:boxStrokeWidth="@dimen/button_stroke_unpressed"
+                app:boxStrokeWidthFocused="@dimen/button_stroke_width"
+                app:hintTextColor="@color/text">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/login_ET_username"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto_bold"
+                    android:hint="@string/User_name_text"
+                    android:inputType="textEmailAddress" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/login_TIL_password"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="@dimen/button_width"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/login_TIL_username"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_10"
+                app:boxCornerRadiusBottomEnd="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusBottomStart="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusTopEnd="@dimen/text_input_corner_radius"
+                app:boxCornerRadiusTopStart="@dimen/text_input_corner_radius"
+                app:boxStrokeColor="@color/box_stroke_selector"
+                app:boxStrokeWidth="@dimen/button_stroke_unpressed"
+                app:boxStrokeWidthFocused="@dimen/button_stroke_width"
+                app:hintTextColor="@color/text"
+                app:passwordToggleEnabled="true">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/login_ET_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto_bold"
+                    android:hint="@string/Password_text"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/login_BTN_login"
+                android:layout_width="@dimen/button_width"
+                android:layout_height="@dimen/min_height"
+                android:layout_below="@id/login_TIL_password"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_24"
+                android:background="@drawable/btn_gradient"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/login_account_text"
+                android:textColor="@color/background_gray_smoke"
+                android:textSize="@dimen/login_text_size"
+                app:backgroundTint="@null"
+                app:cornerRadius="@dimen/button_corner_radius"
+                app:strokeColor="@color/aa_button_primary_bg"
+                app:strokeWidth="@dimen/button_stroke_width" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/login_LBL_forgotPassword"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/login_BTN_login"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_8"
+                android:clickable="true"
+                android:fontFamily="@font/roboto_bold"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/spacing_48"
+                android:text="@string/forgotten_password"
+                android:textColor="@color/brand_button_dark_muted"
+                android:textSize="@dimen/text_size_body" />
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/login_LAY_footer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/login_LBL_forgotPassword"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="@dimen/spacing_48"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/login_LBL_newToAthle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto_regular"
+                    android:text="@string/New_to_AthleAgent_text"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/text_size_body" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/login_LBL_createAccount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/new_button_space"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/roboto_bold"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/spacing_48"
+                    android:text="@string/create_account_text"
+                    android:textColor="@color/brand_button_dark_muted"
+                    android:textSize="@dimen/text_size_body" />
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </RelativeLayout>
+    </ScrollView>
+
+    <RelativeLayout
+        android:id="@+id/login_layout_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/main_IMG_center_logo"
+            android:layout_width="@dimen/logo_size"
+            android:layout_height="@dimen/logo_height"
+            android:layout_centerInParent="true"
+            app:cardCornerRadius="@dimen/logo_radius"
+            app:cardElevation="@dimen/logo_shadow"
+            app:strokeWidth="0dp">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                app:srcCompat="@drawable/logon" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <ProgressBar
+            android:id="@+id/main_PRG_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/main_IMG_center_logo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="@dimen/spacing_32"
+            android:indeterminateTint="@color/text" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/main_LBL_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/main_PRG_loading"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="@dimen/spacing_16"
+            android:fontFamily="@font/roboto_bold"
+            android:text="@string/loading_dashboard"
+            android:textColor="@color/text"
+            android:textSize="@dimen/text_size_body" />
+    </RelativeLayout>
+
+</RelativeLayout>

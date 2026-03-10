@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_alice_blue">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintBottom_toTopOf="@+id/btn_logout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_24">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_28">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/athleteHome_LBL_teamName"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_regular"
+                        android:text="@string/welcome_back"
+                        android:textColor="@color/text"
+                        android:textSize="@dimen/text_size_input_bigger" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/athleteHome_LBL_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_bold"
+                        android:text="@string/athlete"
+                        android:textColor="@color/brand_button_light_muted"
+                        android:textSize="@dimen/headline_text_survey" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/athleteHome_LBL_teamName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="@drawable/bg_team_chip"
+                    android:fontFamily="@font/roboto_bold"
+                    android:paddingHorizontal="@dimen/spacing_16"
+                    android:paddingVertical="@dimen/spacing_8"
+                    android:text="@string/Team_name"
+                    android:textColor="@color/brand_button_light_muted"
+                    android:textSize="@dimen/text_size_input_bigger" /> />
+
+            </RelativeLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/athleteHome_CARD_alert"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_24"
+                app:cardBackgroundColor="@color/background_white_ghost"
+                app:cardCornerRadius="@dimen/spacing_16"
+                app:cardElevation="2dp"
+                app:strokeColor="@color/orange"
+                app:strokeWidth="1.5dp">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_16">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/athleteHome_IMG_alertIcon"
+                        android:layout_width="@dimen/spacing_32"
+                        android:layout_height="@dimen/spacing_32"
+                        android:src="@android:drawable/ic_dialog_alert"
+                        app:tint="@color/orange_red" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/athleteHome_TXT_alertMessage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_16"
+                        android:fontFamily="@font/roboto_bold"
+                        android:text="@string/checking_your_daily_data"
+                        android:textColor="@color/text"
+                        android:textSize="@dimen/text_size_input_bigger" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/athleteHome_BTN_dashboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_44"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="@color/background_white_floral"
+                app:cardCornerRadius="@dimen/spacing_24"
+                app:cardElevation="6dp">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_28">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_bold"
+                            android:text="@string/my_dashboard"
+                            android:textColor="@color/brand_button_light_muted"
+                            android:textSize="@dimen/team_text"/>
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/view_risk_score_amp_ai_insights"
+                            android:textColor="@color/text_color_primary"
+                            android:textSize="@dimen/text_size_input_bigger" />
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="@dimen/spacing_56"
+                        android:layout_height="@dimen/spacing_56"
+                        android:background="@drawable/custom_circular_progress"
+                        android:padding="@dimen/special_width"
+                        android:src="@drawable/twotone_space_dashboard_24"
+                        app:tint="@color/brand_button_light_muted" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_28"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/daily_actions"
+                android:textColor="@color/brand_button_dark_muted"
+                android:textSize="@dimen/login_text_size" />
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_24"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/athleteHome_BTN_checkIn"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/white"
+                    app:cardCornerRadius="@dimen/spacing_20"
+                    app:cardElevation="3dp">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="@dimen/spacing_24">
+
+                        <androidx.appcompat.widget.AppCompatImageView
+                            android:layout_width="@dimen/spacing_44"
+                            android:layout_height="@dimen/spacing_44"
+                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:src="@drawable/rounded_assignment_add_24"
+                            app:tint="@color/aa_brand_primary_dark" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_bold"
+                            android:text="@string/daily_survey"
+                            android:textAlignment="center"
+                            android:textColor="@color/text"
+                            android:textSize="@dimen/text_size_input_bigger" />
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/athleteHome_BTN_nutrition"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/white"
+                    app:cardCornerRadius="@dimen/spacing_20"
+                    app:cardElevation="3dp">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="@dimen/spacing_24">
+
+                        <androidx.appcompat.widget.AppCompatImageView
+                            android:layout_width="@dimen/spacing_44"
+                            android:layout_height="@dimen/spacing_44"
+                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:src="@drawable/baseline_add_a_photo_24"
+                            app:tint="@color/brand_button_light_muted" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_bold"
+                            android:text="@string/ai_meal_analysis"
+                            android:textAlignment="center"
+                            android:textColor="@color/text"
+                            android:textSize="@dimen/text_size_input_bigger" />
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+                </com.google.android.material.card.MaterialCardView>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/athleteHome_BTN_sync"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/white"
+                    app:cardCornerRadius="@dimen/spacing_20"
+                    app:cardElevation="3dp">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="@dimen/spacing_24">
+
+                        <androidx.appcompat.widget.AppCompatImageView
+                            android:layout_width="@dimen/spacing_44"
+                            android:layout_height="@dimen/spacing_44"
+                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:src="@android:drawable/ic_popup_sync"
+                            app:tint="@color/brand_button_dark_muted" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_bold"
+                            android:text="@string/sync_wearable"
+                            android:textAlignment="center"
+                            android:textColor="@color/text"
+                            android:textSize="@dimen/text_size_input_bigger" />
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnJoinTeam"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/white"
+                    app:cardCornerRadius="@dimen/spacing_20"
+                    app:cardElevation="3dp">
+
+                    <androidx.appcompat.widget.LinearLayoutCompat
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="@dimen/spacing_24">
+
+                        <androidx.appcompat.widget.AppCompatImageView
+                            android:layout_width="@dimen/spacing_44"
+                            android:layout_height="@dimen/spacing_44"
+                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:src="@drawable/outline_group_add_24"
+                            app:tint="@color/material_dynamic_tertiary50" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_bold"
+                            android:text="@string/join_team"
+                            android:textAlignment="center"
+                            android:textColor="@color/text"
+                            android:textSize="@dimen/text_size_input_bigger" />
+                    </androidx.appcompat.widget.LinearLayoutCompat>
+                </com.google.android.material.card.MaterialCardView>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_logout"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_16"
+        android:fontFamily="@font/roboto_bold"
+        android:text="@string/log_out"
+        android:textColor="@color/text"
+        android:textSize="@dimen/login_text_size"
+        app:iconTint="@color/text"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_alice_blue">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/main_IMG_logo"
+        android:layout_width="@dimen/logo_size"
+        android:layout_height="@dimen/logo_height"
+        android:layout_centerInParent="true"
+        app:cardCornerRadius="@dimen/logo_radius"
+        app:cardElevation="@dimen/logo_shadow"
+        app:strokeWidth="0dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            app:srcCompat="@drawable/logon" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <ProgressBar
+        android:id="@+id/main_PRG_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/main_IMG_logo"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="@dimen/spacing_32"
+        android:indeterminateTint="@color/text" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/main_PRG_loading"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="@dimen/spacing_16"
+        android:fontFamily="@font/roboto_bold"
+        android:text="@string/AI_meal_analysis"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_size_body" />
+
+</RelativeLayout>

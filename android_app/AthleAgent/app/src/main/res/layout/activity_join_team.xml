@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_white_alice_blue"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="@dimen/spacing_24">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/white"
+        app:cardCornerRadius="@dimen/spacing_24"
+        app:cardElevation="@dimen/spacing_8">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_32">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:layout_width="@dimen/spacing_72"
+                android:layout_height="@dimen/spacing_72"
+                android:layout_marginBottom="@dimen/spacing_16"
+                android:padding="@dimen/spacing_16"
+                android:src="@drawable/outline_group_add_24"
+                app:tint="@color/brand_button_dark_muted" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_8"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/join_a_team"
+                android:textColor="@color/text"
+                android:textSize="@dimen/headline_text_size" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="@dimen/button_width"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_32"
+                android:fontFamily="@font/roboto_regular"
+                android:text="@string/enter_the_team_code"
+                android:textAlignment="center"
+                android:textColor="@color/brand_button_dark_muted"
+                android:textSize="@dimen/text_size_body" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_32"
+                android:hint="@string/team_code"
+                app:boxCornerRadiusBottomEnd="@dimen/spacing_12"
+                app:boxCornerRadiusBottomStart="@dimen/spacing_12"
+                app:boxCornerRadiusTopEnd="@dimen/spacing_12"
+                app:boxCornerRadiusTopStart="@dimen/spacing_12"
+                app:boxStrokeColor="@color/brand_button_dark_muted">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/joinTeamEDTCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto_bold"
+                    android:gravity="center"
+                    android:inputType="number"
+                    android:letterSpacing="0.2"
+                    android:maxLength="8"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/login_text_size"
+
+                    />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/joinTeamBTNSubmit"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/min_height"
+                android:layout_marginTop="@dimen/spacing_20"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/btn_gradient"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/send_request"
+                android:textColor="@color/background_gray_smoke"
+                android:textSize="@dimen/login_text_size"
+                app:backgroundTint="@null"
+                app:cornerRadius="@dimen/button_corner_radius"
+                app:strokeColor="@color/aa_button_primary_bg"
+                app:strokeWidth="@dimen/button_stroke_width" />
+
+            <ProgressBar
+                android:id="@+id/joinTeamProgressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_16"
+                android:visibility="gone" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.appcompat.widget.LinearLayoutCompat>
