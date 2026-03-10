@@ -29,6 +29,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.core.graphics.toColorInt
 import androidx.core.content.ContextCompat
+import com.yahav.athleagent.BuildConfig
 import com.yahav.athleagent.R
 
 
@@ -38,7 +39,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
     private val db = FirebaseFirestore.getInstance()
     private val userId by lazy { FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123" }
 
-    private val GEMINI_API_KEY = "AIzaSyDow6c3MvHf5CDk2h0N-bN8M-momy-fIHU"
+    private val GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

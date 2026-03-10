@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
+import com.yahav.athleagent.BuildConfig
 import com.yahav.athleagent.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,7 +25,7 @@ import org.json.JSONObject
 class AnalyzingMealActivity : AppCompatActivity() {
 
     // Gemini API Key
-    private val GEMINI_API_KEY = "AIzaSyDow6c3MvHf5CDk2h0N-bN8M-momy-fIHU"
+    private val GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
