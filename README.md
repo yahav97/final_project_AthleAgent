@@ -1,170 +1,83 @@
-# AthleAgent - Smart Injury Risk Prediction System
+# 🏃‍♂️ AthleAgent
 
-מערכת חכמה למעקב וחיזוי סיכון לפציעות בעזרת מודל למידת מכונה.
+> **Shifting Athlete Care from Reaction to Prevention.**
 
-## 🏗️ ארכיטקטורה
+[![Kotlin](https://img.shields.io/badge/Kotlin-Android-blue.svg)](https://kotlinlang.org/)
+[![AI](https://img.shields.io/badge/AI-Gemini_API-orange.svg)](https://deepmind.google/technologies/gemini/)
+[![HealthConnect](https://img.shields.io/badge/Integration-Health_Connect-green.svg)](https://developer.android.com/health-and-fitness/guides/health-connect)
+[![MachineLearning](https://img.shields.io/badge/Machine_Learning-Predictive_Model-red.svg)](https://tensorflow.org/)
 
-```
-┌─────────────────┐
-│  Android App    │  (Kotlin)
-│  (Frontend)     │
-└────────┬────────┘
-         │ HTTP/REST API
-         │ JWT Authentication
-         ▼
-┌─────────────────┐
-│  FastAPI        │  (Python)
-│  Backend        │
-└────────┬────────┘
-         │
-    ┌────┴────┬──────────────┬─────────────┐
-    │         │              │             │
-    ▼         ▼              ▼             ▼
-┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│PostgreSQL│ │Gemini AI│ │Health    │ │ML Model  │
-│Database  │ │(Nutrition)│ │Connect   │ │(XGBoost/ │
-│          │ │          │ │(Android) │ │RF/SVM)   │
-└──────────┘ └──────────┘ └──────────┘ └──────────┘
-```
+## 📖 Overview
+Athlete injuries are complex, resulting from a combination of factors that are traditionally tracked in isolation. **AthleAgent** provides a single, intelligent platform to unify the key pillars of athlete wellness.
 
-## 📁 מבנה הפרויקט
+By continuously monitoring diverse data points and applying advanced Machine Learning algorithms, AthleAgent shifts the paradigm of sports medicine from reactive treatment to proactive injury prevention, generating a daily "Risk Score" based on real-time data.
 
-```
-final_project_AthleAgent/
-├── backend/              # Python FastAPI Backend
-│   ├── models/          # SQLAlchemy database models
-│   ├── schemas/         # Pydantic validation schemas
-│   ├── repositories/    # Data access layer
-│   ├── services/        # Business logic
-│   ├── api/            # API routes/endpoints
-│   ├── ml/             # ML model integration
-│   ├── database/       # Database connection
-│   └── utils/          # Utilities (logging, exceptions)
-│
-├── ML_model/           # ML Model Training
-│   ├── data_generator.py
-│   ├── train_model.py
-│   └── athlete_injury_data.csv
-│
-├── android_app/        # Android App (Kotlin)
-│   └── AthleAgent/
-│
-└── docs/              # Documentation
-    ├── COMPLETE_PROJECT_ARCHITECTURE.md
-    └── BACKEND_ARCHITECTURE.md
-```
+## ✨ Core Features
 
-## 🚀 התחלה מהירה
+AthleAgent integrates seamlessly into an athlete's daily routine:
 
-### Backend Setup
+* **📊 Daily Check-ins:** Athletes fill out quick physical and psychological surveys to log subjective data such as energy levels, muscle soreness, and current stress levels.
+* **🥗 AI Meal Analysis:** Utilizing the Google Gemini Vision API, athletes simply upload an image of their meal. The system automatically extracts nutritional values (Calories, Protein, Carbohydrates) and tracks them against daily targets.
+* **⌚ Health Connect Sync:** Seamless integration with the Google Health Connect API to pull objective wearable data automatically, such as live heart rate monitoring and sleep data.
+* **🤖 Predictive Risk Modeling:** A custom Machine Learning model analyzes the combined objective and subjective data streams to calculate a highly accurate Daily Injury Risk Score (%), alerting both athletes and coaches *before* an injury occurs.
 
-1. **התקנת תלויות:**
-```bash
-cd backend
-pip install -r ../requirements.txt
-```
+## 🛠️ Tech Stack
+* **Frontend:** Kotlin, Android SDK, Material Design, XML.
+* **Backend & Database:** Firebase Authentication, Cloud Firestore.
+* **Machine Learning:** Predictive Injury Algorithm (TensorFlow / Scikit-learn).
+* **APIs:** Google Health Connect API, Google Gemini Vision API.
+* **Architecture:** MVVM (Model-View-ViewModel).
 
-2. **הגדרת Database:**
-- פתחי pgAdmin
-- צרי database חדש: `athleagent`
-- עדכני את `backend/config.py` עם פרטי החיבור שלך
+## 🏗️ System Architecture & Workflow
 
-3. **יצירת Tables:**
-```bash
-python create_tables.py
-```
+The platform features two distinct user flows managed via **Firebase Authentication**:
 
-4. **הרצת השרת:**
-```bash
-uvicorn main:app --reload
-```
+### The Athlete Application
+* **Onboarding:** Register and send a "Join Team Request" to a specific coach.
+* **Data Logging:** Upload meal images, connect to Health Connect, and fill out daily surveys.
+* **Monitoring:** View personal AI-driven injury risk, recommendations, and historical data.
 
-השרת יעלה על: `http://localhost:8000`
-API Documentation: `http://localhost:8000/docs`
+### The Coach's Toolkit
+* **Team Management:** Create a team, view the athlete list, and approve athlete join requests.
+* **Risk Assessment:** Monitor the entire roster's real-time risk scores and historical trends to adjust training loads proactively.
 
-### ML Model Training
+## 🧠 Design Philosophy
 
-```bash
-cd ML_model
-python data_generator.py  # יוצר נתונים
-python train_model.py     # מאמן את המודל
-```
+Designed specifically for the demands of professional sport, our architecture prioritizes:
+* **Usability:** A simple, intuitive interface that minimizes manual data entry.
+* **Reliability:** Robust handling of missing data and resilience to external service outages.
+* **Supportability:** A modular system architecture that allows for continuous improvement and retraining of the ML model with real-world data over time.
+* **Performance:** Optimized for speed and computational efficiency, delivering real-time predictions when they matter most.
 
-המודל נשמר ב: `backend/injury_model.pkl`
+## 📱 Screenshots
 
-## 📊 Database Schema
+| Architecture | Workflow | Screens | Athlete View | Coach View |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/archi.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/workflow.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/screens.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/Athlete.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/coach.png?raw=true" width="200"/> |
 
-- **users** - משתמשים (athletes ו-coaches)
-- **teams** - קבוצות
-- **daily_records** - נתונים יומיים (אימונים, שינה, HR)
-- **predictions** - ניבויי פציעות יומיים
-- **nutrition_records** - תזונה (מ-Gemini AI)
-- **stress_surveys** - סקרי לחץ
-- **health_connect_permissions** - הרשאות Health Connect
+## 🚀 Getting Started
 
-ראה [COMPLETE_PROJECT_ARCHITECTURE.md](docs/COMPLETE_PROJECT_ARCHITECTURE.md) לפרטים מלאים.
+### Prerequisites
+* Android Studio (Latest Version)
+* Physical Android device (Recommended) with [Health Connect](https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata) installed.
+* Google Gemini API Key.
+* Firebase Project Setup.
 
-## 🔧 טכנולוגיות
+### Installation
 
-### Backend
-- **FastAPI** - Web framework
-- **PostgreSQL** - Database
-- **SQLAlchemy** - ORM
-- **Pydantic** - Data validation
-- **JWT** - Authentication
-- **Google Gemini AI** - Nutrition analysis
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/yahav97/AthleAgent-App.git](https://github.com/yahav97/AthleAgent-App.git)
+   ```
+2. Open the project in Android Studio.
+3. Add your Gemini API Key to the `local.properties` file:
+   ```properties
+   GEMINI_API_KEY=your_api_key_here
+   ```
+4. Obtain a `google-services.json` file from your Firebase console and place it in the `app/` directory.
+5. *(If applicable)* Ensure the ML model file is placed in the `app/src/main/assets/` directory.
+6. Sync the project with Gradle files and run the application.
 
-### ML
-- **scikit-learn** - ML models
-- **XGBoost** - Gradient boosting
-- **pandas** - Data processing
-
-### Android
-- **Kotlin** - Programming language
-- **Health Connect** - Health data sync
-- **Retrofit** - HTTP client
-
-## 📝 API Endpoints
-
-### Authentication
-- `POST /auth/register` - הרשמה
-- `POST /auth/login` - התחברות
-- `POST /auth/google` - התחברות עם Google
-
-### Predictions
-- `GET /predictions/today` - ניבוי יומי
-- `GET /predictions/history` - היסטוריה
-
-### Daily Data
-- `POST /daily-data` - עדכון נתונים יומיים
-- `GET /daily-data/today` - נתונים יומיים
-
-ראה [API Contracts](docs/COMPLETE_PROJECT_ARCHITECTURE.md#api-contracts) לפרטים מלאים.
-
-## 🔐 Environment Variables
-
-צרי קובץ `backend/.env`:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/athleagent
-SECRET_KEY=your-secret-key-min-32-chars
-GEMINI_API_KEY=your-gemini-api-key
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-```
-
-## 📚 תיעוד
-
-- [Complete Project Architecture](docs/COMPLETE_PROJECT_ARCHITECTURE.md)
-- [Backend Architecture](docs/BACKEND_ARCHITECTURE.md)
-
-## 👥 צוות
-
-- [שם משתמש 1]
-- [שם משתמש 2]
-
-## 📄 רישיון
-
-[ציין רישיון]
-
-
+## 👨‍💻 Authors
+* **Yahav Simon** - [GitHub](https://github.com/yahav97)
+* **Tzuf Feldon** ## 📄 License
