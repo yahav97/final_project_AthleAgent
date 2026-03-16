@@ -80,4 +80,4 @@ Designed specifically for the demands of professional sport, our architecture pr
 
 ## 👨‍💻 Authors
 * **Yahav Simon** - [GitHub](https://github.com/yahav97)
-* **Tzuf Feldon** ## 📄 License
+* **Tzuf Feldon** 
