@@ -46,10 +46,10 @@ class AthleteDashboardActivity : AppCompatActivity() {
         binding = ActivityAthleteDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Step A: Load existing historical data for the chart
+        //  Load existing historical data for the chart
         loadHistoricalData()
 
-        // Step B: Calculate today's score from the server
+        //  Calculate today's score from the server
         fetchDataAndSendToBackend()
     }
 
@@ -142,7 +142,6 @@ class AthleteDashboardActivity : AppCompatActivity() {
 
                 var xIndex = 0f
                 for (doc in lastSevenDocs) {
-                    // Note: Ensure the field in Firestore is exactly finalRiskScore (case sensitive!)
                     val score = doc.getDouble("finalRiskScore")?.toFloat()
 
                     if (score != null) {
@@ -173,7 +172,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
         dataSet.circleRadius = 5f
         dataSet.setCircleColor("#FFA726".toColorInt())
         dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
-        dataSet.setDrawFilled(true) // Fill under the line
+        dataSet.setDrawFilled(true)
         dataSet.fillColor = "#FFF3E0".toColorInt()
         dataSet.setDrawValues(false)
 
@@ -195,7 +194,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun updateUIWithScore(riskScore: Int) {
         runOnUiThread {
-            // 1. First, select colors and design based on the score
+            //  select colors and design based on the score
             val (drawableResId, textColorHex) = when {
                 riskScore <= 20 -> Pair(R.drawable.progress_drawable_green, "#388E3C") // Dark green
                 riskScore <= 50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300") // Yellow
@@ -203,13 +202,13 @@ class AthleteDashboardActivity : AppCompatActivity() {
                 else -> Pair(R.drawable.progress_drawable_red, "#B71C1C") // Red
             }
 
-            // 2. Replace the ProgressBar design!
+            //  Replace the ProgressBar design!
             binding.dashboardPRGRiskScore.progressDrawable = ContextCompat.getDrawable(this, drawableResId)
 
-            // 3. *Only now* update the percentage (so the system knows to fill the new design)
+            //  *Only now* update the percentage (so the system knows to fill the new design)
             binding.dashboardPRGRiskScore.progress = riskScore
 
-            // 4. Update the text and its color
+            //  Update the text and its color
             binding.dashboardTXTScore.text = "$riskScore%"
             binding.dashboardTXTScore.setTextColor(textColorHex.toColorInt())
         }
@@ -239,12 +238,12 @@ class AthleteDashboardActivity : AppCompatActivity() {
             val response = generativeModel.generateContent(prompt)
             val aiText = response.text ?: "No recommendation available."
 
-            // 1. Update the athlete's screen
+            //  Update the athlete's screen
             withContext(Dispatchers.Main) {
                 binding.dashboardTXTAiRecommendation.text = aiText
             }
 
-            // 2. Save the recommendation in the database so the coach can read it!
+            //  Save the recommendation in the database so the coach can read it!
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             db.collection("users").document(userId)
                 .collection("daily_health").document(today)

@@ -62,46 +62,33 @@
                     android:paddingVertical="@dimen/spacing_8"
                     android:text="@string/Team_name"
                     android:textColor="@color/brand_button_light_muted"
-                    android:textSize="@dimen/text_size_input_bigger" /> />
+                    android:textSize="@dimen/text_size_input_bigger"
+                    app:drawableEndCompat="@drawable/outline_group_add_24"
+                    android:drawablePadding="@dimen/spacing_10"
+                    app:drawableTint="@color/brand_button_light_muted"
+                    />
 
             </RelativeLayout>
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/athleteHome_CARD_alert"
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/athleteHome_VP_alerts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_8"
+                 />
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/athleteHome_TAB_alerts"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/spacing_12"
+                android:layout_gravity="center_horizontal"
                 android:layout_marginBottom="@dimen/spacing_24"
-                app:cardBackgroundColor="@color/background_white_ghost"
-                app:cardCornerRadius="@dimen/spacing_16"
-                app:cardElevation="2dp"
-                app:strokeColor="@color/orange"
-                app:strokeWidth="1.5dp">
-
-                <androidx.appcompat.widget.LinearLayoutCompat
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="@dimen/spacing_16">
-
-                    <androidx.appcompat.widget.AppCompatImageView
-                        android:id="@+id/athleteHome_IMG_alertIcon"
-                        android:layout_width="@dimen/spacing_32"
-                        android:layout_height="@dimen/spacing_32"
-                        android:src="@android:drawable/ic_dialog_alert"
-                        app:tint="@color/orange_red" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/athleteHome_TXT_alertMessage"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/spacing_16"
-                        android:fontFamily="@font/roboto_bold"
-                        android:text="@string/checking_your_daily_data"
-                        android:textColor="@color/text"
-                        android:textSize="@dimen/text_size_input_bigger" />
-                </androidx.appcompat.widget.LinearLayoutCompat>
-            </com.google.android.material.card.MaterialCardView>
+                android:background="@android:color/transparent"
+                app:tabBackground="@drawable/bg_tab_indicator"
+                app:tabIndicatorHeight="0dp"
+                app:tabMaxWidth="@dimen/spacing_8"
+                app:tabMinWidth="@dimen/spacing_8"
+                app:tabRippleColor="@null" />
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/athleteHome_BTN_dashboard"

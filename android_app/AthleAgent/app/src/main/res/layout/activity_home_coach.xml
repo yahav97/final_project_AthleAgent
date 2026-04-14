@@ -88,14 +88,14 @@
                         android:layout_width="@dimen/spacing_36"
                         android:layout_height="@dimen/spacing_36"
                         android:src="@android:drawable/ic_menu_info_details"
-                        app:tint="@color/brand_button_dark_muted" />
+                        app:tint="@color/fui_bgTwitter" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/coachHome_LBL_notifText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/spacing_12"
-                        android:fontFamily="@font/roboto_regular"
+                        android:fontFamily="@font/roboto_bold"
                         android:text="@string/you_have_2_new_athlete_join_requests"
                         android:textColor="@color/brand_button_dark_muted"
                         android:textSize="@dimen/text_size_body" />
@@ -178,7 +178,7 @@
                             android:layout_height="@dimen/spacing_44"
                             android:layout_marginBottom="@dimen/spacing_16"
                             android:src="@android:drawable/ic_menu_manage"
-                            app:tint="@color/aa_brand_surface" />
+                            app:tint="@color/text" />
 
                         <com.google.android.material.textview.MaterialTextView
                             android:layout_width="wrap_content"

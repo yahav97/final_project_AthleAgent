@@ -35,14 +35,14 @@ class DailyCheckInActivity : AppCompatActivity() {
     }
 
     private fun initListeners() {
-        // 1. Set click listeners for each soreness button separately
+        //  Set click listeners for each soreness button separately
         binding.checkinBTN1.setOnClickListener { updateSorenessSelection(1) }
         binding.checkinBTN2.setOnClickListener { updateSorenessSelection(2) }
         binding.checkinBTN3.setOnClickListener { updateSorenessSelection(3) }
         binding.checkinBTN4.setOnClickListener { updateSorenessSelection(4) }
         binding.checkinBTN5.setOnClickListener { updateSorenessSelection(5) }
 
-        // 2. Save data to Firebase when clicking Submit
+        //  Save data to Firebase when clicking Submit
         binding.dailyCheckInBTNSubmit.setOnClickListener {
             energyLevel = binding.checkinSLDEnergy.value
             stressLevel = binding.checkinSLDStress.value
@@ -104,7 +104,7 @@ class DailyCheckInActivity : AppCompatActivity() {
             "lastCheckInTime" to FieldValue.serverTimestamp()
         )
 
-        // Save to Firestore (in a **separate** collection called daily_checkins)
+        // Save to Firestore
         val db = FirebaseFirestore.getInstance()
         db.collection("users").document(userId)
             .collection("daily_checkins").document(today) // <-- Separate collection here

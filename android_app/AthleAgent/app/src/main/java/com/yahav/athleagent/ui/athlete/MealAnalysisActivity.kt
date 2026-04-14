@@ -28,7 +28,7 @@ class MealAnalysisActivity : AppCompatActivity() {
         binding = ActivityMealAnalysisBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Retrieve data passed from the Gemini API analysis
+        // Extract the nutritional data passed from the Gemini API analysis
         val calories = intent.getIntExtra("CALORIES", 0)
         val protein = intent.getIntExtra("PROTEIN", 0)
         val carbs = intent.getIntExtra("CARBS", 0)
@@ -66,7 +66,7 @@ class MealAnalysisActivity : AppCompatActivity() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-        // 1. Save the specific meal entry as a new document
+        //  Save the specific meal entry as a new document
         val mealData = hashMapOf(
             "calories" to calories,
             "protein" to protein,
@@ -79,7 +79,7 @@ class MealAnalysisActivity : AppCompatActivity() {
             .collection("meals").add(mealData)
             .addOnSuccessListener {
 
-                // 2. Upon successful save, update the daily aggregated totals
+                //  Upon successful save, update the daily aggregated totals
                 val dailyNutritionUpdates = hashMapOf(
                     "totalCalories" to FieldValue.increment(calories.toDouble()),
                     "totalProtein" to FieldValue.increment(protein.toDouble()),

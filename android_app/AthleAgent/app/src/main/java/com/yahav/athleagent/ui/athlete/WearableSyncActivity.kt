@@ -102,11 +102,11 @@ class WearableSyncActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // 1. Fetch data from the wearable/phone
+                //  Fetch data from the wearable/phone
                 val sleepMinutes = fetchSleepData()
                 val physicalData = fetchPhysicalData()
 
-                // 2. Prepare the data for saving to Firebase
+                //  Prepare the data for saving to Firebase
                 val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123"
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
@@ -117,7 +117,7 @@ class WearableSyncActivity : AppCompatActivity() {
                 )
                 healthDataToSave.putAll(physicalData)
 
-                // 3. Save to Firestore
+                //  Save to Firestore
                 val db = FirebaseFirestore.getInstance()
                 db.collection("users").document(userId)
                     .collection("daily_health").document(today)

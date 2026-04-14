@@ -1,74 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background_white_ghost">#333333</color>
-
-    <color name="text_color_primary">#FFFAF0</color>
-    <color name="stroke_color_primary">#F8F8FF</color>
-
-    <color name="lm_input_border">#FFFFFF</color>
-    <color name="aa_input_border">#FFFFFF</color>
-    <color name="aa_input_border_focused">#00B1DA</color> <color name="lm_input_bg">#303030</color>
-    <color name="aa_input_bg">#303030</color>
-
-    <color name="lm_input_placeholder">#CCCCCC</color>
-    <color name="aa_input_placeholder">#CCCCCC</color>
-
-    <color name="lm_text_secondary">#D1D1D1</color>
-    <color name="text_color_secondary">#D1D1D1</color>
-    <color name="charcoal_black">#FFFFFF</color> <color name="background_gray_smoke">#FFFFFF</color> <color name="aa_button_primary_bg">#00B1DA</color>
-    <color name="brand_button_dark_muted">#64B5F6</color> <color name="aa_brand_primary">#00B1DA</color>
-    <color name="aa_brand_primary_dark">#008CB0</color>
-    <color name="aa_brand_primary_light">#66D5EE</color>
-    <color name="aa_brand_background">#252525</color>
-    <color name="aa_brand_background_alt">#303030</color>
-    <color name="lm_background">#252525</color>
-    <color name="lm_surface">#303030</color>
-    <color name="lm_surface_alt">#383838</color>
     <color name="gradient_top_blue">#003344</color>
-    <color name="gradient_bottom_grey_white">#252525</color>
-    <color name="background_white_alice_blue">#252525</color>
-    <color name="background_white_floral">#252525</color>
-    <color name="background_white_snow">#252525</color>
-    <color name="lm_text_primary">#FFFFFF</color>
-    <color name="lm_text_muted">#CCCCCC</color>
-    <color name="lm_primary">#818CF8</color>
-    <color name="lm_primary_dark">#3730A3</color>
-    <color name="lm_primary_light">#818CF8</color>
-    <color name="lm_primary_text">#FFFFFF</color>
-    <color name="lm_outline_border">#FFFFFF</color>
-    <color name="lm_outline_text">#FFFFFF</color>
-    <color name="lm_input_border_focused">#00B1DA</color>
-    <color name="dark_mode_background">#252525</color>
-    <color name="aa_brand_surface">#303030</color>
-    <color name="cs_background_dark">#000000</color>
-    <color name="cs_surface_dark">#252525</color>
+    <color name="gradient_bottom_grey_white">#1E1E1E</color>
+
+    <color name="background_white_alice_blue">#2C2C2C</color>
+
+
+    <color name="background_white_floral">#383838</color>
+    <color name="background_white_snow">#383838</color>
+    <color name="background_white_ghost">#424242</color>
+    <color name="background_gray_smoke">#383838</color>
+    <color name="background_dash">#2C2C2C</color>
+    <color name="background_daily">#383838</color>
+    <color name="bright_gray">#424242</color>
+    <color name="inactive">#4A4A4A</color>
+
+    <color name="aa_brand_background">#2C2C2C</color>
+    <color name="aa_brand_background_alt">#383838</color>
+    <color name="lm_background">#2C2C2C</color>
+    <color name="lm_surface">#383838</color>
+    <color name="lm_surface_alt">#424242</color>
+    <color name="dark_mode_background">#2C2C2C</color>
+    <color name="aa_brand_surface">#383838</color>
+    <color name="cs_background_dark">#121212</color>
+    <color name="cs_surface_dark">#2C2C2C</color>
+    <color name="background">#2C2C2C</color>
+
+    <color name="text">#F5F5F5</color>
+    <color name="text_color_primary">#F5F5F5</color>
+    <color name="text_color_secondary">#C0C0C0</color>
+    <color name="lm_text_primary">#F5F5F5</color>
+    <color name="lm_text_secondary">#C0C0C0</color>
+    <color name="lm_text_muted">#9E9E9E</color>
     <color name="aa_text_primary">#FFFFFF</color>
     <color name="aa_text_secondary">#D1D1D1</color>
-    <color name="aa_text_muted">#CCCCCC</color>
-    <color name="aa_button_primary_bg_pressed">#0091B5</color>
+    <color name="aa_text_muted">#AAAAAA</color>
+    <color name="charcoal_black">#E0E0E0</color>
+
+    <color name="stroke_color_primary">#555555</color>
+    <color name="lm_input_bg">#424242</color>
+    <color name="lm_input_border">#555555</color>
+    <color name="lm_input_border_focused">#2CBCE0</color>
+    <color name="lm_input_placeholder">#9E9E9E</color>
+
+    <color name="aa_input_bg">#424242</color>
+    <color name="aa_input_border">#555555</color>
+    <color name="aa_input_border_focused">#2CBCE0</color>
+    <color name="aa_input_placeholder">#9E9E9E</color>
+
+    <color name="aa_divider">#4A4A4A</color>
+
+    <color name="brand_button_dark_muted">#4A7E91</color>
+    <color name="brand_button_light_muted">#6893A3</color>
+
+    <color name="aa_brand_primary">#2CBCE0</color>
+    <color name="aa_brand_primary_dark">#009FC4</color>
+    <color name="aa_brand_primary_light">#66D5EE</color>
+
+    <color name="lm_primary">#818CF8</color>
+    <color name="lm_primary_dark">#6366F1</color>
+    <color name="lm_primary_light">#A5B4FC</color>
+    <color name="lm_primary_text">#FFFFFF</color>
+    <color name="lm_outline_border">#818CF8</color>
+    <color name="lm_outline_text">#818CF8</color>
+
+    <color name="aa_button_primary_bg">#2CBCE0</color>
+    <color name="aa_button_primary_bg_pressed">#009FC4</color>
     <color name="aa_button_primary_bg_disabled">#335E6D</color>
     <color name="aa_button_primary_text">#FFFFFF</color>
-    <color name="aa_button_outline_border">#00B1DA</color>
-    <color name="aa_button_outline_text">#00B1DA</color>
-    <color name="aa_divider">#383838</color>
+
+    <color name="aa_button_outline_border">#2CBCE0</color>
+    <color name="aa_button_outline_text">#2CBCE0</color>
+    <color name="aa_button_text_on_dark">#FFFFFF</color>
+
+    <color name="cs_primary">#E85A8F</color>
+    <color name="cs_primary_dark">#DB2777</color>
+    <color name="cs_secondary">#9333EA</color>
+    <color name="cs_secondary_dark">#7E22CE</color>
+    <color name="cs_accent_green">#39E29D</color>
+    <color name="cs_accent_yellow">#FFE66D</color>
+    <color name="green">#66BB6A</color>
+
+    <color name="cs_cta_bg">#E85A8F</color>
+    <color name="cs_cta_bg_pressed">#DB2777</color>
+    <color name="cs_cta_text">#FFFFFF</color>
+
     <color name="aa_success">#18C29C</color>
     <color name="aa_warning">#FFC857</color>
     <color name="aa_error">#FF6B77</color>
     <color name="aa_info">#4F8BFF</color>
-    <color name="cs_primary">#FF6B9C</color>
-    <color name="cs_primary_dark">#D94A7A</color>
-    <color name="cs_secondary">#7C3AED</color>
-    <color name="cs_secondary_dark">#5B21B6</color>
-    <color name="cs_accent_green">#39E29D</color>
-    <color name="cs_accent_yellow">#FFE66D</color>
-    <color name="cs_cta_bg">#FF6B9C</color>
-    <color name="cs_cta_bg_pressed">#D94A7A</color>
-    <color name="cs_cta_text">#FFFFFF</color>
+    <color name="orange_red">#FF8A65</color>
+    <color name="red">#EF5350</color>
+    <color name="orange">#FFB74D</color>
+    <color name="inactive_gray">#4A4A4A</color>
+    <color name="image_green">#26A69A</color>
+
     <color name="black">#FFFFFF</color>
-    <color name="white">#000000</color>
-    <color name="gray">#808080</color>
-    <color name="link">#64B5F6</color>
-    <color name="background">#252525</color>
-    <color name="brand_button_light_muted">#548492</color>
-    <color name="aa_button_text_on_dark">#FFFFFF</color>
+    <color name="white">#2C2C2C</color> <color name="gray">#A4A4A4</color>
 </resources>
