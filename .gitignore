@@ -2,6 +2,33 @@
 backend/venv/
 __pycache__/
 *.pyc
+*.pkl
+backend/*.pkl
 
-# Editor ignores
+# Environment variables (contains secrets!)
+.env
+backend/.env
+*.env
+
+# Logs
+logs/
+*.log
+backend/logs/
+
+# Uploads
+uploads/
+backend/uploads/
+
+# Database
+*.db
+*.sqlite
+
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

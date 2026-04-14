@@ -1,22 +1,64 @@
+"""
+AthleAgent FastAPI Backend
+Main application entry point.
+"""
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import joblib
 import pandas as pd
 import os
 
-app = FastAPI()
+from config import settings
+from utils.logging import logger
 
-# Load the model
+# Import all models to register them
+from models import (
+    User, Team, TeamMember, JoinRequest,
+    DailyRecord, Prediction, NutritionRecord,
+    StressSurvey, HealthConnectPermission, Injury
+)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="Smart injury risk prediction system using ML"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load the model (From your working version)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(script_dir, 'injury_model.pkl')
 model = None
 
 if os.path.exists(model_path):
     model = joblib.load(model_path)
-    print("Model loaded successfully!")
+    logger.info("Model loaded successfully!")
 else:
-    print(f"WARNING: Model file not found at {model_path}. Please run train_model.py first.")
+    logger.warning(f"Model file not found at {model_path}. Please run train_model.py first.")
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize on startup."""
+    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
+    logger.info("Database models loaded")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down server")
+
 
 class AthleteData(BaseModel):
     age: int
@@ -44,8 +86,23 @@ class SimpleData(BaseModel):
     user_id: str
 
 @app.get("/")
-def read_root():
-    return {"status": "Server is running"}
+async def root():
+    """Root endpoint - health check."""
+    return {
+        "status": "ok",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+# ----------------------------------
+# ML Prediction Endpoints
+# ----------------------------------
 
 @app.post("/test_predict")
 def test_predict_injury(data: SimpleData):
@@ -78,7 +135,6 @@ def demo_predict_injury(data: AthleteData):
         "risk_percentage": round(final_score, 1),
         "risk_level": "High" if final_score > 60 else "Medium" if final_score > 40 else "Low"
     }
-# ----------------------------------
 
 @app.post("/predict")
 def predict_injury(data: AthleteData):
@@ -92,3 +148,25 @@ def predict_injury(data: AthleteData):
         "risk_percentage": round(risk_probability * 100, 1),
         "risk_level": "High" if risk_probability > 0.6 else "Medium" if risk_probability > 0.3 else "Low"
     }
+
+# ----------------------------------
+
+# Import and register API routes
+from api.routes import auth
+
+# Register authentication routes
+app.include_router(
+    auth.router,
+    prefix=settings.API_V1_PREFIX + "/auth",
+    tags=["Authentication"],
+)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+        log_level="warning",
+    )
