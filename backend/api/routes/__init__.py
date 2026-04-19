@@ -1,6 +1,7 @@
-"""API route modules."""
+"""API route modules.
 
-from . import auth
+Avoid importing legacy ``auth`` here so ``ENABLE_LEGACY_AUTH_DB=false`` does not
+pull SQLAlchemy/Postgres. Import ``api.routes.auth`` only from ``main`` when needed.
+"""
 
-__all__ = ["auth"]
-
+__all__ = ["auth", "health", "predict"]

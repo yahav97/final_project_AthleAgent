@@ -1,6 +1,5 @@
-"""Business logic services."""
+"""Business logic services.
 
-from .auth_service import AuthService
-
-__all__ = ["AuthService"]
-
+Import concrete modules explicitly, e.g. ``from services.auth_service import AuthService``,
+to avoid pulling optional dependencies when only inference code is needed.
+"""

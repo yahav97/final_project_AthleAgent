@@ -4,14 +4,21 @@ Loads settings from environment variables with sensible defaults.
 """
 
 import os
+from pathlib import Path
 from typing import Optional
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
-    # Database
+
+    # When False, the app does not import SQLAlchemy, Postgres, or legacy JWT auth routes.
+    ENABLE_LEGACY_AUTH_DB: bool = False
+
+    # sklearn model artifact (default: backend/injury_model.pkl)
+    MODEL_PATH: str = str(Path(__file__).resolve().parent / "injury_model.pkl")
+
+    # Database (only used if ENABLE_LEGACY_AUTH_DB is True)
     DATABASE_URL: str = "postgresql://postgres:Michal09@localhost:5432/athleagent"
     
     # JWT Authentication
