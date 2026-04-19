@@ -1,112 +1,163 @@
-# Backend - AthleAgent API
+# AthleAgent backend — ML inference hub
 
-FastAPI backend for AthleAgent injury prediction system.
+FastAPI service that exposes **injury risk inference** over HTTP. The **system of record** for athlete and team data is **Firestore** (Android app); this backend does not write to Firestore unless you add that later.
 
-## 🚀 Quick Start
+**Development branch:** `ml-backend` — keep hub work on this branch until merged to `main`.
 
-### 1. Install Dependencies
+**Operational rules**
 
-```bash
-pip install -r ../requirements.txt
-```
+1. **`android_app/` is read-only** for this backend work — use it only to align JSON field names with Firestore; do not change Kotlin/UI here without explicit approval.
+2. **Inference-only default:** set `ENABLE_LEGACY_AUTH_DB=false` (default) so the app starts **without** loading legacy JWT/Postgres auth routes.
+3. **Tests:** run `python -m pytest tests/ -v` from this directory before considering changes complete.
 
-### 2. Setup Database
+---
 
-1. Create PostgreSQL database `athleagent` in pgAdmin
-2. Update `config.py` with your database credentials
-3. Run:
+## Quick start
 
-```bash
-python create_tables.py
-```
+### 1. Install dependencies
 
-### 3. Run Server
+From the repository root:
 
 ```bash
-uvicorn main:app --reload
+pip install -r requirements.txt
 ```
 
-Server runs on: `http://localhost:8000`
-API Docs: `http://localhost:8000/docs`
+Or install into a virtual environment of your choice.
 
-## 📁 Project Structure
+### 2. Model artifact (optional but required for real scores)
 
-```
-backend/
-├── main.py              # FastAPI app entry point
-├── config.py            # Configuration (env variables)
-├── create_tables.py     # Database initialization script
-│
-├── models/              # SQLAlchemy ORM models
-│   ├── user.py
-│   ├── daily_record.py
-│   ├── prediction.py
-│   └── ...
-│
-├── schemas/             # Pydantic validation schemas
-│   ├── user.py
-│   ├── daily_data.py
-│   └── ...
-│
-├── repositories/        # Data access layer
-│   ├── user_repository.py
-│   └── ...
-│
-├── services/            # Business logic
-│   ├── auth_service.py
-│   ├── prediction_service.py
-│   └── ...
-│
-├── api/                 # API routes
-│   └── routes/
-│       ├── auth.py
-│       ├── predictions.py
-│       └── ...
-│
-├── database/            # Database connection
-│   └── connection.py
-│
-├── utils/               # Utilities
-│   ├── logging.py
-│   └── exceptions.py
-│
-└── ml/                  # ML model integration
-    └── model_loader.py
-```
-
-## 🔧 Configuration
-
-Create `.env` file:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/athleagent
-SECRET_KEY=your-secret-key-min-32-chars
-GEMINI_API_KEY=your-gemini-api-key
-```
-
-## 📊 Database Models
-
-- **User** - Users (athletes/coaches)
-- **DailyRecord** - Daily training/health data
-- **Prediction** - Injury risk predictions
-- **NutritionRecord** - Meal data from Gemini AI
-- **StressSurvey** - Daily stress surveys
-- **Team** - Team management
-- **HealthConnectPermission** - Health Connect integration
-
-## 🧪 Testing
+Train or copy the sklearn model to the backend folder (or set `MODEL_PATH`):
 
 ```bash
-# Test database connection
-python create_tables.py
+# After training (ML_model/train_model.py writes here by default):
+# backend/injury_model.pkl
+```
 
-# Run with auto-reload
+If the file is missing, `POST /predict` still returns **200** with a small **demo** payload and a note in `recommendation`.
+
+### 3. Run the server
+
+From **`backend/`** (so imports resolve):
+
+```bash
+cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## 📝 API Documentation
-
-Once server is running, visit:
-- Swagger UI: `http://localhost:8000/docs`
+- API: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+---
+
+## Configuration (environment / `.env`)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ENABLE_LEGACY_AUTH_DB` | `false` | If `true`, mounts legacy `/api/v1/auth/*` routes (Postgres + SQLAlchemy). Keep `false` for the inference hub. |
+| `MODEL_PATH` | `backend/injury_model.pkl` (resolved from `config.py`) | Path to the joblib classifier. |
+| `DATABASE_URL` | (see `config.py`) | Only used when legacy auth routes are enabled. |
+| `SECRET_KEY`, etc. | (see `config.py`) | Legacy auth only. |
+
+Example `.env` for **inference only**:
+
+```env
+ENABLE_LEGACY_AUTH_DB=false
+MODEL_PATH=C:/dev/final_project_AthleAgent/backend/injury_model.pkl
+```
+
+---
+
+## Production HTTP contract: `POST /predict`
+
+**Request:** JSON body with **camelCase** fields aligned with Android / Firestore (all optional; missing values are imputed).
+
+**Response:** JSON
+
+- `risk_level`: `"Low"` | `"Medium"` | `"High"`
+- `risk_score`: float in **0–1** (injury class probability from `predict_proba`)
+- `recommendation`: short text guidance
+
+### Example: curl (Windows PowerShell)
+
+```powershell
+cd backend
+curl -s -X POST http://127.0.0.1:8000/predict `
+  -H "Content-Type: application/json" `
+  -d '{\"userId\":\"demo\",\"date\":\"2026-04-19\",\"sleepMinutes\":420,\"steps\":9000,\"distanceMeters\":7200,\"activeCalories\":550,\"totalCalories\":2600,\"stressLevel\":45,\"muscleSoreness\":3}'
+```
+
+### Example: minimal JSON
+
+```json
+{
+  "sleepMinutes": 480,
+  "steps": 8000,
+  "stressLevel": 35,
+  "muscleSoreness": 2
+}
+```
+
+### Other routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/`, `/health` | Liveness |
+| POST | `/predict` | Production pipeline (Firestore-shaped body) |
+| POST | `/predict/sklearn` | Legacy **AthleteData** row for the same `.pkl` |
+| POST | `/demo_predict` | Heuristic demo (old Android shape) |
+| POST | `/test_predict` | Fixed mock for UI tests |
+| POST | `/api/v1/auth/*` | **Only if** `ENABLE_LEGACY_AUTH_DB=true` |
+
+---
+
+## Project structure (inference hub)
+
+```
+backend/
+├── main.py                 # App factory, CORS, routers, startup model load
+├── config.py               # Settings including ENABLE_LEGACY_AUTH_DB, MODEL_PATH
+├── ml/
+│   └── model_loader.py     # joblib load / get_model
+├── api/routes/
+│   ├── health.py           # GET /, GET /health
+│   ├── predict.py          # POST /predict, /predict/sklearn, demo, test
+│   └── auth.py             # Legacy; not imported when ENABLE_LEGACY_AUTH_DB=false
+├── schemas/
+│   ├── inference.py        # InjuryPredictionRequest / Response, AthleteData, …
+│   └── user.py             # Legacy auth schemas
+├── services/
+│   ├── model_features.py   # MODEL_FEATURE_COLUMNS (must match training CSV)
+│   ├── preprocessing.py    # Request → model DataFrame
+│   ├── feature_engineering.py  # ACWR proxies, sleep debt proxy, etc.
+│   ├── prediction_service.py   # predict_proba orchestration
+│   └── auth_service.py     # Legacy; unused in inference-only mode
+├── tests/
+│   ├── test_inference.py
+│   ├── test_preprocessing.py
+│   └── test_feature_engineering.py
+├── database/, models/, repositories/   # Legacy Postgres stack (optional)
+└── create_tables.py        # Legacy DB init (optional)
+```
+
+---
+
+## Testing
+
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+---
+
+## Known limitations
+
+- **Rolling workload:** Training uses true 7d/21d rollups per athlete. The mobile payload is often a **single day**; the service uses **documented proxies** for acute/chronic/ACWR until history is supplied (e.g. extra fields or server-side reads).
+- **Legacy stack:** Postgres models and `create_tables.py` remain for optional `ENABLE_LEGACY_AUTH_DB=true` workflows; they are **not** required for `POST /predict`.
+
+---
+
+## API documentation
+
+With the server running: **http://localhost:8000/docs**
