@@ -149,6 +149,17 @@ cd backend
 python -m pytest tests/ -v
 ```
 
+**Quick smoke (no long-running server):** exercises lifespan, `/health`, `/docs`, `/openapi.json`, and `POST /predict`:
+
+```bash
+cd backend
+python scripts/smoke_uvicorn.py
+```
+
+**Manual regression samples and training metrics log:** see [docs/MANUAL_REGRESSION.md](docs/MANUAL_REGRESSION.md).
+
+**Android / Firestore mapping and integration options:** see [docs/ANDROID_INTEGRATION.md](docs/ANDROID_INTEGRATION.md).
+
 ---
 
 ## Known limitations

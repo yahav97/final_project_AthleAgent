@@ -37,7 +37,11 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             "recommendation": "Model artifact not loaded; demo response only. Train/copy injury_model.pkl to backend/.",
         }
 
-    proba = float(model.predict_proba(df)[0, 1])
+    # Saved estimators may have been trained after feature selection (subset of MODEL_FEATURE_COLUMNS).
+    feature_names = getattr(model, "feature_names_in_", None)
+    X = df[list(feature_names)] if feature_names is not None else df
+
+    proba = float(model.predict_proba(X)[0, 1])
     risk_level = "High" if proba > 0.6 else "Medium" if proba > 0.3 else "Low"
 
     return {
