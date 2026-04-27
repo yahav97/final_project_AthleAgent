@@ -9,6 +9,9 @@ backend/*.pkl
 .env
 backend/.env
 *.env
+serviceAccountKey.json
+*serviceAccount*.json
+firebase-adminsdk*.json
 
 # Logs
 logs/

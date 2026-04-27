@@ -35,6 +35,63 @@ def _soreness_to_model_scale(value: int | None) -> float:
     return float(max(1.0, min(10.0, v)))
 
 
+def _safe_float(value: object, fallback: float = 0.0) -> float:
+    """Convert arbitrary numeric-like value to finite float."""
+    try:
+        out = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return float(fallback)
+    if not math.isfinite(out):
+        return float(fallback)
+    return out
+
+
+def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) -> pd.DataFrame:
+    """
+    Validate final model input against training contract.
+
+    Ensures:
+    - expected columns exist and are ordered exactly like training
+    - all values are finite float64
+    - critical scaled ranges remain in sane model bounds
+    """
+    expected_columns = None
+    if isinstance(model, dict):
+        cols = model.get("feature_columns")
+        if isinstance(cols, list) and cols:
+            expected_columns = [str(c) for c in cols]
+        model = model.get("estimator")
+    if expected_columns is None:
+        feature_names = getattr(model, "feature_names_in_", None)
+        if feature_names is not None:
+            expected_columns = [str(c) for c in feature_names]
+    if expected_columns:
+        missing = [c for c in expected_columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"Model expects missing feature columns: {missing}")
+        df = df.loc[:, expected_columns]
+
+    aligned = df.astype("float64")
+    if not pd.Series(pd.notna(aligned.to_numpy().ravel())).all():
+        raise ValueError("Feature vector contains NaN values")
+    if not pd.Series(pd.Series(aligned.to_numpy().ravel()).map(math.isfinite)).all():
+        raise ValueError("Feature vector contains non-finite values")
+
+    if "stress_level" in aligned.columns:
+        v = float(aligned["stress_level"].iloc[0])
+        if v < 1.0 or v > 10.0:
+            raise ValueError(f"stress_level out of expected scaled range [1,10]: {v}")
+    if "muscle_soreness" in aligned.columns:
+        v = float(aligned["muscle_soreness"].iloc[0])
+        if v < 1.0 or v > 10.0:
+            raise ValueError(f"muscle_soreness out of expected scaled range [1,10]: {v}")
+    if "acwr_ratio" in aligned.columns:
+        v = float(aligned["acwr_ratio"].iloc[0])
+        if v < 0.35 or v > 2.8:
+            raise ValueError(f"acwr_ratio out of expected range [0.35,2.8]: {v}")
+    return aligned
+
+
 def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.DataFrame:
     """
     Build one model-ready row: Android-shaped request → engineered → imputed DataFrame.
@@ -42,6 +99,15 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     Returns a DataFrame with exactly MODEL_FEATURE_COLUMNS (same order as training CSV).
     """
     d = payload.model_dump()
+    age = _safe_float(d.get("age"), DEFAULT_FEATURE_VALUES["age"])
+    age = float(max(14.0, min(60.0, age)))
+    vo2_max = _safe_float(d.get("vo2_max"), DEFAULT_FEATURE_VALUES["vo2_max"])
+    vo2_max = float(max(25.0, min(85.0, vo2_max)))
+    history_injury_count = _safe_float(
+        d.get("history_injury_count"),
+        DEFAULT_FEATURE_VALUES["history_injury_count"],
+    )
+    history_injury_count = float(max(0.0, min(10.0, round(history_injury_count))))
 
     sleep_minutes = d.get("sleepMinutes")
     sleep_hours = (
@@ -51,22 +117,36 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         sleep_hours = float(DEFAULT_FEATURE_VALUES["sleep_hours"])
     sleep_hours = float(max(3.0, min(12.0, sleep_hours)))
 
-    steps = float(d.get("steps") or 0.0)
-    distance_m = float(d.get("distanceMeters") or 0.0)
+    steps = max(0.0, _safe_float(d.get("steps"), 0.0))
+    distance_m = max(0.0, _safe_float(d.get("distanceMeters"), 0.0))
     daily_distance_km = distance_m / 1000.0 if distance_m > 0 else max(0.0, steps * 0.0008)
+    daily_distance_km = float(min(60.0, daily_distance_km))
 
-    active_cal = float(d.get("activeCalories") or 0.0)
-    intake = d.get("totalCalories")
-    burned = d.get("totalCalories")  # Android stores total under daily_health; use as both if needed
-    daily_calories = float(intake if intake is not None else DEFAULT_FEATURE_VALUES["daily_calories"])
-    bmr = float(d.get("bmrCalories") or 0.0)
+    active_cal = max(0.0, _safe_float(d.get("activeCalories"), 0.0))
+    total_burned_health = max(0.0, _safe_float(d.get("totalCalories"), 0.0))
+    bmr = max(0.0, _safe_float(d.get("bmrCalories"), 0.0))
+    # totalCalories in daily_health represents burn from Health Connect.
     total_burned = float(
-        (d.get("totalCalories") or 0) + active_cal * 0.25 + bmr * 0.15
-        if (d.get("totalCalories") is not None or active_cal or bmr)
-        else DEFAULT_FEATURE_VALUES["total_calories_burned"]
+        total_burned_health
+        if total_burned_health > 0
+        else (bmr + active_cal if (bmr > 0 or active_cal > 0) else DEFAULT_FEATURE_VALUES["total_calories_burned"])
     )
     if total_burned <= 0:
         total_burned = float(DEFAULT_FEATURE_VALUES["total_calories_burned"])
+    total_burned = float(min(9000.0, total_burned))
+
+    protein_g = max(0.0, _safe_float(d.get("totalProtein"), 0.0))
+    carbs_g = max(0.0, _safe_float(d.get("totalCarbs"), 0.0))
+    meals_logged = max(0.0, _safe_float(d.get("mealsLoggedCount"), 0.0))
+    macro_energy = protein_g * 4.0 + carbs_g * 4.0
+    # If only protein/carbs are available, estimate missing fat energy conservatively.
+    estimated_intake_from_macros = macro_energy * 1.2 if macro_energy > 0 else 0.0
+    daily_calories = (
+        estimated_intake_from_macros if estimated_intake_from_macros > 0 else float(DEFAULT_FEATURE_VALUES["daily_calories"])
+    )
+    if meals_logged > 0 and macro_energy <= 0:
+        daily_calories = float(DEFAULT_FEATURE_VALUES["daily_calories"] * min(1.25, 0.6 + meals_logged * 0.2))
+    daily_calories = float(min(7000.0, max(800.0, daily_calories)))
 
     workout_intensity = max(0.0, min(240.0, daily_distance_km * 5.5 + active_cal / 40.0))
     avg_cadence = float(DEFAULT_FEATURE_VALUES["avg_cadence"])
@@ -76,23 +156,26 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     weight_kg = d.get("weightKg")
     bmi = DEFAULT_FEATURE_VALUES["bmi"]
-    if weight_kg is not None and float(weight_kg) > 0:
+    if weight_kg is not None and _safe_float(weight_kg, 0.0) > 0:
         height_m = 1.75
         bmi = float(weight_kg) / (height_m**2)
+    bmi = float(max(15.0, min(45.0, bmi)))
 
-    hr_avg = d.get("heartRateAvg")
-    resting_hr = float(hr_avg if hr_avg is not None else DEFAULT_FEATURE_VALUES["resting_hr"])
+    hr_avg = _safe_float(d.get("heartRateAvg"), DEFAULT_FEATURE_VALUES["resting_hr"])
+    hr_min = _safe_float(d.get("heartRateMin"), hr_avg)
+    resting_proxy = hr_min if hr_min > 0 else hr_avg
+    resting_hr = float(resting_proxy if resting_proxy > 0 else DEFAULT_FEATURE_VALUES["resting_hr"])
     resting_hr = float(max(38.0, min(95.0, resting_hr)))
 
     hrv_score = float(DEFAULT_FEATURE_VALUES["hrv_score"])
-    if hr_avg is not None:
+    if hr_avg > 0:
         hrv_score = float(max(30.0, min(100.0, 110.0 - resting_hr * 0.65)))
 
     partial: dict = {
-        "age": float(DEFAULT_FEATURE_VALUES["age"]),
+        "age": age,
         "bmi": float(bmi),
-        "history_injury_count": float(DEFAULT_FEATURE_VALUES["history_injury_count"]),
-        "vo2_max": float(DEFAULT_FEATURE_VALUES["vo2_max"]),
+        "history_injury_count": history_injury_count,
+        "vo2_max": vo2_max,
         "daily_distance_km": float(daily_distance_km),
         "workout_intensity_minutes": float(workout_intensity),
         "avg_cadence": float(avg_cadence),

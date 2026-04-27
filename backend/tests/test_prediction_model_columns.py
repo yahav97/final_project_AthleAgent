@@ -2,10 +2,13 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from schemas.inference import InjuryPredictionRequest
+from services.model_features import MODEL_FEATURE_COLUMNS
 from services.prediction_service import predict_injury_risk
+from services.preprocessing import validate_feature_vector_for_model
 
 
 @pytest.mark.skipif(
@@ -36,3 +39,29 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
     out = predict_injury_risk(InjuryPredictionRequest(sleepMinutes=480))
     assert out["risk_score"] == 0.12
     assert "artifact" in out["recommendation"].lower()
+
+
+def test_validate_feature_vector_enforces_exact_training_order():
+    df = pd.DataFrame(
+        [
+            {
+                "sleep_hours": 7.0,
+                "age": 26.0,
+                "vo2_max": 55.0,
+            }
+        ]
+    )
+    aligned = validate_feature_vector_for_model(
+        df,
+        {"feature_columns": ["age", "vo2_max", "sleep_hours"], "estimator": None},
+    )
+    assert list(aligned.columns) == ["age", "vo2_max", "sleep_hours"]
+
+
+def test_validate_feature_vector_raises_when_missing_column():
+    df = pd.DataFrame([{c: 1.0 for c in MODEL_FEATURE_COLUMNS if c != "acwr_ratio"}])
+    with pytest.raises(ValueError, match="missing feature columns"):
+        validate_feature_vector_for_model(
+            df,
+            {"feature_columns": MODEL_FEATURE_COLUMNS, "estimator": None},
+        )

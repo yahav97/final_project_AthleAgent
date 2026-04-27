@@ -21,26 +21,38 @@ Based on research-validated risk factors:
 Author: AthleAgent Project
 """
 
-import pandas as pd
+import argparse
+import os
+
 import numpy as np
+import pandas as pd
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-NUM_ATHLETES = 100          # Number of synthetic athletes
-DAYS_PER_ATHLETE = 90       # Days of data per athlete (~3 months)
+NUM_ATHLETES = 1000         # Default requested scale for first iteration
+DAYS_PER_ATHLETE = 365      # One full year per athlete
 START_DATE = '2025-01-01'   # Starting date for data generation
+DEFAULT_SEED = 42
 
 # ============================================================================
 # DATA GENERATION FUNCTION
 # ============================================================================
 
-def generate_synthetic_data():
+def generate_synthetic_data(
+    num_athletes: int = NUM_ATHLETES,
+    days_per_athlete: int = DAYS_PER_ATHLETE,
+    seed: int = DEFAULT_SEED,
+):
+    np.random.seed(seed)
     all_data = []
-    print(f"Generating data for {NUM_ATHLETES} athletes over {DAYS_PER_ATHLETE} days...")
+    print(
+        f"Generating data for {num_athletes} athletes over {days_per_athlete} days "
+        f"(seed={seed})..."
+    )
 
-    for athlete_id in range(1, NUM_ATHLETES + 1):
+    for athlete_id in range(1, num_athletes + 1):
         # Generate athlete baseline characteristics (constant per athlete)
         age = np.random.randint(18, 40)
         height = np.random.normal(1.75, 0.10)  # Average height ~175cm
@@ -51,9 +63,9 @@ def generate_synthetic_data():
         history_injury_count = np.random.choice([0, 1, 2, 3], p=[0.6, 0.2, 0.1, 0.1])
         base_hrv = np.random.randint(40, 90)  # Baseline HRV (ms)
         base_resting_hr = np.random.randint(45, 65)  # Baseline resting HR (bpm)
-        dates = pd.date_range(start=START_DATE, periods=DAYS_PER_ATHLETE)
+        dates = pd.date_range(start=START_DATE, periods=days_per_athlete)
         
-        for day in range(DAYS_PER_ATHLETE):
+        for day in range(days_per_athlete):
             # ============================================================
             # PHYSICAL LOAD METRICS
             # ============================================================
@@ -207,11 +219,42 @@ def generate_synthetic_data():
     
     return final_df
 
+
+def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
+    class_counts = df["injury_tomorrow"].value_counts().to_dict()
+    injury_rate = float(df["injury_tomorrow"].mean())
+    report = {
+        "rows": int(len(df)),
+        "columns": int(df.shape[1]),
+        "injury_rate": injury_rate,
+        "class_counts": {str(k): int(v) for k, v in class_counts.items()},
+        "acwr_ratio_range": [float(df["acwr_ratio"].min()), float(df["acwr_ratio"].max())],
+        "sleep_debt_3d_range": [float(df["sleep_debt_3d"].min()), float(df["sleep_debt_3d"].max())],
+        "hrv_drop_range": [float(df["hrv_drop"].min()), float(df["hrv_drop"].max())],
+    }
+    output_path = os.path.join(output_dir, "dataset_quality_report.json")
+    import json
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
+    return output_path
+
+
 if __name__ == "__main__":
-    import os
-    df = generate_synthetic_data()
-    # Save to ML_model directory
+    parser = argparse.ArgumentParser(description="Generate synthetic athlete injury dataset.")
+    parser.add_argument("--num-athletes", type=int, default=NUM_ATHLETES)
+    parser.add_argument("--days", type=int, default=DAYS_PER_ATHLETE)
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    args = parser.parse_args()
+
+    df = generate_synthetic_data(
+        num_athletes=args.num_athletes,
+        days_per_athlete=args.days,
+        seed=args.seed,
+    )
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(script_dir, 'athlete_injury_data.csv')
+    output_path = os.path.join(script_dir, "athlete_injury_data.csv")
     df.to_csv(output_path, index=False)
+    report_path = _write_quality_report(df, script_dir)
     print(f"SUCCESS: Created {output_path}")
+    print(f"QUALITY REPORT: {report_path}")

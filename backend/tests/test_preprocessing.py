@@ -34,3 +34,11 @@ def test_types_float64():
     req = InjuryPredictionRequest()
     df = injury_request_to_model_dataframe(req)
     assert df.dtypes.apply(lambda t: pd.api.types.is_float_dtype(t)).all()
+
+
+def test_profile_fields_override_defaults_when_provided():
+    req = InjuryPredictionRequest(age=31, vo2_max=58, history_injury_count=2, sleepMinutes=420)
+    df = injury_request_to_model_dataframe(req)
+    assert float(df["age"].iloc[0]) == 31.0
+    assert float(df["vo2_max"].iloc[0]) == 58.0
+    assert float(df["history_injury_count"].iloc[0]) == 2.0

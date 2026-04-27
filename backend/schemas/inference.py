@@ -1,6 +1,6 @@
 """Request/response shapes for injury risk inference."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 # --- Legacy / demo payloads (Android demo_predict, test_predict) ---
@@ -47,6 +47,17 @@ class InjuryPredictionRequest(BaseModel):
 
     userId: str | None = Field(default=None, description="Firebase Auth uid")
     date: str | None = Field(default=None, description="Day key yyyy-MM-dd")
+
+    # users/{uid}/profile (static or slowly-changing athlete profile)
+    age: int | None = None
+    vo2_max: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("vo2_max", "vo2Max"),
+    )
+    history_injury_count: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("history_injury_count", "historyInjuryCount"),
+    )
 
     # users/{uid}/daily_health (Health Connect sync)
     sleepMinutes: int | None = None

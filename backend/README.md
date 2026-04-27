@@ -160,11 +160,13 @@ python scripts/smoke_uvicorn.py
 
 **Android / Firestore mapping and integration options:** see [docs/ANDROID_INTEGRATION.md](docs/ANDROID_INTEGRATION.md).
 
+**Frontend-backend daily contract before model tuning:** see [docs/DATA_CONTRACT_FRONTEND_BACKEND.md](docs/DATA_CONTRACT_FRONTEND_BACKEND.md).
+
 ---
 
 ## Known limitations
 
-- **Rolling workload:** Training uses true 7d/21d rollups per athlete. The mobile payload is often a **single day**; the service uses **documented proxies** for acute/chronic/ACWR until history is supplied (e.g. extra fields or server-side reads).
+- **Rolling workload:** Training uses true 7d/21d rollups per athlete. In serving, the backend now reads up to **7 historical days** when available and uses documented fallbacks/proxies when history is sparse.
 - **Legacy stack:** Postgres models and `create_tables.py` remain for optional `ENABLE_LEGACY_AUTH_DB=true` workflows; they are **not** required for `POST /predict`.
 
 ---

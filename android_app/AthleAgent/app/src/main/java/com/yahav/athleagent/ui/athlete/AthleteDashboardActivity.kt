@@ -13,10 +13,11 @@ import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.yahav.athleagent.config.FeatureFlags
 import com.yahav.athleagent.databinding.ActivityAthleteDashboardBinding
+import com.yahav.athleagent.model.PredictionResponse
 import com.yahav.athleagent.network.ApiClient
 import com.yahav.athleagent.network.ApiService
-import com.yahav.athleagent.model.PredictionResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -58,30 +59,30 @@ class AthleteDashboardActivity : AppCompatActivity() {
             try {
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
+                val profileDoc = db.collection("users").document(userId).get().await()
                 val healthDoc = db.collection("users").document(userId)
                     .collection("daily_health").document(today).get().await()
                 val checkinDoc = db.collection("users").document(userId)
                     .collection("daily_checkins").document(today).get().await()
+                val nutritionDoc = db.collection("users").document(userId)
+                    .collection("daily_nutrition").document(today).get().await()
 
-                val sleepMinutes = healthDoc.getLong("sleepMinutes") ?: 480L
-                val steps = healthDoc.getLong("steps") ?: 5000L
-                val soreness = checkinDoc.getLong("muscleSoreness")?.toInt() ?: 1
-                val stress = checkinDoc.getLong("stressLevel")?.toInt() ?: 20
-
-                val sleepHours = sleepMinutes / 60.0f
-                val distanceKm = (steps * 0.0008).toFloat()
-
-                val athleteDataForServer = ApiService.AthleteData(
-                    age = 25, bmi = 22.5f, history_injury_count = 0, vo2_max = 50,
-                    daily_distance_km = distanceKm, workout_intensity_minutes = 60,
-                    avg_cadence = 160, sleep_hours = sleepHours, hrv_score = 60,
-                    resting_hr = 55, daily_calories = 2500, total_calories_burned = 2800,
-                    calorie_balance = -300, stress_level = stress, muscle_soreness = soreness,
-                    acute_load_7d = 1500f, chronic_load_21d = 1400f, acwr_ratio = 1.07f,
-                    sleep_debt_3d = 0.0f, hrv_drop = 0.0f
+                val payload = PredictPayloadBuilder.build(
+                    userId = userId,
+                    date = today,
+                    profile = profileDoc.data ?: emptyMap(),
+                    health = healthDoc.data ?: emptyMap(),
+                    checkin = checkinDoc.data ?: emptyMap(),
+                    nutrition = nutritionDoc.data ?: emptyMap(),
                 )
 
-                sendToPythonBackend(athleteDataForServer, sleepMinutes, soreness, stress)
+                sendToPythonBackend(
+                    payload.legacyData,
+                    payload.predictRequest,
+                    payload.sleepMinutes,
+                    payload.soreness,
+                    payload.stress,
+                )
 
             } catch (e: Exception) {
                 Log.e("Dashboard", "Error loading data", e)
@@ -89,11 +90,26 @@ class AthleteDashboardActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendToPythonBackend(data: ApiService.AthleteData, sleepMins: Long, soreness: Int, stress: Int) {
-        ApiClient.apiService.getDemoPrediction(data).enqueue(object : Callback<PredictionResponse> {
+    private fun sendToPythonBackend(
+        legacyData: ApiService.AthleteData,
+        predictRequest: ApiService.PredictRequest,
+        sleepMins: Long,
+        soreness: Int,
+        stress: Int
+    ) {
+        val usePredictV2 = FeatureFlags.isPredictV2Enabled()
+        val call = if (usePredictV2) {
+            Log.d("Dashboard", "Using /predict flow (enablePredictV2=true)")
+            ApiClient.apiService.getPredictV2(predictRequest)
+        } else {
+            Log.d("Dashboard", "Using /demo_predict flow (enablePredictV2=false)")
+            ApiClient.apiService.getDemoPrediction(legacyData)
+        }
+        call.enqueue(object : Callback<PredictionResponse> {
             override fun onResponse(call: Call<PredictionResponse>, response: Response<PredictionResponse>) {
                 if (response.isSuccessful) {
-                    val riskScore = response.body()?.risk_percentage?.toInt() ?: 0
+                    val body = response.body()
+                    val riskScore = extractRiskScore(body)
                     updateUIWithScore(riskScore)
 
                     // Save the new score to DB and refresh the chart
@@ -102,12 +118,26 @@ class AthleteDashboardActivity : AppCompatActivity() {
                     lifecycleScope.launch(Dispatchers.IO) {
                         fetchAIRecommendation(riskScore, sleepMins, soreness, stress)
                     }
+                } else {
+                    updateUIWithError("Prediction API Error (${response.code()})")
                 }
             }
             override fun onFailure(call: Call<PredictionResponse>, t: Throwable) {
                 updateUIWithError("Backend Connection Failed")
             }
         })
+    }
+
+    private fun extractRiskScore(body: PredictionResponse?): Int {
+        val score01 = body?.riskScore
+        if (score01 != null) {
+            return (score01 * 100.0).toInt().coerceIn(0, 100)
+        }
+        val legacy = body?.riskPercentageLegacy
+        if (legacy != null) {
+            return legacy.toInt().coerceIn(0, 100)
+        }
+        return 0
     }
 
     private fun saveRiskScoreToFirestore(score: Int) {

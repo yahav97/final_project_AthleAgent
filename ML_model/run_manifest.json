@@ -1,0 +1,19 @@
+{
+  "created_at_utc": "2026-04-23T10:53:05.722073+00:00",
+  "dataset_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\athlete_injury_data.csv",
+  "dataset_rows": 345000,
+  "threshold": 0.4,
+  "policy": {
+    "recall_min": 0.9,
+    "precision_min": 0.3,
+    "f1_min": 0.45
+  },
+  "winner": "LogisticRegression",
+  "winner_metrics": {
+    "Recall@Threshold": 0.8323084431429966,
+    "Precision@Threshold": 0.18407702437234202,
+    "F1@Threshold": 0.3014778673454957,
+    "ROC-AUC": 0.66659097204026,
+    "LogLoss": 0.6497853698272746
+  }
+}

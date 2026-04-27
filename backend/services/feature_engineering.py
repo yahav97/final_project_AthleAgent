@@ -10,6 +10,21 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
+def compute_rolling_features_stub(
+    current_row: Mapping[str, Any],
+    history_rows: list[Mapping[str, Any]] | None = None,
+) -> dict[str, float]:
+    """
+    Stub for history-aware rolling features.
+
+    TODO:
+    - replace proxy logic with real 7d/21d rolling windows from persisted history
+    - support athlete-specific baselines from Firestore-backed history service
+    """
+    _ = history_rows  # explicit placeholder for future integration
+    return compute_derived_features(current_row)
+
+
 def compute_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
     """
     Compute acute/chronic load, ACWR, sleep debt proxy, and HRV drop proxy.
