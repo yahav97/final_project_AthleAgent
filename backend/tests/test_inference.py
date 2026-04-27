@@ -25,8 +25,17 @@ def test_predict_production_contract():
     response = client.post("/predict", json=sample)
     assert response.status_code == 200
     data = response.json()
-    assert set(data.keys()) == {"risk_level", "risk_score", "recommendation"}
+    assert set(data.keys()) == {
+        "risk_level",
+        "risk_score",
+        "recommendation",
+        "data_quality_score",
+        "data_quality_status",
+    }
     assert data["risk_level"] in ("Low", "Medium", "High")
     assert isinstance(data["risk_score"], (int, float))
     assert 0.0 <= float(data["risk_score"]) <= 1.0
+    assert isinstance(data["data_quality_score"], (int, float))
+    assert 0.0 <= float(data["data_quality_score"]) <= 1.0
+    assert data["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
     assert len(data["recommendation"]) > 5

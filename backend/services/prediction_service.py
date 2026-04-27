@@ -8,7 +8,12 @@ from ml.model_loader import get_model
 from schemas.inference import InjuryPredictionRequest
 from services.history_service import get_history_window_context
 from services.model_features import DEFAULT_FEATURE_VALUES
-from services.preprocessing import injury_request_to_model_dataframe, validate_feature_vector_for_model
+from services.preprocessing import (
+    calculate_data_quality_score,
+    injury_request_to_model_dataframe,
+    validate_feature_vector_for_model,
+)
+from utils.logging import logger
 
 
 def _recommendation(probability: float, acwr: float) -> str:
@@ -58,6 +63,33 @@ def _append_confidence_note(recommendation: str, confidence: str) -> str:
     return recommendation + " Confidence: low (insufficient history; using profile/default baselines)."
 
 
+def _history_score_from_confidence(confidence: str) -> float:
+    if confidence == "high":
+        return 0.95
+    if confidence == "medium":
+        return 0.7
+    return 0.45
+
+
+def _combined_confidence(history_confidence: str, quality_score: float) -> str:
+    score = 0.6 * _history_score_from_confidence(history_confidence) + 0.4 * quality_score
+    if score >= 0.78:
+        return "high"
+    if score >= 0.52:
+        return "medium"
+    return "low"
+
+
+def _quality_status(quality_score: float) -> str:
+    if quality_score >= 0.9:
+        return "Excellent"
+    if quality_score >= 0.7:
+        return "Good"
+    if quality_score >= 0.45:
+        return "Fair"
+    return "Poor"
+
+
 def _resolve_estimator_and_features(loaded_model: Any) -> tuple[Any | None, list[str] | None]:
     """
     Support both legacy raw estimators and the new model bundle format.
@@ -87,6 +119,30 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     """
     df = injury_request_to_model_dataframe(payload)
     df, history_confidence = _apply_history_confidence_fallback(df, payload)
+    quality = calculate_data_quality_score(payload)
+    quality_score = float(quality["score"])
+    quality_status = _quality_status(quality_score)
+    logger.info(
+        "predict_data_quality userId=%s date=%s quality=%.3f sensitive_missing_fields=%s hard_missing=%s",
+        payload.userId,
+        payload.date,
+        quality_score,
+        quality.get("sensitive_missing", []),
+        quality.get("hard_missing", []),
+    )
+    final_confidence = _combined_confidence(history_confidence, quality_score)
+
+    if bool(quality["has_hard_blocker"]) or quality_score < 0.35:
+        return {
+            "risk_level": "Low",
+            "risk_score": 0.08,
+            "recommendation": _append_confidence_note(
+                "Insufficient data for accurate prediction. Conservative low-risk fallback returned.",
+                final_confidence,
+            ),
+            "data_quality_score": round(quality_score, 4),
+            "data_quality_status": quality_status,
+        }
     acwr = float(df["acwr_ratio"].iloc[0])
 
     loaded_model = get_model()
@@ -96,6 +152,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             "risk_level": "Low",
             "risk_score": 0.12,
             "recommendation": "Model artifact not loaded; demo response only. Train/copy injury_model.pkl to backend/.",
+            "data_quality_score": round(quality_score, 4),
+            "data_quality_status": quality_status,
         }
 
     # Saved estimators may have been trained after feature selection (subset of MODEL_FEATURE_COLUMNS).
@@ -108,5 +166,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     return {
         "risk_level": risk_level,
         "risk_score": round(proba, 4),
-        "recommendation": _append_confidence_note(_recommendation(proba, acwr), history_confidence),
+        "recommendation": _append_confidence_note(_recommendation(proba, acwr), final_confidence),
+        "data_quality_score": round(quality_score, 4),
+        "data_quality_status": quality_status,
     }

@@ -88,3 +88,5 @@ class InjuryPredictionResponse(BaseModel):
     risk_level: str
     risk_score: float = Field(..., description="Scalar risk score, e.g. 0.0–1.0")
     recommendation: str
+    data_quality_score: float = Field(..., description="Current-day payload quality score in range 0.0–1.0")
+    data_quality_status: str = Field(..., description="Current-day quality label: Excellent/Good/Fair/Poor")

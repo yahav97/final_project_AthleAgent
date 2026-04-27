@@ -4,7 +4,7 @@ import pandas as pd
 
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import MODEL_FEATURE_COLUMNS
-from services.preprocessing import injury_request_to_model_dataframe
+from services.preprocessing import calculate_data_quality_score, injury_request_to_model_dataframe
 
 
 def test_dataframe_shape_and_no_nan():
@@ -42,3 +42,31 @@ def test_profile_fields_override_defaults_when_provided():
     assert float(df["age"].iloc[0]) == 31.0
     assert float(df["vo2_max"].iloc[0]) == 58.0
     assert float(df["history_injury_count"].iloc[0]) == 2.0
+
+
+def test_quality_score_tolerates_missing_nutrition_fields():
+    req = InjuryPredictionRequest(
+        userId="u1",
+        date="2026-04-27",
+        sleepMinutes=420,
+        steps=9000,
+        stressLevel=40,
+        muscleSoreness=3,
+    )
+    q = calculate_data_quality_score(req)
+    assert q["has_hard_blocker"] is False
+    assert float(q["score"]) > 0.5
+    assert "totalProtein" not in q["sensitive_missing"]
+
+
+def test_quality_score_sets_hard_blocker_without_load_signal():
+    req = InjuryPredictionRequest(
+        userId="u1",
+        date="2026-04-27",
+        sleepMinutes=420,
+        stressLevel=40,
+        muscleSoreness=3,
+    )
+    q = calculate_data_quality_score(req)
+    assert q["has_hard_blocker"] is True
+    assert "load_signal" in q["hard_missing"]

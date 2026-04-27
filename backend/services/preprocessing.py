@@ -14,6 +14,27 @@ from schemas.inference import InjuryPredictionRequest
 from services.feature_engineering import compute_derived_features
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 
+TOLERANT_FIELDS: tuple[str, ...] = (
+    "totalProtein",
+    "totalCarbs",
+    "mealsLoggedCount",
+    "energyLevel",
+    "heartRateMax",
+    "heartRateMin",
+    "activeCalories",
+)
+
+SENSITIVE_FIELDS: tuple[str, ...] = (
+    "sleepMinutes",
+    "steps",
+    "distanceMeters",
+    "heartRateAvg",
+    "stressLevel",
+    "muscleSoreness",
+)
+
+HARD_FIELDS: tuple[str, ...] = ("userId", "date")
+
 
 def _stress_to_model_scale(value: int | None) -> float:
     """Map Android stress (often 0–100) to training scale 1–10."""
@@ -44,6 +65,51 @@ def _safe_float(value: object, fallback: float = 0.0) -> float:
     if not math.isfinite(out):
         return float(fallback)
     return out
+
+
+def _is_present(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return math.isfinite(float(value))
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def calculate_data_quality_score(payload: InjuryPredictionRequest) -> dict[str, object]:
+    """
+    Score current-day payload completeness and report hard-missing conditions.
+
+    Score range: 0.0 - 1.0
+    - tolerant missing fields do not reduce score
+    - sensitive missing fields reduce score
+    - hard requirements trigger red flag
+    """
+    d = payload.model_dump()
+    hard_missing = [f for f in HARD_FIELDS if not _is_present(d.get(f))]
+    sensitive_missing = [f for f in SENSITIVE_FIELDS if not _is_present(d.get(f))]
+
+    has_load_signal = _is_present(d.get("steps")) or _is_present(d.get("distanceMeters"))
+    has_recovery_signal = _is_present(d.get("sleepMinutes")) or (
+        _is_present(d.get("stressLevel")) and _is_present(d.get("muscleSoreness"))
+    )
+    if not has_load_signal:
+        hard_missing.append("load_signal")
+    if not has_recovery_signal:
+        hard_missing.append("recovery_signal")
+
+    sensitive_penalty = 0.12 * len(sensitive_missing)
+    score = max(0.0, min(1.0, 1.0 - sensitive_penalty))
+    if hard_missing:
+        score = min(score, 0.25)
+
+    return {
+        "score": float(score),
+        "hard_missing": hard_missing,
+        "sensitive_missing": sensitive_missing,
+        "has_hard_blocker": bool(hard_missing),
+    }
 
 
 def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) -> pd.DataFrame:

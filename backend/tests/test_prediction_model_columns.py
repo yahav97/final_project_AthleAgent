@@ -32,13 +32,15 @@ def test_predict_injury_risk_with_loaded_model_no_500():
 
 
 def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monkeypatch):
-    """When no model, service returns demo dict without calling sklearn."""
+    """When hard requirements are missing, service returns conservative fallback."""
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
     out = predict_injury_risk(InjuryPredictionRequest(sleepMinutes=480))
-    assert out["risk_score"] == 0.12
-    assert "artifact" in out["recommendation"].lower()
+    assert out["risk_score"] == 0.08
+    assert "insufficient data" in out["recommendation"].lower()
+    assert 0.0 <= float(out["data_quality_score"]) <= 1.0
+    assert out["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
 
 
 def test_validate_feature_vector_enforces_exact_training_order():
