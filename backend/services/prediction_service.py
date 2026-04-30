@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ml.model_loader import get_model
+from ml.model_loader import get_model, get_model_gate_reason
 from schemas.inference import InjuryPredictionRequest
 from services.history_service import get_history_window_context
 from services.model_features import DEFAULT_FEATURE_VALUES
@@ -88,6 +88,16 @@ def _combined_confidence(history_confidence: str, quality_score: float) -> str:
     if score >= 0.52:
         return "medium"
     return "low"
+
+
+def _confidence_bucket(probability: float, high_cutoff: float, medium_cutoff: float) -> str:
+    if probability >= high_cutoff + 0.12:
+        return "High"
+    if probability >= high_cutoff:
+        return "Medium"
+    if probability >= medium_cutoff:
+        return "Medium"
+    return "Low"
 
 
 def _quality_status(quality_score: float) -> str:
@@ -215,6 +225,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             "meta": {
                 "model_version": "fallback_demo",
                 "fallback_reason": "insufficient_input_quality",
+                "confidence_bucket": "Low",
             },
         }
     acwr = float(df["acwr_ratio"].iloc[0])
@@ -229,10 +240,12 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         model_status,
     ) = _resolve_model_bundle(loaded_model)
     if model is None:
+        gate_reason = get_model_gate_reason()
+        fallback_reason = model_status if model_status != "model_not_loaded" else gate_reason
         logger.info(
             "predict_fallback userId=%s reason=%s confidence=%s",
             payload.userId,
-            model_status,
+            fallback_reason,
             final_confidence,
         )
         return {
@@ -243,7 +256,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             "data_quality_status": quality_status,
             "meta": {
                 "model_version": model_version,
-                "fallback_reason": model_status,
+                "fallback_reason": fallback_reason,
+                "confidence_bucket": "Low",
             },
         }
 
@@ -256,6 +270,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     high_cutoff = float(model_threshold)
     medium_cutoff = min(float(medium_threshold), high_cutoff)
     risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
+    confidence_bucket = _confidence_bucket(proba, high_cutoff, medium_cutoff)
 
     return {
         "risk_level": risk_level,
@@ -266,5 +281,6 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         "meta": {
             "model_version": model_version,
             "fallback_reason": "none",
+            "confidence_bucket": confidence_bucket,
         },
     }

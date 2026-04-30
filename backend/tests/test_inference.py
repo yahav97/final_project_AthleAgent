@@ -42,6 +42,8 @@ def test_predict_production_contract():
     assert isinstance(data["meta"], dict)
     assert "model_version" in data["meta"]
     assert "fallback_reason" in data["meta"]
+    assert "confidence_bucket" in data["meta"]
+    assert data["meta"]["confidence_bucket"] in ("Low", "Medium", "High")
     assert len(data["recommendation"]) > 5
 
 

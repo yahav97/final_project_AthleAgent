@@ -36,11 +36,32 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
+    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
     out = predict_injury_risk(InjuryPredictionRequest(sleepMinutes=480))
     assert out["risk_score"] == 0.08
     assert "insufficient data" in out["recommendation"].lower()
     assert 0.0 <= float(out["data_quality_score"]) <= 1.0
     assert out["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
+
+
+def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
+    from services import prediction_service as ps
+
+    monkeypatch.setattr(ps, "get_model", lambda: None)
+    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
+    out = predict_injury_risk(
+        InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=450,
+            steps=6200,
+            stressLevel=36,
+            muscleSoreness=3,
+        )
+    )
+    assert isinstance(out["meta"], dict)
+    assert out["meta"]["fallback_reason"] in ("manifest_corrupted", "model_not_loaded")
+    assert out["meta"]["confidence_bucket"] in ("Low", "Medium", "High")
 
 
 def test_validate_feature_vector_enforces_exact_training_order():

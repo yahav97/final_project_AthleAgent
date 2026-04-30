@@ -78,6 +78,7 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
             "meta": {
                 "model_version": "fallback_demo",
                 "fallback_reason": "predict_exception",
+                "confidence_bucket": "Low",
             },
         }
     return InjuryPredictionResponse(**result)
