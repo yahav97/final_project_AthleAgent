@@ -29,33 +29,6 @@ interface ApiService {
         val hrv_drop: Float
     )
 
-    data class PredictRequest(
-        val userId: String,
-        val date: String,
-        val age: Int,
-        val vo2Max: Int,
-        val historyInjuryCount: Int,
-        val sleepMinutes: Int,
-        val steps: Int,
-        val distanceMeters: Int,
-        val activeCalories: Int,
-        val totalCalories: Int,
-        val heartRateAvg: Int,
-        val heartRateMax: Int,
-        val heartRateMin: Int,
-        val weightKg: Double,
-        val bmrCalories: Int,
-        val energyLevel: Int,
-        val muscleSoreness: Int,
-        val stressLevel: Int,
-        val totalProtein: Int,
-        val totalCarbs: Int,
-        val mealsLoggedCount: Int
-    )
-
     @POST("/demo_predict")
     fun getDemoPrediction(@Body data: AthleteData): Call<PredictionResponse>
-
-    @POST("/predict")
-    fun getPredictV2(@Body data: PredictRequest): Call<PredictionResponse>
 }

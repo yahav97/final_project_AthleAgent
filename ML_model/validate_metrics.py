@@ -8,6 +8,7 @@ import sys
 import pandas as pd
 
 TARGET_RECALL = 0.90
+MIN_RECALL_THRESHOLD = 0.85
 TARGET_PRECISION = 0.30
 TARGET_F1 = 0.45
 THRESHOLD = 0.4
@@ -35,19 +36,30 @@ def main() -> int:
     print(f"Policy threshold: {THRESHOLD}")
     print(ranked.to_string(index=False))
 
-    recall_ok = float(top["Recall@Threshold"]) >= TARGET_RECALL
+    recall_value = float(top["Recall@Threshold"])
+    recall_hard_gate_ok = recall_value >= MIN_RECALL_THRESHOLD
+    recall_target_ok = recall_value >= TARGET_RECALL
     precision_ok = float(top["Precision@Threshold"]) >= TARGET_PRECISION
     f1_ok = float(top["F1@Threshold"]) >= TARGET_F1
-    if recall_ok and precision_ok and f1_ok:
+    if not recall_hard_gate_ok:
+        print(
+            f"\nREJECTED: {top['Model']} failed hard safety gate "
+            f"(Recall={recall_value:.4f} < {MIN_RECALL_THRESHOLD})."
+        )
+        return 2
+
+    if recall_target_ok and precision_ok and f1_ok:
         print(
             f"\nPASS: {top['Model']} meets targets "
-            f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1})."
+            f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
+            f"Hard gate: Recall>={MIN_RECALL_THRESHOLD}."
         )
         return 0
 
     print(
         f"\nWARN: Top model {top['Model']} does not meet all targets "
-        f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1})."
+        f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
+        f"but passes hard gate Recall>={MIN_RECALL_THRESHOLD}."
     )
     return 2
 

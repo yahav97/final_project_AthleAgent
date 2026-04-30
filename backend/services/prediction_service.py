@@ -90,24 +90,38 @@ def _quality_status(quality_score: float) -> str:
     return "Poor"
 
 
-def _resolve_estimator_and_features(loaded_model: Any) -> tuple[Any | None, list[str] | None]:
+def _resolve_model_bundle(loaded_model: Any) -> tuple[Any | None, list[str] | None, float | None, str, str]:
     """
-    Support both legacy raw estimators and the new model bundle format.
+    Enforce a single model contract for serving.
 
-    Bundle format (saved by ML_model/train_model.py):
-      {"estimator": <model>, "feature_columns": [...], ...}
+    Required bundle format (saved by ML_model/train_model.py):
+      {
+        "estimator": <model>,
+        "feature_columns": [...],
+        "threshold": <float>,
+        "winner": <str>
+      }
     """
     if loaded_model is None:
-        return None, None
-    if isinstance(loaded_model, dict):
-        estimator = loaded_model.get("estimator")
-        feature_columns = loaded_model.get("feature_columns")
-        if isinstance(feature_columns, list):
-            feature_columns = [str(c) for c in feature_columns]
-        else:
-            feature_columns = None
-        return estimator, feature_columns
-    return loaded_model, None
+        return None, None, None, "fallback_demo", "model_not_loaded"
+    if not isinstance(loaded_model, dict):
+        return None, None, None, "fallback_demo", "unsupported_model_format"
+
+    estimator = loaded_model.get("estimator")
+    feature_columns = loaded_model.get("feature_columns")
+    threshold_raw = loaded_model.get("threshold")
+    winner = str(loaded_model.get("winner") or "live_model")
+
+    if estimator is None:
+        return None, None, None, "fallback_demo", "missing_estimator"
+    if not isinstance(feature_columns, list) or not feature_columns:
+        return None, None, None, "fallback_demo", "missing_feature_columns"
+    try:
+        threshold = float(threshold_raw)
+    except (TypeError, ValueError):
+        return None, None, None, "fallback_demo", "invalid_threshold"
+
+    return estimator, [str(c) for c in feature_columns], threshold, winner, "none"
 
 
 def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
@@ -142,18 +156,28 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             ),
             "data_quality_score": round(quality_score, 4),
             "data_quality_status": quality_status,
+            "meta": {
+                "model_version": "fallback_demo",
+                "fallback_reason": "insufficient_input_quality",
+            },
         }
     acwr = float(df["acwr_ratio"].iloc[0])
 
     loaded_model = get_model()
-    model, bundle_feature_columns = _resolve_estimator_and_features(loaded_model)
+    model, bundle_feature_columns, model_threshold, model_version, model_status = _resolve_model_bundle(
+        loaded_model
+    )
     if model is None:
         return {
             "risk_level": "Low",
             "risk_score": 0.12,
-            "recommendation": "Model artifact not loaded; demo response only. Train/copy injury_model.pkl to backend/.",
+            "recommendation": "Model bundle is unavailable or invalid; conservative fallback returned.",
             "data_quality_score": round(quality_score, 4),
             "data_quality_status": quality_status,
+            "meta": {
+                "model_version": model_version,
+                "fallback_reason": model_status,
+            },
         }
 
     # Saved estimators may have been trained after feature selection (subset of MODEL_FEATURE_COLUMNS).
@@ -161,7 +185,10 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     X = validate_feature_vector_for_model(df, model_contract)
 
     proba = float(model.predict_proba(X)[0, 1])
-    risk_level = "High" if proba > 0.6 else "Medium" if proba > 0.3 else "Low"
+    # Single source of truth: operating threshold comes from the saved model bundle.
+    high_cutoff = float(model_threshold)
+    medium_cutoff = max(0.15, high_cutoff * 0.6)
+    risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
 
     return {
         "risk_level": risk_level,
@@ -169,4 +196,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         "recommendation": _append_confidence_note(_recommendation(proba, acwr), final_confidence),
         "data_quality_score": round(quality_score, 4),
         "data_quality_status": quality_status,
+        "meta": {
+            "model_version": model_version,
+            "fallback_reason": "none",
+        },
     }

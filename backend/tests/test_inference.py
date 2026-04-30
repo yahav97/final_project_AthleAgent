@@ -31,6 +31,7 @@ def test_predict_production_contract():
         "recommendation",
         "data_quality_score",
         "data_quality_status",
+        "meta",
     }
     assert data["risk_level"] in ("Low", "Medium", "High")
     assert isinstance(data["risk_score"], (int, float))
@@ -38,4 +39,7 @@ def test_predict_production_contract():
     assert isinstance(data["data_quality_score"], (int, float))
     assert 0.0 <= float(data["data_quality_score"]) <= 1.0
     assert data["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
+    assert isinstance(data["meta"], dict)
+    assert "model_version" in data["meta"]
+    assert "fallback_reason" in data["meta"]
     assert len(data["recommendation"]) > 5

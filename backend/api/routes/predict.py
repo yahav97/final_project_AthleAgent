@@ -11,6 +11,7 @@ from schemas.inference import (
     SimpleData,
 )
 from services.prediction_service import predict_injury_risk
+from utils.logging import logger
 
 router = APIRouter(tags=["Prediction"])
 
@@ -51,7 +52,33 @@ def demo_predict_injury(data: AthleteData):
 @router.post("/predict", response_model=InjuryPredictionResponse)
 def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredictionResponse:
     """Production contract: Firestore-shaped daily payload in, risk assessment out."""
-    result = predict_injury_risk(payload)
+    try:
+        result = predict_injury_risk(payload)
+    except Exception as exc:
+        logger.exception("predict_route_fallback_exception userId=%s err=%s", payload.userId, exc)
+        sleep_hours = (payload.sleepMinutes or 0) / 60.0
+        soreness = float(payload.muscleSoreness or 2)
+        stress = float(payload.stressLevel or 40)
+        score = 10.0
+        if sleep_hours < 5.0:
+            score += 30.0
+        elif sleep_hours < 7.0:
+            score += 15.0
+        score += soreness * 7.0
+        score += stress * 0.25
+        risk_score = min(score / 100.0, 1.0)
+        risk_level = "High" if risk_score > 0.6 else "Medium" if risk_score > 0.3 else "Low"
+        result = {
+            "risk_level": risk_level,
+            "risk_score": round(risk_score, 4),
+            "recommendation": "Server fallback response returned while model service is unavailable.",
+            "data_quality_score": 0.0,
+            "data_quality_status": "Poor",
+            "meta": {
+                "model_version": "fallback_demo",
+                "fallback_reason": "predict_exception",
+            },
+        }
     return InjuryPredictionResponse(**result)
 
 
