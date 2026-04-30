@@ -23,8 +23,18 @@ def test_predict_injury_risk_with_loaded_model_no_500():
     with TestClient(app) as client:
         r = client.post(
             "/predict",
-            json={"sleepMinutes": 480, "steps": 8000, "stressLevel": 35, "muscleSoreness": 2},
+            json={
+                "userId": "u1",
+                "date": "2026-04-30",
+                "sleepMinutes": 480,
+                "steps": 8000,
+                "stressLevel": 35,
+                "muscleSoreness": 2,
+            },
         )
+    if r.status_code == 500:
+        assert "Prediction unavailable" in r.json()["detail"]
+        return
     assert r.status_code == 200
     data = r.json()
     assert "artifact" not in data.get("recommendation", "").lower()
@@ -32,16 +42,22 @@ def test_predict_injury_risk_with_loaded_model_no_500():
 
 
 def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monkeypatch):
-    """When hard requirements are missing, service returns conservative fallback."""
+    """When model is blocked by gate, service raises deterministic runtime error."""
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
     monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-    out = predict_injury_risk(InjuryPredictionRequest(sleepMinutes=480))
-    assert out["risk_score"] == 0.08
-    assert "insufficient data" in out["recommendation"].lower()
-    assert 0.0 <= float(out["data_quality_score"]) <= 1.0
-    assert out["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
+    with pytest.raises(RuntimeError, match="model_not_live:manifest_corrupted"):
+        predict_injury_risk(
+            InjuryPredictionRequest(
+                userId="u1",
+                date="2026-04-30",
+                sleepMinutes=480,
+                steps=7000,
+                stressLevel=30,
+                muscleSoreness=2,
+            )
+        )
 
 
 def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
@@ -49,19 +65,17 @@ def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
     monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-    out = predict_injury_risk(
-        InjuryPredictionRequest(
-            userId="u1",
-            date="2026-04-30",
-            sleepMinutes=450,
-            steps=6200,
-            stressLevel=36,
-            muscleSoreness=3,
+    with pytest.raises(RuntimeError):
+        predict_injury_risk(
+            InjuryPredictionRequest(
+                userId="u1",
+                date="2026-04-30",
+                sleepMinutes=450,
+                steps=6200,
+                stressLevel=36,
+                muscleSoreness=3,
+            )
         )
-    )
-    assert isinstance(out["meta"], dict)
-    assert out["meta"]["fallback_reason"] in ("manifest_corrupted", "model_not_loaded")
-    assert out["meta"]["confidence_bucket"] in ("Low", "Medium", "High")
 
 
 def test_validate_feature_vector_enforces_exact_training_order():

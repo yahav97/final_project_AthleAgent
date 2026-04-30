@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 import pandas as pd
 
 from config import settings
-from ml.model_loader import get_model
+from ml.model_loader import get_model, get_model_status
 from schemas.inference import (
     AthleteData,
     InjuryPredictionRequest,
@@ -56,31 +56,8 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
     try:
         result = predict_injury_risk(payload)
     except Exception as exc:
-        logger.exception("predict_route_fallback_exception userId=%s err=%s", payload.userId, exc)
-        sleep_hours = (payload.sleepMinutes or 0) / 60.0
-        soreness = float(payload.muscleSoreness or 2)
-        stress = float(payload.stressLevel or 40)
-        score = 10.0
-        if sleep_hours < 5.0:
-            score += 30.0
-        elif sleep_hours < 7.0:
-            score += 15.0
-        score += soreness * 7.0
-        score += stress * 0.25
-        risk_score = min(score / 100.0, 1.0)
-        risk_level = "High" if risk_score > 0.6 else "Medium" if risk_score > 0.3 else "Low"
-        result = {
-            "risk_level": risk_level,
-            "risk_score": round(risk_score, 4),
-            "recommendation": "Server fallback response returned while model service is unavailable.",
-            "data_quality_score": 0.0,
-            "data_quality_status": "Poor",
-            "meta": {
-                "model_version": "fallback_demo",
-                "fallback_reason": "predict_exception",
-                "confidence_bucket": "Low",
-            },
-        }
+        logger.exception("predict_route_error userId=%s err=%s", payload.userId, exc)
+        raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
     return InjuryPredictionResponse(**result)
 
 
@@ -103,3 +80,9 @@ def predict_injury_sklearn(data: AthleteData):
         "risk_percentage": round(risk_probability * 100, 1),
         "risk_level": "High" if risk_probability > 0.6 else "Medium" if risk_probability > 0.3 else "Low",
     }
+
+
+@router.get("/status/ml")
+def ml_status():
+    """Internal status endpoint for model gate and active manifest."""
+    return get_model_status()

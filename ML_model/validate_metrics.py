@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 import pandas as pd
 
@@ -15,9 +16,21 @@ TARGET_F1 = 0.45
 THRESHOLD = 0.4
 
 
+def _latest_artifacts_dir(script_dir: str) -> str | None:
+    root = Path(script_dir) / "artifacts"
+    if not root.exists():
+        return None
+    candidates = [p for p in root.iterdir() if p.is_dir()]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.name, reverse=True)
+    return str(candidates[0])
+
+
 def main() -> int:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    comparison_path = os.path.join(script_dir, "model_comparison.csv")
+    artifacts_dir = _latest_artifacts_dir(script_dir) or script_dir
+    comparison_path = os.path.join(artifacts_dir, "model_comparison.csv")
     if not os.path.exists(comparison_path):
         print("model_comparison.csv not found. Run train_model.py first.")
         return 1

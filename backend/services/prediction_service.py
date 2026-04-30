@@ -208,26 +208,12 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     )
 
     if bool(quality["has_hard_blocker"]) or quality_score < 0.35:
-        logger.info(
-            "predict_fallback userId=%s reason=insufficient_input_quality confidence=%s",
+        logger.warning(
+            "predict_blocked userId=%s reason=insufficient_input_quality confidence=%s",
             payload.userId,
             final_confidence,
         )
-        return {
-            "risk_level": "Low",
-            "risk_score": 0.08,
-            "recommendation": _append_confidence_note(
-                "Insufficient data for accurate prediction. Conservative low-risk fallback returned.",
-                final_confidence,
-            ),
-            "data_quality_score": round(quality_score, 4),
-            "data_quality_status": quality_status,
-            "meta": {
-                "model_version": "fallback_demo",
-                "fallback_reason": "insufficient_input_quality",
-                "confidence_bucket": "Low",
-            },
-        }
+        raise ValueError("insufficient_input_quality")
     acwr = float(df["acwr_ratio"].iloc[0])
 
     loaded_model = get_model()
@@ -241,25 +227,14 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     ) = _resolve_model_bundle(loaded_model)
     if model is None:
         gate_reason = get_model_gate_reason()
-        fallback_reason = model_status if model_status != "model_not_loaded" else gate_reason
-        logger.info(
-            "predict_fallback userId=%s reason=%s confidence=%s",
+        blocked_reason = model_status if model_status != "model_not_loaded" else gate_reason
+        logger.warning(
+            "predict_blocked userId=%s reason=%s confidence=%s",
             payload.userId,
-            fallback_reason,
+            blocked_reason,
             final_confidence,
         )
-        return {
-            "risk_level": "Low",
-            "risk_score": 0.12,
-            "recommendation": "Model bundle is unavailable or invalid; conservative fallback returned.",
-            "data_quality_score": round(quality_score, 4),
-            "data_quality_status": quality_status,
-            "meta": {
-                "model_version": model_version,
-                "fallback_reason": fallback_reason,
-                "confidence_bucket": "Low",
-            },
-        }
+        raise RuntimeError(f"model_not_live:{blocked_reason}")
 
     # Saved estimators may have been trained after feature selection (subset of MODEL_FEATURE_COLUMNS).
     model_contract = {"estimator": model, "feature_columns": bundle_feature_columns}

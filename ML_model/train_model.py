@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -304,6 +305,7 @@ def main() -> None:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     dataset_path = os.path.join(script_dir, "athlete_injury_data.csv")
+    benchmark_path = os.path.join(script_dir, "benchmark_holdout.csv")
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
 
@@ -313,14 +315,26 @@ def main() -> None:
     y = df["injury_tomorrow"].astype(int)
     model_df = X.drop(columns=["athlete_id", "date"])
     feature_columns = list(model_df.columns)
-    groups = df["athlete_id"]
-
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=RANDOM_STATE)
-    train_idx, test_idx = next(gss.split(model_df, y, groups=groups))
-    X_train = model_df.iloc[train_idx]
-    X_test = model_df.iloc[test_idx]
-    y_train = y.iloc[train_idx]
-    y_test = y.iloc[test_idx]
+    if os.path.exists(benchmark_path):
+        benchmark_df = pd.read_csv(benchmark_path, parse_dates=["date"])
+        benchmark_df = add_sequential_features(benchmark_df)
+        benchmark_ids = set(benchmark_df["athlete_id"].astype(int).unique().tolist())
+        train_mask = ~df["athlete_id"].astype(int).isin(benchmark_ids)
+        test_mask = df["athlete_id"].astype(int).isin(benchmark_ids)
+        if train_mask.sum() == 0 or test_mask.sum() == 0:
+            raise ValueError("Benchmark split invalid: empty train/test after athlete split.")
+        X_train = model_df.loc[train_mask]
+        X_test = model_df.loc[test_mask]
+        y_train = y.loc[train_mask]
+        y_test = y.loc[test_mask]
+    else:
+        groups = df["athlete_id"]
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=RANDOM_STATE)
+        train_idx, test_idx = next(gss.split(model_df, y, groups=groups))
+        X_train = model_df.iloc[train_idx]
+        X_test = model_df.iloc[test_idx]
+        y_train = y.iloc[train_idx]
+        y_test = y.iloc[test_idx]
     print_split_diagnostics(y, y_train, y_test)
 
     results: list[dict[str, float | str]] = []
@@ -379,7 +393,10 @@ def main() -> None:
 
     importance_df = extract_feature_importance(best_model, feature_columns)
 
-    output_model_path = os.path.join(project_root, "backend", "injury_model.pkl")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    artifacts_dir = os.path.join(script_dir, "artifacts", run_id)
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
+    output_model_path = os.path.join(artifacts_dir, "injury_model.pkl")
     model_bundle = {
         "estimator": best_model,
         "feature_columns": feature_columns,
@@ -396,27 +413,30 @@ def main() -> None:
     }
     joblib.dump(model_bundle, output_model_path)
 
-    comparison_path = os.path.join(script_dir, "model_comparison.csv")
+    comparison_path = os.path.join(artifacts_dir, "model_comparison.csv")
     results_df.to_csv(comparison_path, index=False)
 
-    calibration_path = os.path.join(script_dir, "calibration_curve_data.csv")
+    calibration_path = os.path.join(artifacts_dir, "calibration_curve_data.csv")
     (
         pd.concat(
             [df.assign(model=name) for name, df in calibration_bins.items()],
             ignore_index=True,
         ).to_csv(calibration_path, index=False)
     )
-    threshold_path = os.path.join(script_dir, "threshold_sweep.csv")
+    threshold_path = os.path.join(artifacts_dir, "threshold_sweep.csv")
     pd.DataFrame(threshold_rows).to_csv(threshold_path, index=False)
-    best_points_path = os.path.join(script_dir, "best_operating_points.csv")
+    best_points_path = os.path.join(artifacts_dir, "best_operating_points.csv")
     best_points.to_csv(best_points_path, index=False)
-    risk_bins_path = os.path.join(script_dir, "risk_bins_summary.csv")
+    risk_bins_path = os.path.join(artifacts_dir, "risk_bins_summary.csv")
     risk_bins_df.to_csv(risk_bins_path, index=False)
 
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "run_id": run_id,
+        "artifacts_dir": artifacts_dir,
         "dataset_path": dataset_path,
         "dataset_rows": int(len(df)),
+        "benchmark_path": benchmark_path if os.path.exists(benchmark_path) else None,
         "threshold": best_operating_threshold,
         "policy": model_bundle["policy"],
         "winner": best_model_name,
@@ -438,12 +458,12 @@ def main() -> None:
             for _, row in risk_bins_df.iterrows()
         ],
     }
-    manifest_path = os.path.join(script_dir, "run_manifest.json")
+    manifest_path = os.path.join(artifacts_dir, "run_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
     if importance_df is not None:
-        importance_df.to_csv(os.path.join(script_dir, "feature_importance.csv"), index=False)
+        importance_df.to_csv(os.path.join(artifacts_dir, "feature_importance.csv"), index=False)
 
     print(f"\nSaved model bundle: {output_model_path}")
     print(f"Saved comparison: {comparison_path}")
