@@ -1,19 +1,40 @@
 {
-  "created_at_utc": "2026-04-27T08:28:59.128640+00:00",
+  "created_at_utc": "2026-04-30T13:17:32.159678+00:00",
   "dataset_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\athlete_injury_data.csv",
   "dataset_rows": 345000,
-  "threshold": 0.4,
+  "threshold": 0.36,
   "policy": {
+    "recall_hard_min": 0.85,
     "recall_min": 0.9,
+    "recall_high_target": 0.95,
     "precision_min": 0.3,
     "f1_min": 0.45
   },
   "winner": "ExtraTrees",
   "winner_metrics": {
-    "Recall@Threshold": 0.8722303562713519,
-    "Precision@Threshold": 0.20014334348683033,
-    "F1@Threshold": 0.3255788534057166,
-    "ROC-AUC": 0.7119757283462661,
-    "LogLoss": 0.6154324931519903
-  }
+    "Recall@Threshold": 0.9696083550913838,
+    "Precision@Threshold": 0.14397146623245716,
+    "F1@Threshold": 0.25071563597083446,
+    "FPR@Threshold": 0.9289188052166597,
+    "BrierScore": 0.22477915793484055,
+    "ROC-AUC": 0.6400128735894797,
+    "LogLoss": 0.6419692773138489
+  },
+  "risk_bins": [
+    {
+      "bin": "green_0_20",
+      "samples": 0,
+      "injury_rate": 0.0
+    },
+    {
+      "bin": "yellow_20_50",
+      "samples": 46785,
+      "injury_rate": 0.10394357165758256
+    },
+    {
+      "bin": "red_50_100",
+      "samples": 22215,
+      "injury_rate": 0.2121089354040063
+    }
+  ]
 }

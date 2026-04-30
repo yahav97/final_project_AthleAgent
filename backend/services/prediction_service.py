@@ -49,7 +49,17 @@ def _apply_history_confidence_fallback(df, payload: InjuryPredictionRequest) -> 
         return df, confidence
 
     # New/insufficient history: use conservative profile averages for rolling fields.
-    for col in ("acute_load_7d", "chronic_load_21d", "acwr_ratio", "sleep_debt_3d", "hrv_drop"):
+    for col in (
+        "acute_load_7d",
+        "chronic_load_21d",
+        "acwr_ratio",
+        "acwr_ratio_ma7",
+        "acwr_ratio_std21",
+        "sleep_hours_ma7",
+        "sleep_hours_std21",
+        "sleep_debt_3d",
+        "hrv_drop",
+    ):
         if col in df.columns:
             df.at[df.index[0], col] = float(DEFAULT_FEATURE_VALUES[col])
     return df, confidence
@@ -90,7 +100,32 @@ def _quality_status(quality_score: float) -> str:
     return "Poor"
 
 
-def _resolve_model_bundle(loaded_model: Any) -> tuple[Any | None, list[str] | None, float | None, str, str]:
+def _count_defaulted_critical_features(df) -> int:
+    critical = (
+        "acute_load_7d",
+        "chronic_load_21d",
+        "acwr_ratio",
+        "acwr_ratio_ma7",
+        "acwr_ratio_std21",
+        "sleep_hours_ma7",
+        "sleep_hours_std21",
+        "sleep_debt_3d",
+        "hrv_drop",
+    )
+    count = 0
+    for col in critical:
+        if col not in df.columns:
+            continue
+        observed = float(df[col].iloc[0])
+        default = float(DEFAULT_FEATURE_VALUES[col])
+        if abs(observed - default) < 1e-9:
+            count += 1
+    return count
+
+
+def _resolve_model_bundle(
+    loaded_model: Any,
+) -> tuple[Any | None, list[str] | None, float | None, float | None, str, str]:
     """
     Enforce a single model contract for serving.
 
@@ -103,25 +138,34 @@ def _resolve_model_bundle(loaded_model: Any) -> tuple[Any | None, list[str] | No
       }
     """
     if loaded_model is None:
-        return None, None, None, "fallback_demo", "model_not_loaded"
+        return None, None, None, None, "fallback_demo", "model_not_loaded"
     if not isinstance(loaded_model, dict):
-        return None, None, None, "fallback_demo", "unsupported_model_format"
+        return None, None, None, None, "fallback_demo", "unsupported_model_format"
 
     estimator = loaded_model.get("estimator")
     feature_columns = loaded_model.get("feature_columns")
     threshold_raw = loaded_model.get("threshold")
+    medium_threshold_raw = loaded_model.get("medium_threshold")
     winner = str(loaded_model.get("winner") or "live_model")
 
     if estimator is None:
-        return None, None, None, "fallback_demo", "missing_estimator"
+        return None, None, None, None, "fallback_demo", "missing_estimator"
     if not isinstance(feature_columns, list) or not feature_columns:
-        return None, None, None, "fallback_demo", "missing_feature_columns"
+        return None, None, None, None, "fallback_demo", "missing_feature_columns"
     try:
         threshold = float(threshold_raw)
     except (TypeError, ValueError):
-        return None, None, None, "fallback_demo", "invalid_threshold"
+        return None, None, None, None, "fallback_demo", "invalid_threshold"
+    try:
+        medium_threshold = (
+            float(medium_threshold_raw)
+            if medium_threshold_raw is not None
+            else max(0.15, threshold * 0.6)
+        )
+    except (TypeError, ValueError):
+        return None, None, None, None, "fallback_demo", "invalid_medium_threshold"
 
-    return estimator, [str(c) for c in feature_columns], threshold, winner, "none"
+    return estimator, [str(c) for c in feature_columns], threshold, medium_threshold, winner, "none"
 
 
 def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
@@ -145,8 +189,20 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         quality.get("hard_missing", []),
     )
     final_confidence = _combined_confidence(history_confidence, quality_score)
+    defaulted_critical_count = _count_defaulted_critical_features(df)
+    logger.info(
+        "predict_confidence_summary userId=%s confidence=%s defaulted_critical=%d",
+        payload.userId,
+        final_confidence,
+        defaulted_critical_count,
+    )
 
     if bool(quality["has_hard_blocker"]) or quality_score < 0.35:
+        logger.info(
+            "predict_fallback userId=%s reason=insufficient_input_quality confidence=%s",
+            payload.userId,
+            final_confidence,
+        )
         return {
             "risk_level": "Low",
             "risk_score": 0.08,
@@ -164,10 +220,21 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     acwr = float(df["acwr_ratio"].iloc[0])
 
     loaded_model = get_model()
-    model, bundle_feature_columns, model_threshold, model_version, model_status = _resolve_model_bundle(
-        loaded_model
-    )
+    (
+        model,
+        bundle_feature_columns,
+        model_threshold,
+        medium_threshold,
+        model_version,
+        model_status,
+    ) = _resolve_model_bundle(loaded_model)
     if model is None:
+        logger.info(
+            "predict_fallback userId=%s reason=%s confidence=%s",
+            payload.userId,
+            model_status,
+            final_confidence,
+        )
         return {
             "risk_level": "Low",
             "risk_score": 0.12,
@@ -187,7 +254,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     proba = float(model.predict_proba(X)[0, 1])
     # Single source of truth: operating threshold comes from the saved model bundle.
     high_cutoff = float(model_threshold)
-    medium_cutoff = max(0.15, high_cutoff * 0.6)
+    medium_cutoff = min(float(medium_threshold), high_cutoff)
     risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
 
     return {

@@ -9,6 +9,7 @@ import pandas as pd
 
 TARGET_RECALL = 0.90
 MIN_RECALL_THRESHOLD = 0.85
+MIN_AUC_THRESHOLD = 0.70
 TARGET_PRECISION = 0.30
 TARGET_F1 = 0.45
 THRESHOLD = 0.4
@@ -22,15 +23,31 @@ def main() -> int:
         return 1
 
     df = pd.read_csv(comparison_path)
-    required_columns = {"Model", "Recall@Threshold", "Precision@Threshold", "F1@Threshold", "ROC-AUC", "LogLoss"}
+    required_columns = {
+        "Model",
+        "Recall@Threshold",
+        "Precision@Threshold",
+        "F1@Threshold",
+        "FPR@Threshold",
+        "BrierScore",
+        "ROC-AUC",
+        "LogLoss",
+    }
     missing = required_columns - set(df.columns)
     if missing:
         print(f"model_comparison.csv missing columns: {sorted(missing)}")
         return 1
 
     ranked = df.sort_values(
-        by=["Recall@Threshold", "F1@Threshold", "Precision@Threshold", "ROC-AUC"],
-        ascending=False,
+        by=[
+            "Recall@Threshold",
+            "FPR@Threshold",
+            "F1@Threshold",
+            "Precision@Threshold",
+            "BrierScore",
+            "ROC-AUC",
+        ],
+        ascending=[False, True, False, False, True, False],
     )
     top = ranked.iloc[0]
     print(f"Policy threshold: {THRESHOLD}")
@@ -39,6 +56,7 @@ def main() -> int:
     recall_value = float(top["Recall@Threshold"])
     recall_hard_gate_ok = recall_value >= MIN_RECALL_THRESHOLD
     recall_target_ok = recall_value >= TARGET_RECALL
+    auc_ok = float(top["ROC-AUC"]) >= MIN_AUC_THRESHOLD
     precision_ok = float(top["Precision@Threshold"]) >= TARGET_PRECISION
     f1_ok = float(top["F1@Threshold"]) >= TARGET_F1
     if not recall_hard_gate_ok:
@@ -48,17 +66,17 @@ def main() -> int:
         )
         return 2
 
-    if recall_target_ok and precision_ok and f1_ok:
+    if recall_target_ok and auc_ok and precision_ok and f1_ok:
         print(
             f"\nPASS: {top['Model']} meets targets "
-            f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
+            f"(Recall>={TARGET_RECALL}, AUC>={MIN_AUC_THRESHOLD}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
             f"Hard gate: Recall>={MIN_RECALL_THRESHOLD}."
         )
         return 0
 
     print(
         f"\nWARN: Top model {top['Model']} does not meet all targets "
-        f"(Recall>={TARGET_RECALL}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
+        f"(Recall>={TARGET_RECALL}, AUC>={MIN_AUC_THRESHOLD}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
         f"but passes hard gate Recall>={MIN_RECALL_THRESHOLD}."
     )
     return 2

@@ -1,8 +1,9 @@
 """Injury risk prediction HTTP routes."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import pandas as pd
 
+from config import settings
 from ml.model_loader import get_model
 from schemas.inference import (
     AthleteData,
@@ -85,6 +86,11 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
 @router.post("/predict/sklearn")
 def predict_injury_sklearn(data: AthleteData):
     """Legacy sklearn pipeline using engineered feature row (AthleteData)."""
+    if not settings.ENABLE_LEGACY_SKLEARN_ENDPOINT:
+        raise HTTPException(
+            status_code=410,
+            detail="Legacy endpoint disabled. Use POST /predict production contract.",
+        )
     model = get_model()
     if model is None:
         return {"error": "Model not loaded"}

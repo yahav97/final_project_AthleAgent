@@ -43,3 +43,32 @@ def test_predict_production_contract():
     assert "model_version" in data["meta"]
     assert "fallback_reason" in data["meta"]
     assert len(data["recommendation"]) > 5
+
+
+def test_predict_sklearn_legacy_endpoint_disabled_by_default():
+    response = client.post(
+        "/predict/sklearn",
+        json={
+            "age": 25,
+            "bmi": 22.1,
+            "history_injury_count": 0,
+            "vo2_max": 50,
+            "daily_distance_km": 4.0,
+            "workout_intensity_minutes": 40,
+            "avg_cadence": 165,
+            "sleep_hours": 7.0,
+            "hrv_score": 62,
+            "resting_hr": 54,
+            "daily_calories": 2400,
+            "total_calories_burned": 2500,
+            "calorie_balance": -100,
+            "stress_level": 4,
+            "muscle_soreness": 3,
+            "acute_load_7d": 4.5,
+            "chronic_load_21d": 5.0,
+            "acwr_ratio": 0.9,
+            "sleep_debt_3d": 1.0,
+            "hrv_drop": -1.0,
+        },
+    )
+    assert response.status_code == 410

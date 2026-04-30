@@ -16,6 +16,7 @@ from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, R
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     balanced_accuracy_score,
+    brier_score_loss,
     f1_score,
     log_loss,
     precision_recall_curve,
@@ -24,7 +25,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -34,6 +35,7 @@ if sys.platform == "win32":
 from xgboost import XGBClassifier
 
 THRESHOLD = 0.4
+MIN_RECALL_HARD = 0.85
 TARGET_RECALL = 0.90
 TARGET_RECALL_HIGH = 0.95
 TARGET_PRECISION = 0.30
@@ -118,16 +120,16 @@ def select_operating_threshold_for_model(
     high_recall = model_df[model_df["Recall"] >= TARGET_RECALL_HIGH]
     if not high_recall.empty:
         ranked = high_recall.sort_values(
-            by=["Precision", "F1", "FPR", "Threshold"],
-            ascending=[False, False, True, True],
+            by=["FPR", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, True],
         )
         return float(ranked.iloc[0]["Threshold"])
 
     min_recall = model_df[model_df["Recall"] >= TARGET_RECALL]
     if not min_recall.empty:
         ranked = min_recall.sort_values(
-            by=["Precision", "F1", "FPR", "Threshold"],
-            ascending=[False, False, True, True],
+            by=["FPR", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, True],
         )
         return float(ranked.iloc[0]["Threshold"])
 
@@ -138,7 +140,22 @@ def select_operating_threshold_for_model(
     return float(fallback["Threshold"])
 
 
-def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedClassifierCV]:
+def _build_risk_bin_table(y_true: pd.Series, y_proba: np.ndarray) -> pd.DataFrame:
+    bins = pd.cut(
+        y_proba,
+        bins=[0.0, 0.2, 0.5, 1.0],
+        labels=["green_0_20", "yellow_20_50", "red_50_100"],
+        include_lowest=True,
+        right=True,
+    )
+    frame = pd.DataFrame({"bin": bins, "injury": y_true.astype(int)})
+    grouped = frame.groupby("bin", observed=False)["injury"].agg(["count", "mean"]).reset_index()
+    grouped = grouped.rename(columns={"count": "samples", "mean": "injury_rate"})
+    grouped["injury_rate"] = grouped["injury_rate"].fillna(0.0)
+    return grouped
+
+
+def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedClassifierCV | XGBClassifier]:
     return {
         "LogisticRegression": Pipeline(
             steps=[
@@ -221,20 +238,47 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
             method="sigmoid",
             cv=3,
         ),
+        "XGBoostRaw": XGBClassifier(
+            n_estimators=260,
+            max_depth=5,
+            learning_rate=0.06,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            eval_metric="logloss",
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            scale_pos_weight=2.2,
+        ),
     }
 
 
 def pick_best_model(results_df: pd.DataFrame) -> pd.Series:
     guarded = results_df[
-        (results_df["Recall@Threshold"] >= TARGET_RECALL)
-        & (results_df["Precision@Threshold"] >= TARGET_PRECISION)
-        & (results_df["F1@Threshold"] >= TARGET_F1)
+        (results_df["Recall@Threshold"] >= MIN_RECALL_HARD)
     ]
     source = guarded if not guarded.empty else results_df
     return source.sort_values(
-        by=["Recall@Threshold", "F1@Threshold", "Precision@Threshold", "FPR@Threshold", "ROC-AUC"],
-        ascending=[False, False, False, True, False],
+        by=["FPR@Threshold", "Recall@Threshold", "Precision@Threshold", "F1@Threshold", "ROC-AUC"],
+        ascending=[True, False, False, False, False],
     ).iloc[0]
+
+
+def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.sort_values(["athlete_id", "date"]).copy()
+    grouped = out.groupby("athlete_id", group_keys=False)
+    out["acwr_ratio_ma7"] = grouped["acwr_ratio"].transform(
+        lambda x: x.rolling(7, min_periods=1).mean()
+    )
+    out["acwr_ratio_std21"] = grouped["acwr_ratio"].transform(
+        lambda x: x.rolling(21, min_periods=1).std().fillna(0.0)
+    )
+    out["sleep_hours_ma7"] = grouped["sleep_hours"].transform(
+        lambda x: x.rolling(7, min_periods=1).mean()
+    )
+    out["sleep_hours_std21"] = grouped["sleep_hours"].transform(
+        lambda x: x.rolling(21, min_periods=1).std().fillna(0.0)
+    )
+    return out
 
 
 def extract_feature_importance(model, feature_names: list[str]) -> pd.DataFrame | None:
@@ -263,14 +307,20 @@ def main() -> None:
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
 
-    df = pd.read_csv(dataset_path)
+    df = pd.read_csv(dataset_path, parse_dates=["date"])
+    df = add_sequential_features(df)
     X = df.drop(columns=["injury_tomorrow"])
     y = df["injury_tomorrow"].astype(int)
-    feature_columns = list(X.columns)
+    model_df = X.drop(columns=["athlete_id", "date"])
+    feature_columns = list(model_df.columns)
+    groups = df["athlete_id"]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
-    )
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=RANDOM_STATE)
+    train_idx, test_idx = next(gss.split(model_df, y, groups=groups))
+    X_train = model_df.iloc[train_idx]
+    X_test = model_df.iloc[test_idx]
+    y_train = y.iloc[train_idx]
+    y_test = y.iloc[test_idx]
     print_split_diagnostics(y, y_train, y_test)
 
     results: list[dict[str, float | str]] = []
@@ -291,6 +341,7 @@ def main() -> None:
                 "ROC-AUC": roc_auc_score(y_test, y_proba),
                 "PR-AUC": pr_auc,
                 "LogLoss": log_loss(y_test, y_proba, labels=[0, 1]),
+                "BrierScore": brier_score_loss(y_test, y_proba),
                 "BalancedAccuracy@Threshold": balanced_accuracy_score(
                     y_test, (y_proba >= THRESHOLD).astype(int)
                 ),
@@ -315,6 +366,7 @@ def main() -> None:
     best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
     winner_proba = best_model.predict_proba(X_test)[:, 1]
     winner_operating_metrics = evaluate_with_threshold(y_test, winner_proba, best_operating_threshold)
+    risk_bins_df = _build_risk_bin_table(y_test, winner_proba)
 
     print("\nModel comparison:")
     print(results_df.to_string(index=False))
@@ -332,7 +384,9 @@ def main() -> None:
         "estimator": best_model,
         "feature_columns": feature_columns,
         "threshold": best_operating_threshold,
+        "medium_threshold": max(0.15, best_operating_threshold * 0.6),
         "policy": {
+            "recall_hard_min": MIN_RECALL_HARD,
             "recall_min": TARGET_RECALL,
             "recall_high_target": TARGET_RECALL_HIGH,
             "precision_min": TARGET_PRECISION,
@@ -356,6 +410,8 @@ def main() -> None:
     pd.DataFrame(threshold_rows).to_csv(threshold_path, index=False)
     best_points_path = os.path.join(script_dir, "best_operating_points.csv")
     best_points.to_csv(best_points_path, index=False)
+    risk_bins_path = os.path.join(script_dir, "risk_bins_summary.csv")
+    risk_bins_df.to_csv(risk_bins_path, index=False)
 
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -369,9 +425,18 @@ def main() -> None:
             "Precision@Threshold": float(winner_operating_metrics["Precision@Threshold"]),
             "F1@Threshold": float(winner_operating_metrics["F1@Threshold"]),
             "FPR@Threshold": float(winner_operating_metrics["FPR@Threshold"]),
+            "BrierScore": float(best_row["BrierScore"]),
             "ROC-AUC": float(best_row["ROC-AUC"]),
             "LogLoss": float(best_row["LogLoss"]),
         },
+        "risk_bins": [
+            {
+                "bin": str(row["bin"]),
+                "samples": int(row["samples"]),
+                "injury_rate": float(row["injury_rate"]),
+            }
+            for _, row in risk_bins_df.iterrows()
+        ],
     }
     manifest_path = os.path.join(script_dir, "run_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
@@ -385,6 +450,7 @@ def main() -> None:
     print(f"Saved calibration data: {calibration_path}")
     print(f"Saved threshold sweep: {threshold_path}")
     print(f"Saved best operating points: {best_points_path}")
+    print(f"Saved risk bins summary: {risk_bins_path}")
     print(f"Saved run manifest: {manifest_path}")
 
 

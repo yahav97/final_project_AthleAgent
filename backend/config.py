@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # When False, the app does not import SQLAlchemy, Postgres, or legacy JWT auth routes.
     ENABLE_LEGACY_AUTH_DB: bool = False
+    ENABLE_LEGACY_SKLEARN_ENDPOINT: bool = False
 
     # sklearn model artifact (default: backend/injury_model.pkl)
     MODEL_PATH: str = str(Path(__file__).resolve().parent / "injury_model.pkl")

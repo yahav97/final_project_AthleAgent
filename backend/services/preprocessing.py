@@ -260,6 +260,19 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     partial.pop("_active_calories", None)
 
     partial["calorie_balance"] = float(partial["daily_calories"] - partial["total_calories_burned"])
+    # Proxy sequential features for serving when only snapshot data is available.
+    partial["acwr_ratio_ma7"] = float(partial["acwr_ratio"])
+    partial["acwr_ratio_std21"] = float(
+        max(
+            0.02,
+            min(
+                0.8,
+                abs(partial["acwr_ratio"] - 1.0) * 0.35 + abs(partial["hrv_drop"]) * 0.012,
+            ),
+        )
+    )
+    partial["sleep_hours_ma7"] = float(partial["sleep_hours"])
+    partial["sleep_hours_std21"] = float(max(0.05, min(2.0, abs(8.0 - partial["sleep_hours"]) * 0.45)))
 
     out: dict[str, float] = {}
     for col in MODEL_FEATURE_COLUMNS:
