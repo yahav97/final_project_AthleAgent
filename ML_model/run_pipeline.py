@@ -9,14 +9,15 @@ import sys
 from pathlib import Path
 
 
-def _run(command: list[str], cwd: Path) -> None:
+def _run(command: list[str], cwd: Path, allowed_exit_codes: tuple[int, ...] = (0,)) -> int:
     proc = subprocess.run(command, cwd=str(cwd), check=False, capture_output=True, text=True)
     if proc.stdout:
         print(proc.stdout, end="")
     if proc.stderr:
         print(proc.stderr, end="", file=sys.stderr)
-    if proc.returncode != 0:
+    if proc.returncode not in allowed_exit_codes:
         raise RuntimeError(f"Command failed ({proc.returncode}): {' '.join(command)}")
+    return proc.returncode
 
 
 def _latest_artifacts_dir(ml_dir: Path) -> Path:
@@ -27,12 +28,13 @@ def _latest_artifacts_dir(ml_dir: Path) -> Path:
     return dirs[0]
 
 
-def _promote(ml_dir: Path, artifacts_dir: Path) -> None:
+def _promote(ml_dir: Path, artifacts_dir: Path, degraded_rc: bool) -> None:
     promoted_path = ml_dir / "artifacts" / "promoted.json"
     payload = {
         "artifacts_dir": str(artifacts_dir),
         "model_path": str(artifacts_dir / "injury_model.pkl"),
         "manifest_path": str(artifacts_dir / "run_manifest.json"),
+        "degraded_rc": degraded_rc,
     }
     with open(promoted_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
@@ -66,9 +68,9 @@ def main() -> int:
         benchmark_cmd.append("--force")
     _run(benchmark_cmd, ml_dir)
     _run([sys.executable, "train_model.py"], ml_dir)
-    _run([sys.executable, "validate_metrics.py"], ml_dir)
+    validate_exit = _run([sys.executable, "validate_metrics.py"], ml_dir, allowed_exit_codes=(0, 2))
     artifacts_dir = _latest_artifacts_dir(ml_dir)
-    _promote(ml_dir, artifacts_dir)
+    _promote(ml_dir, artifacts_dir, degraded_rc=(validate_exit == 2))
     return 0
 
 

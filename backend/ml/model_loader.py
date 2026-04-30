@@ -143,10 +143,18 @@ def get_model_status() -> dict[str, Any]:
     policy = _active_manifest.get("policy") if isinstance(_active_manifest, dict) else {}
     winner = _active_manifest.get("winner") if isinstance(_active_manifest, dict) else None
     threshold = _active_manifest.get("threshold") if isinstance(_active_manifest, dict) else None
+    auc_value = None
+    if isinstance(_active_manifest, dict):
+        try:
+            auc_value = float((_active_manifest.get("winner_metrics") or {}).get("ROC-AUC"))
+        except (TypeError, ValueError):
+            auc_value = None
+    degraded_rc = bool(_model_live and auc_value is not None and auc_value < 0.70)
     return {
         "status": "Live" if _model_live else "Blocked",
         "gate_reason": _model_gate_reason,
         "winner": winner,
         "threshold": threshold,
         "policy": policy if isinstance(policy, dict) else {},
+        "degraded_rc": degraded_rc,
     }
