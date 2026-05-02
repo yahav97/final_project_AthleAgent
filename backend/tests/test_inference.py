@@ -85,5 +85,5 @@ def test_ml_status_endpoint_shape():
     response = client.get("/status/ml")
     assert response.status_code == 200
     data = response.json()
-    assert set(data.keys()) == {"status", "gate_reason", "winner", "threshold", "policy"}
+    assert set(data.keys()) == {"status", "gate_reason", "winner", "threshold", "policy", "degraded_rc"}
     assert data["status"] in ("Live", "Blocked")

@@ -19,6 +19,14 @@ router = APIRouter(tags=["Prediction"])
 
 @router.post("/test_predict")
 def test_predict_injury(data: SimpleData):
+    """Return a fixed mock payload for UI/API smoke usage.
+
+    Args:
+        data: Minimal request containing a user identifier.
+
+    Returns:
+        dict: Stable mock inference payload.
+    """
     return {
         "user_id": data.user_id,
         "risk_percentage": 72.5,
@@ -29,6 +37,14 @@ def test_predict_injury(data: SimpleData):
 
 @router.post("/demo_predict")
 def demo_predict_injury(data: AthleteData):
+    """Run a lightweight heuristic score for legacy demo clients.
+
+    Args:
+        data: Legacy athlete feature payload.
+
+    Returns:
+        dict: Risk percentage and categorical risk level.
+    """
     score = 10.0
 
     if data.sleep_hours < 5.0:
@@ -52,7 +68,18 @@ def demo_predict_injury(data: AthleteData):
 
 @router.post("/predict", response_model=InjuryPredictionResponse)
 def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredictionResponse:
-    """Production contract: Firestore-shaped daily payload in, risk assessment out."""
+    """Run production inference with strict no-fallback semantics.
+
+    Args:
+        payload: Firestore-shaped daily athlete signals.
+
+    Returns:
+        InjuryPredictionResponse: Model-based risk prediction response.
+
+    Raises:
+        HTTPException: 500 if model is blocked, input quality is insufficient, or
+            prediction execution fails.
+    """
     try:
         result = predict_injury_risk(payload)
     except Exception as exc:
@@ -63,7 +90,14 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
 
 @router.post("/predict/sklearn")
 def predict_injury_sklearn(data: AthleteData):
-    """Legacy sklearn pipeline using engineered feature row (AthleteData)."""
+    """Run legacy sklearn endpoint guarded behind explicit feature flag.
+
+    Args:
+        data: Legacy engineered feature row.
+
+    Returns:
+        dict: Legacy risk percentage response.
+    """
     if not settings.ENABLE_LEGACY_SKLEARN_ENDPOINT:
         raise HTTPException(
             status_code=410,
@@ -84,5 +118,5 @@ def predict_injury_sklearn(data: AthleteData):
 
 @router.get("/status/ml")
 def ml_status():
-    """Internal status endpoint for model gate and active manifest."""
+    """Expose model liveness and gate metadata for operational debugging."""
     return get_model_status()

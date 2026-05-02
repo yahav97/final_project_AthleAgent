@@ -42,15 +42,18 @@ DEFAULT_SEED = 42
 # ============================================================================
 
 def _sigmoid(x: float) -> float:
+    """Compute logistic sigmoid for hazard to probability conversion."""
     return 1.0 / (1.0 + np.exp(-x))
 
 
 def _rolling_mean(values: list[float], window: int) -> float:
+    """Compute rolling mean over tail window, fallback to full list."""
     tail = values[-window:] if len(values) >= window else values
     return float(np.mean(tail)) if tail else 0.0
 
 
 def _bounded(value: float, low: float, high: float) -> float:
+    """Clip scalar into closed interval [low, high]."""
     return float(min(high, max(low, value)))
 
 
@@ -85,6 +88,16 @@ def generate_synthetic_data(
     days_per_athlete: int = DAYS_PER_ATHLETE,
     seed: int = DEFAULT_SEED,
 ):
+    """Generate chronologically ordered synthetic athlete injury dataset.
+
+    Args:
+        num_athletes: Number of athletes to simulate.
+        days_per_athlete: Number of sequential days per athlete.
+        seed: RNG seed for reproducibility.
+
+    Returns:
+        pd.DataFrame: Training-ready dataframe including features and label.
+    """
     rng = np.random.default_rng(seed)
     all_data = []
     print(
@@ -326,6 +339,7 @@ def generate_synthetic_data(
 
 
 def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
+    """Write dataset quality diagnostics JSON and return path."""
     class_counts = df["injury_tomorrow"].value_counts().to_dict()
     injury_rate = float(df["injury_tomorrow"].mean())
     corr = df[["daily_distance_km", "sleep_hours", "stress_level", "muscle_soreness", "acwr_ratio", "hrv_drop"]].corr()

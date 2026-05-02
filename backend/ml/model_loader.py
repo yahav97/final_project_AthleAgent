@@ -20,6 +20,7 @@ MIN_AUC_FOR_LIVE = 0.60
 
 
 def _manifest_path_from_model_path(model_path: str) -> str:
+    """Return manifest path candidate relative to model path/project layout."""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     default_manifest = os.path.join(project_root, "ML_model", "run_manifest.json")
     model_dir_manifest = os.path.join(os.path.dirname(model_path), "run_manifest.json")
@@ -27,10 +28,12 @@ def _manifest_path_from_model_path(model_path: str) -> str:
 
 
 def _project_root() -> str:
+    """Resolve project root path from backend/ml module location."""
     return os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 
 def _resolve_promoted_artifact_paths() -> tuple[str | None, str | None]:
+    """Resolve model/manifest from promoted pointer if available."""
     promoted_path = os.path.join(_project_root(), "ML_model", "artifacts", "promoted.json")
     if not os.path.exists(promoted_path):
         return None, None
@@ -47,6 +50,15 @@ def _resolve_promoted_artifact_paths() -> tuple[str | None, str | None]:
 
 
 def _validate_manifest_for_live(manifest: dict[str, Any], model_path: str) -> tuple[bool, str]:
+    """Validate manifest quality gates before allowing model to be live.
+
+    Args:
+        manifest: Loaded manifest dictionary.
+        model_path: Path to model artifact expected by manifest.
+
+    Returns:
+        tuple[bool, str]: (is_valid, rejection_reason)
+    """
     winner = str(manifest.get("winner") or "").strip()
     if not winner:
         return False, "manifest_missing_winner"
@@ -79,7 +91,15 @@ def _validate_manifest_for_live(manifest: dict[str, Any], model_path: str) -> tu
 
 
 def load_model(model_path: str | None = None, manifest_path: str | None = None) -> Optional[Any]:
-    """Load joblib model from disk. Idempotent: replaces cached estimator."""
+    """Load and gate-validate the promoted model bundle.
+
+    Args:
+        model_path: Optional explicit model path override.
+        manifest_path: Optional explicit manifest path override.
+
+    Returns:
+        Optional[Any]: Loaded model object if gate checks pass, otherwise None.
+    """
     global _estimator, _model_gate_reason, _model_live, _active_manifest
     promoted_model_path, promoted_manifest_path = _resolve_promoted_artifact_paths()
     path = model_path or promoted_model_path or os.path.join(os.path.dirname(os.path.dirname(__file__)), "injury_model.pkl")
@@ -139,7 +159,7 @@ def get_model_gate_reason() -> str:
 
 
 def get_model_status() -> dict[str, Any]:
-    """Internal operational status for ML model gate and active manifest."""
+    """Return operational model status for internal monitoring endpoints."""
     policy = _active_manifest.get("policy") if isinstance(_active_manifest, dict) else {}
     winner = _active_manifest.get("winner") if isinstance(_active_manifest, dict) else None
     threshold = _active_manifest.get("threshold") if isinstance(_active_manifest, dict) else None

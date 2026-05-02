@@ -1,176 +1,102 @@
-# AthleAgent backend — ML inference hub
+# AthleAgent Backend (RC1)
 
-FastAPI service that exposes **injury risk inference** over HTTP. The **system of record** for athlete and team data is **Firestore** (Android app); this backend does not write to Firestore unless you add that later.
+FastAPI backend for injury-risk inference. This service is treated as mission-critical:
 
-**Development branch:** `ml-backend` — keep hub work on this branch until merged to `main`.
+- If model gate checks pass, `/predict` returns a model-based response.
+- If gate checks fail or input is invalid, `/predict` returns HTTP 500 with a clear error.
 
-**Operational rules**
+## API Structure
 
-1. **`android_app/` is read-only** for this backend work — use it only to align JSON field names with Firestore; do not change Kotlin/UI here without explicit approval.
-2. **Inference-only default:** set `ENABLE_LEGACY_AUTH_DB=false` (default) so the app starts **without** loading legacy JWT/Postgres auth routes.
-3. **Tests:** run `python -m pytest tests/ -v` from this directory before considering changes complete.
+### `POST /predict`
 
----
+Production inference endpoint.
 
-## Quick start
+**Request (camelCase, Firestore-shaped):**
+- `userId`, `date`
+- health/checkin/nutrition fields (optional but quality affects inference)
 
-### 1. Install dependencies
+**Response JSON:**
+- `risk_score` (`0..1`)
+- `risk_level` (`Low|Medium|High`)
+- `recommendation`
+- `data_quality_score`
+- `data_quality_status`
+- `meta`
+  - `model_version`
+  - `fallback_reason` (`none` for live inference)
+  - `confidence_bucket` (`Low|Medium|High`)
 
-From the repository root:
+### `GET /status/ml`
+
+Internal operational endpoint:
+- `status` (`Live|Blocked`)
+- `gate_reason`
+- `winner`
+- `threshold`
+- `policy`
+- `degraded_rc`
+
+## ML Integration and Manifest Gate
+
+Model loading is handled in `backend/ml/model_loader.py`.
+
+At startup, the backend loads the promoted artifact set from:
+- `ML_model/artifacts/promoted.json`
+
+Then it validates `run_manifest.json` before marking model as live:
+- Recall hard gate: `Recall@Threshold >= 0.85`
+- AUC live sanity gate (RC1): `ROC-AUC >= 0.60`
+
+If gate validation fails:
+- model status becomes `Blocked`
+- `/predict` returns HTTP 500 (no fallback predictions)
+
+## Run Locally
+
+### 1) Create virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### 2) Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Or install into a virtual environment of your choice.
-
-### 2. Model artifact (optional but required for real scores)
-
-Train or copy the sklearn model to the backend folder (or set `MODEL_PATH`):
-
-```bash
-# After training (ML_model/train_model.py writes here by default):
-# backend/injury_model.pkl
-```
-
-If the file is missing, `POST /predict` still returns **200** with a small **demo** payload and a note in `recommendation`.
-
-### 3. Run the server
-
-From **`backend/`** (so imports resolve):
+### 3) Start backend
 
 ```bash
 cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+Docs: `http://localhost:8000/docs`
 
----
+## Tests
 
-## Configuration (environment / `.env`)
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `ENABLE_LEGACY_AUTH_DB` | `false` | If `true`, mounts legacy `/api/v1/auth/*` routes (Postgres + SQLAlchemy). Keep `false` for the inference hub. |
-| `MODEL_PATH` | `backend/injury_model.pkl` (resolved from `config.py`) | Path to the joblib classifier. |
-| `DATABASE_URL` | (see `config.py`) | Only used when legacy auth routes are enabled. |
-| `SECRET_KEY`, etc. | (see `config.py`) | Legacy auth only. |
-
-Example `.env` for **inference only**:
-
-```env
-ENABLE_LEGACY_AUTH_DB=false
-MODEL_PATH=C:/dev/final_project_AthleAgent/backend/injury_model.pkl
-```
-
----
-
-## Production HTTP contract: `POST /predict`
-
-**Request:** JSON body with **camelCase** fields aligned with Android / Firestore (all optional; missing values are imputed).
-
-**Response:** JSON
-
-- `risk_level`: `"Low"` | `"Medium"` | `"High"`
-- `risk_score`: float in **0–1** (injury class probability from `predict_proba`)
-- `recommendation`: short text guidance
-
-### Example: curl (Windows PowerShell)
-
-```powershell
-cd backend
-curl -s -X POST http://127.0.0.1:8000/predict `
-  -H "Content-Type: application/json" `
-  -d '{\"userId\":\"demo\",\"date\":\"2026-04-19\",\"sleepMinutes\":420,\"steps\":9000,\"distanceMeters\":7200,\"activeCalories\":550,\"totalCalories\":2600,\"stressLevel\":45,\"muscleSoreness\":3}'
-```
-
-### Example: minimal JSON
-
-```json
-{
-  "sleepMinutes": 480,
-  "steps": 8000,
-  "stressLevel": 35,
-  "muscleSoreness": 2
-}
-```
-
-### Other routes
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/`, `/health` | Liveness |
-| POST | `/predict` | Production pipeline (Firestore-shaped body) |
-| POST | `/predict/sklearn` | Legacy **AthleteData** row for the same `.pkl` |
-| POST | `/demo_predict` | Heuristic demo (old Android shape) |
-| POST | `/test_predict` | Fixed mock for UI tests |
-| POST | `/api/v1/auth/*` | **Only if** `ENABLE_LEGACY_AUTH_DB=true` |
-
----
-
-## Project structure (inference hub)
-
-```
-backend/
-├── main.py                 # App factory, CORS, routers, startup model load
-├── config.py               # Settings including ENABLE_LEGACY_AUTH_DB, MODEL_PATH
-├── ml/
-│   └── model_loader.py     # joblib load / get_model
-├── api/routes/
-│   ├── health.py           # GET /, GET /health
-│   ├── predict.py          # POST /predict, /predict/sklearn, demo, test
-│   └── auth.py             # Legacy; not imported when ENABLE_LEGACY_AUTH_DB=false
-├── schemas/
-│   ├── inference.py        # InjuryPredictionRequest / Response, AthleteData, …
-│   └── user.py             # Legacy auth schemas
-├── services/
-│   ├── model_features.py   # MODEL_FEATURE_COLUMNS (must match training CSV)
-│   ├── preprocessing.py    # Request → model DataFrame
-│   ├── feature_engineering.py  # ACWR proxies, sleep debt proxy, etc.
-│   ├── prediction_service.py   # predict_proba orchestration
-│   └── auth_service.py     # Legacy; unused in inference-only mode
-├── tests/
-│   ├── test_inference.py
-│   ├── test_preprocessing.py
-│   └── test_feature_engineering.py
-├── database/, models/, repositories/   # Legacy Postgres stack (optional)
-└── create_tables.py        # Legacy DB init (optional)
-```
-
----
-
-## Testing
+Run backend tests:
 
 ```bash
 cd backend
 python -m pytest tests/ -v
 ```
 
-**Quick smoke (no long-running server):** exercises lifespan, `/health`, `/docs`, `/openapi.json`, and `POST /predict`:
+## Notes for Evaluation
 
-```bash
-cd backend
-python scripts/smoke_uvicorn.py
-```
-
-**Manual regression samples and training metrics log:** see [docs/MANUAL_REGRESSION.md](docs/MANUAL_REGRESSION.md).
-
-**Android / Firestore mapping and integration options:** see [docs/ANDROID_INTEGRATION.md](docs/ANDROID_INTEGRATION.md).
-
-**Frontend-backend daily contract before model tuning:** see [docs/DATA_CONTRACT_FRONTEND_BACKEND.md](docs/DATA_CONTRACT_FRONTEND_BACKEND.md).
-
----
-
-## Known limitations
-
-- **Rolling workload:** Training uses true 7d/21d rollups per athlete. In serving, the backend now reads up to **7 historical days** when available and uses documented fallbacks/proxies when history is sparse.
-- **Legacy stack:** Postgres models and `create_tables.py` remain for optional `ENABLE_LEGACY_AUTH_DB=true` workflows; they are **not** required for `POST /predict`.
-
----
-
-## API documentation
-
-With the server running: **http://localhost:8000/docs**
+- RC1 is promoted through `ML_model/run_pipeline.py`.
+- Artifact history is versioned under `ML_model/artifacts/<timestamp>/`.
+- Production pointer is `ML_model/artifacts/promoted.json`.
