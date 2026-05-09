@@ -19,11 +19,12 @@
 ### Request
 
 ```json
-{
   "userId": "firebase_uid",
-  "date": "yyyy-MM-dd"
-}
 ```
+
+"date": "yyyy-MM-dd"
+
+}
 
 ### Response (עיקרי)
 
