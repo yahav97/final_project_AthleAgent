@@ -52,6 +52,41 @@ def test_predict_production_contract():
     assert len(data["recommendation"]) > 5
 
 
+def test_predict_daily_minimal_trigger_contract(monkeypatch):
+    from api.routes import predict as predict_routes
+
+    called = {"persisted": False}
+
+    monkeypatch.setattr(
+        predict_routes,
+        "predict_injury_risk_from_firestore",
+        lambda user_id, date_key: {
+            "risk_level": "Medium",
+            "risk_score": 0.42,
+            "recommendation": "Keep load stable today.",
+            "data_quality_score": 0.81,
+            "data_quality_status": "Good",
+            "meta": {
+                "model_version": "test_model",
+                "fallback_reason": "none",
+                "confidence_bucket": "Medium",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        predict_routes,
+        "persist_prediction_result_or_raise",
+        lambda user_id, date_key, result, source: called.__setitem__("persisted", True),
+    )
+    response = client.post("/predict/daily", json={"userId": "u1", "date": "2026-05-09"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_level"] == "Medium"
+    assert abs(float(data["risk_score"]) - 0.42) < 1e-9
+    assert data["meta"]["model_version"] == "test_model"
+    assert called["persisted"] is True
+
+
 def test_predict_sklearn_legacy_endpoint_disabled_by_default():
     response = client.post(
         "/predict/sklearn",

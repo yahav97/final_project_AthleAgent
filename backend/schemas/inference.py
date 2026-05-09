@@ -82,6 +82,13 @@ class InjuryPredictionRequest(BaseModel):
     mealsLoggedCount: int | None = None
 
 
+class DailyPredictionTriggerRequest(BaseModel):
+    """Minimal trigger contract: backend loads full daily snapshot from Firestore."""
+
+    userId: str = Field(..., description="Firebase Auth uid")
+    date: str = Field(..., description="Day key yyyy-MM-dd")
+
+
 class InjuryPredictionResponse(BaseModel):
     """Production JSON response for POST /predict."""
 

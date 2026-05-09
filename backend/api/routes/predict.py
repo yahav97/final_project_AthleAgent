@@ -7,11 +7,16 @@ from config import settings
 from ml.model_loader import get_model, get_model_status
 from schemas.inference import (
     AthleteData,
+    DailyPredictionTriggerRequest,
     InjuryPredictionRequest,
     InjuryPredictionResponse,
     SimpleData,
 )
-from services.prediction_service import predict_injury_risk
+from services.prediction_service import (
+    persist_prediction_result_or_raise,
+    predict_injury_risk,
+    predict_injury_risk_from_firestore,
+)
 from utils.logging import logger
 
 router = APIRouter(tags=["Prediction"])
@@ -82,8 +87,35 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
     """
     try:
         result = predict_injury_risk(payload)
+        if payload.userId and payload.date:
+            persist_prediction_result_or_raise(
+                payload.userId,
+                payload.date,
+                result,
+                source="backend_predict_payload",
+            )
     except Exception as exc:
         logger.exception("predict_route_error userId=%s err=%s", payload.userId, exc)
+        raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
+    return InjuryPredictionResponse(**result)
+
+
+@router.post("/predict/daily", response_model=InjuryPredictionResponse)
+def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredictionResponse:
+    """
+    Minimal trigger endpoint: frontend sends only userId/date; backend loads all
+    relevant daily data directly from Firestore and runs production inference.
+    """
+    try:
+        result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
+        persist_prediction_result_or_raise(
+            trigger.userId,
+            trigger.date,
+            result,
+            source="backend_predict_daily",
+        )
+    except Exception as exc:
+        logger.exception("predict_daily_route_error userId=%s err=%s", trigger.userId, exc)
         raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
     return InjuryPredictionResponse(**result)
 

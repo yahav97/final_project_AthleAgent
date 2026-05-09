@@ -28,13 +28,27 @@ def test_history_window_context_confidence_low_for_short_history(monkeypatch):
     monkeypatch.setattr(
         hs,
         "fetch_user_history",
-        lambda user_id, date_key, lookback_days=7: [
+        lambda user_id, date_key, lookback_days=7, include_target_day=True: [
             {"date_key": "2026-04-19", "distanceMeters": 4500, "sleepMinutes": 420}
         ],
     )
     ctx = get_history_window_context("u1", "2026-04-19")
     assert ctx["confidence"] == "low"
     assert int(ctx["days_count"]) == 1
+
+
+def test_history_window_context_can_exclude_target_day(monkeypatch):
+    from services import history_service as hs
+
+    captured: dict[str, object] = {}
+
+    def _fake_fetch(user_id, date_key, lookback_days=7, include_target_day=True):
+        captured["include_target_day"] = include_target_day
+        return []
+
+    monkeypatch.setattr(hs, "fetch_user_history", _fake_fetch)
+    _ = hs.get_history_window_context("u1", "2026-04-19", include_target_day=False)
+    assert captured["include_target_day"] is False
 
 
 def test_compute_historical_features_with_missing_days_uses_available_average():

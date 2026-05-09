@@ -117,7 +117,67 @@ def _get_firestore_client():
         return None
 
 
-def fetch_user_history(user_id: str, date_key: str, lookback_days: int = 7) -> list[dict[str, Any]]:
+def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any]:
+    """
+    Fetch one-day Firestore snapshot (profile + daily docs) for prediction serving.
+    """
+    db = _get_firestore_client()
+    if db is None:
+        return {}
+    try:
+        user_ref = db.collection("users").document(user_id)
+        user_doc = user_ref.get()
+        health_doc = user_ref.collection("daily_health").document(date_key).get()
+        checkin_doc = user_ref.collection("daily_checkins").document(date_key).get()
+        nutrition_doc = user_ref.collection("daily_nutrition").document(date_key).get()
+    except Exception:
+        return {}
+
+    return {
+        "profile": user_doc.to_dict() if user_doc.exists else {},
+        "daily_health": health_doc.to_dict() if health_doc.exists else {},
+        "daily_checkins": checkin_doc.to_dict() if checkin_doc.exists else {},
+        "daily_nutrition": nutrition_doc.to_dict() if nutrition_doc.exists else {},
+    }
+
+
+def save_daily_prediction_result(
+    user_id: str,
+    date_key: str,
+    result: dict[str, Any],
+    source: str = "backend_predict_daily",
+) -> bool:
+    """
+    Persist prediction output under users/{uid}/daily_health/{date} using merge.
+    """
+    db = _get_firestore_client()
+    if db is None:
+        return False
+    try:
+        risk_score = float(result.get("risk_score") or 0.0)
+        doc = {
+            "finalRiskScore": round(risk_score * 100.0, 2),
+            "riskScore": risk_score,
+            "riskLevel": result.get("risk_level"),
+            "backendRecommendation": result.get("recommendation"),
+            "dataQualityScore": result.get("data_quality_score"),
+            "dataQualityStatus": result.get("data_quality_status"),
+            "predictionMeta": result.get("meta") or {},
+            "predictionSource": source,
+            "predictionUpdatedAt": datetime.utcnow().isoformat(),
+        }
+        db.collection("users").document(user_id).collection("daily_health").document(date_key).set(doc, merge=True)
+        return True
+    except Exception:
+        return False
+
+
+def fetch_user_history(
+    user_id: str,
+    date_key: str,
+    lookback_days: int = 7,
+    include_target_day: bool = True,
+) -> list[dict[str, Any]]:
     """
     Repository layer: fetch merged daily history rows for user/date window.
 
@@ -127,7 +187,12 @@ def fetch_user_history(user_id: str, date_key: str, lookback_days: int = 7) -> l
         end_day = _to_date_key(date_key)
     except ValueError:
         return []
-    start_day = end_day - timedelta(days=lookback_days - 1)
+    if include_target_day:
+        start_day = end_day - timedelta(days=lookback_days - 1)
+        end_inclusive = end_day
+    else:
+        end_inclusive = end_day - timedelta(days=1)
+        start_day = end_inclusive - timedelta(days=lookback_days - 1)
 
     db = _get_firestore_client()
     if db is None:
@@ -147,7 +212,7 @@ def fetch_user_history(user_id: str, date_key: str, lookback_days: int = 7) -> l
             d = _to_date_key(key)
         except ValueError:
             continue
-        if start_day <= d <= end_day:
+        if start_day <= d <= end_inclusive:
             health_by_date[key] = doc.to_dict() or {}
 
     checkin_by_date: dict[str, dict[str, Any]] = {}
@@ -157,7 +222,7 @@ def fetch_user_history(user_id: str, date_key: str, lookback_days: int = 7) -> l
             d = _to_date_key(key)
         except ValueError:
             continue
-        if start_day <= d <= end_day:
+        if start_day <= d <= end_inclusive:
             checkin_by_date[key] = doc.to_dict() or {}
 
     merged_rows: list[dict[str, Any]] = []
@@ -169,12 +234,27 @@ def fetch_user_history(user_id: str, date_key: str, lookback_days: int = 7) -> l
     return merged_rows
 
 
-def fetch_historical_derived_features(user_id: str, date_key: str, lookback_days: int = 7) -> dict[str, float] | None:
-    rows = fetch_user_history(user_id, date_key, lookback_days=lookback_days)
+def fetch_historical_derived_features(
+    user_id: str,
+    date_key: str,
+    lookback_days: int = 7,
+    include_target_day: bool = True,
+) -> dict[str, float] | None:
+    rows = fetch_user_history(
+        user_id,
+        date_key,
+        lookback_days=lookback_days,
+        include_target_day=include_target_day,
+    )
     return compute_historical_derived_features(rows)
 
 
-def get_history_window_context(user_id: str, date_key: str, lookback_days: int = 7) -> dict[str, Any]:
+def get_history_window_context(
+    user_id: str,
+    date_key: str,
+    lookback_days: int = 7,
+    include_target_day: bool = True,
+) -> dict[str, Any]:
     """
     Return historical feature context with quality metadata for fallback decisions.
 
@@ -183,7 +263,12 @@ def get_history_window_context(user_id: str, date_key: str, lookback_days: int =
     - medium: 4-6 days
     - low: 0-3 days
     """
-    rows = fetch_user_history(user_id, date_key, lookback_days=lookback_days)
+    rows = fetch_user_history(
+        user_id,
+        date_key,
+        lookback_days=lookback_days,
+        include_target_day=include_target_day,
+    )
     days_count = len(rows)
     features = compute_historical_derived_features(rows)
     if days_count >= 7:
@@ -196,4 +281,5 @@ def get_history_window_context(user_id: str, date_key: str, lookback_days: int =
         "days_count": days_count,
         "confidence": confidence,
         "features": features,
+        "recent_row": rows[-1] if rows else None,
     }

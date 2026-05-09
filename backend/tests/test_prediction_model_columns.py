@@ -78,6 +78,90 @@ def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
         )
 
 
+def test_predict_quality_relaxed_when_history_backfills_missing_signals(monkeypatch):
+    from services import prediction_service as ps
+
+    base_df = pd.DataFrame(
+        [
+            {
+                "acwr_ratio": 1.0,
+                "daily_distance_km": 0.0,
+                "workout_intensity_minutes": 0.0,
+                "sleep_hours": 0.0,
+                "resting_hr": 0.0,
+                "hrv_score": 0.0,
+            }
+        ]
+    )
+    monkeypatch.setattr(ps, "injury_request_to_model_dataframe", lambda payload: base_df.copy())
+    monkeypatch.setattr(
+        ps,
+        "_backfill_today_row_from_recent_history",
+        lambda df, payload: (df, {"load": True, "recovery": True}),
+    )
+    monkeypatch.setattr(ps, "_apply_history_confidence_fallback", lambda df, payload: (df, "medium"))
+    monkeypatch.setattr(
+        ps,
+        "calculate_data_quality_score",
+        lambda payload: {
+            "score": 0.2,
+            "hard_missing": ["load_signal", "recovery_signal"],
+            "sensitive_missing": [],
+            "has_hard_blocker": True,
+        },
+    )
+    monkeypatch.setattr(ps, "_count_defaulted_critical_features", lambda df: 0)
+    monkeypatch.setattr(ps, "get_model", lambda: None)
+    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
+
+    with pytest.raises(RuntimeError, match="model_not_live:manifest_corrupted"):
+        predict_injury_risk(
+            InjuryPredictionRequest(
+                userId="u1",
+                date="2026-04-30",
+                stressLevel=30,
+                muscleSoreness=3,
+            )
+        )
+
+
+def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
+    from services import prediction_service as ps
+
+    monkeypatch.setattr(
+        ps,
+        "fetch_daily_firestore_snapshot",
+        lambda user_id, date_key: {
+            "profile": {"age": 24, "vo2Max": 57, "historyInjuryCount": 1},
+            "daily_health": {"sleepMinutes": 470, "steps": 8300, "heartRateAvg": 58},
+            "daily_checkins": {"muscleSoreness": 3, "stressLevel": 35, "energyLevel": 60},
+            "daily_nutrition": {"totalProtein": 130, "totalCarbs": 290, "mealsLoggedCount": 3},
+        },
+    )
+    monkeypatch.setattr(
+        ps,
+        "predict_injury_risk",
+        lambda payload: {"risk_level": "Low", "risk_score": 0.12, "recommendation": payload.userId},
+    )
+    out = ps.predict_injury_risk_from_firestore("u1", "2026-05-09")
+    assert out["risk_level"] == "Low"
+    assert abs(float(out["risk_score"]) - 0.12) < 1e-9
+    assert out["recommendation"] == "u1"
+
+
+def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch):
+    from services import prediction_service as ps
+
+    monkeypatch.setattr(ps, "save_daily_prediction_result", lambda user_id, date_key, result, source: False)
+    with pytest.raises(RuntimeError, match="prediction_persist_failed"):
+        ps.persist_prediction_result_or_raise(
+            "u1",
+            "2026-05-09",
+            {"risk_score": 0.3, "risk_level": "Low"},
+            source="backend_predict_daily",
+        )
+
+
 def test_validate_feature_vector_enforces_exact_training_order():
     df = pd.DataFrame(
         [

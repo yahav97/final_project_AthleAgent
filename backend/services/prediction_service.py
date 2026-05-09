@@ -6,7 +6,11 @@ from typing import Any
 
 from ml.model_loader import get_model, get_model_gate_reason
 from schemas.inference import InjuryPredictionRequest
-from services.history_service import get_history_window_context
+from services.history_service import (
+    fetch_daily_firestore_snapshot,
+    get_history_window_context,
+    save_daily_prediction_result,
+)
 from services.model_features import DEFAULT_FEATURE_VALUES
 from services.preprocessing import (
     calculate_data_quality_score,
@@ -38,7 +42,12 @@ def _apply_history_confidence_fallback(df, payload: InjuryPredictionRequest) -> 
     if not (payload.userId and payload.date):
         return df, confidence
 
-    context = get_history_window_context(payload.userId, payload.date, lookback_days=7)
+    context = get_history_window_context(
+        payload.userId,
+        payload.date,
+        lookback_days=7,
+        include_target_day=False,
+    )
     confidence = str(context.get("confidence") or "low")
     features = context.get("features") or {}
 
@@ -63,6 +72,63 @@ def _apply_history_confidence_fallback(df, payload: InjuryPredictionRequest) -> 
         if col in df.columns:
             df.at[df.index[0], col] = float(DEFAULT_FEATURE_VALUES[col])
     return df, confidence
+
+
+def _backfill_today_row_from_recent_history(df, payload: InjuryPredictionRequest) -> tuple[Any, dict[str, bool]]:
+    """
+    Backfill missing current-day load/recovery anchors from the latest available
+    historical snapshot (yesterday/recent week), while preserving today's survey fields.
+    """
+    fallback_flags = {"load": False, "recovery": False}
+    if not (payload.userId and payload.date):
+        return df, fallback_flags
+
+    context = get_history_window_context(
+        payload.userId,
+        payload.date,
+        lookback_days=7,
+        include_target_day=False,
+    )
+    recent = context.get("recent_row") or {}
+    if not recent:
+        return df, fallback_flags
+
+    # Load anchors
+    distance_m = float(recent.get("distanceMeters") or 0.0)
+    steps = float(recent.get("steps") or 0.0)
+    if distance_m > 0:
+        distance_km = distance_m / 1000.0
+    elif steps > 0:
+        distance_km = steps * 0.0008
+    else:
+        distance_km = 0.0
+
+    active_cal = float(recent.get("activeCalories") or 0.0)
+    workout_intensity = max(0.0, min(240.0, distance_km * 5.5 + active_cal / 40.0))
+    if distance_km > 0 and "daily_distance_km" in df.columns and float(df.at[df.index[0], "daily_distance_km"]) <= 0.0:
+        df.at[df.index[0], "daily_distance_km"] = float(distance_km)
+        fallback_flags["load"] = True
+    if workout_intensity > 0 and "workout_intensity_minutes" in df.columns and float(df.at[df.index[0], "workout_intensity_minutes"]) <= 0.0:
+        df.at[df.index[0], "workout_intensity_minutes"] = float(workout_intensity)
+        fallback_flags["load"] = True
+
+    # Recovery anchors (do not override today's stress/soreness from survey)
+    sleep_minutes = float(recent.get("sleepMinutes") or 0.0)
+    sleep_hours = sleep_minutes / 60.0 if sleep_minutes > 0 else 0.0
+    hr_min = float(recent.get("heartRateMin") or 0.0)
+    hr_avg = float(recent.get("heartRateAvg") or 0.0)
+    resting_hr = hr_min if hr_min > 0 else hr_avg
+    if sleep_hours > 0 and "sleep_hours" in df.columns and float(df.at[df.index[0], "sleep_hours"]) <= 0.0:
+        df.at[df.index[0], "sleep_hours"] = float(max(3.0, min(12.0, sleep_hours)))
+        fallback_flags["recovery"] = True
+    if resting_hr > 0 and "resting_hr" in df.columns and float(df.at[df.index[0], "resting_hr"]) <= 0.0:
+        clipped_resting = float(max(38.0, min(95.0, resting_hr)))
+        df.at[df.index[0], "resting_hr"] = clipped_resting
+        if "hrv_score" in df.columns and float(df.at[df.index[0], "hrv_score"]) <= 0.0:
+            df.at[df.index[0], "hrv_score"] = float(max(30.0, min(100.0, 110.0 - clipped_resting * 0.65)))
+        fallback_flags["recovery"] = True
+
+    return df, fallback_flags
 
 
 def _append_confidence_note(recommendation: str, confidence: str) -> str:
@@ -186,6 +252,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     response so local development and CI still behave predictably.
     """
     df = injury_request_to_model_dataframe(payload)
+    df, fallback_used = _backfill_today_row_from_recent_history(df, payload)
     df, history_confidence = _apply_history_confidence_fallback(df, payload)
     quality = calculate_data_quality_score(payload)
     quality_score = float(quality["score"])
@@ -207,7 +274,27 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         defaulted_critical_count,
     )
 
-    if bool(quality["has_hard_blocker"]) or quality_score < 0.35:
+    hard_missing = set(quality.get("hard_missing", []))
+    only_signal_blockers = hard_missing.issubset({"load_signal", "recovery_signal"})
+    if bool(quality["has_hard_blocker"]) and only_signal_blockers and (fallback_used["load"] or fallback_used["recovery"]):
+        quality_score = max(quality_score, 0.45)
+        logger.info(
+            "predict_quality_relaxed_from_history userId=%s load_fallback=%s recovery_fallback=%s",
+            payload.userId,
+            fallback_used["load"],
+            fallback_used["recovery"],
+        )
+
+    if bool(quality["has_hard_blocker"]) and not (
+        only_signal_blockers and (fallback_used["load"] or fallback_used["recovery"])
+    ):
+        logger.warning(
+            "predict_blocked userId=%s reason=insufficient_input_quality confidence=%s",
+            payload.userId,
+            final_confidence,
+        )
+        raise ValueError("insufficient_input_quality")
+    if quality_score < 0.35:
         logger.warning(
             "predict_blocked userId=%s reason=insufficient_input_quality confidence=%s",
             payload.userId,
@@ -259,3 +346,54 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             "confidence_bucket": confidence_bucket,
         },
     }
+
+
+def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str, Any]:
+    """
+    Single-source serving path: load all relevant inputs from Firestore and run
+    standard production prediction.
+    """
+    snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
+    if not snapshot:
+        raise ValueError("firestore_snapshot_unavailable")
+
+    profile = snapshot.get("profile") or {}
+    health = snapshot.get("daily_health") or {}
+    checkins = snapshot.get("daily_checkins") or {}
+    nutrition = snapshot.get("daily_nutrition") or {}
+
+    payload = InjuryPredictionRequest(
+        userId=user_id,
+        date=date_key,
+        age=profile.get("age"),
+        vo2_max=profile.get("vo2Max") or profile.get("vo2_max"),
+        history_injury_count=profile.get("historyInjuryCount") or profile.get("history_injury_count"),
+        sleepMinutes=health.get("sleepMinutes"),
+        steps=health.get("steps"),
+        distanceMeters=health.get("distanceMeters"),
+        activeCalories=health.get("activeCalories"),
+        totalCalories=health.get("totalCalories"),
+        heartRateAvg=health.get("heartRateAvg"),
+        heartRateMax=health.get("heartRateMax"),
+        heartRateMin=health.get("heartRateMin"),
+        weightKg=health.get("weightKg"),
+        bmrCalories=health.get("bmrCalories"),
+        energyLevel=checkins.get("energyLevel"),
+        muscleSoreness=checkins.get("muscleSoreness"),
+        stressLevel=checkins.get("stressLevel"),
+        totalProtein=nutrition.get("totalProtein"),
+        totalCarbs=nutrition.get("totalCarbs"),
+        mealsLoggedCount=nutrition.get("mealsLoggedCount"),
+    )
+    return predict_injury_risk(payload)
+
+
+def persist_prediction_result_or_raise(
+    user_id: str,
+    date_key: str,
+    result: dict[str, Any],
+    source: str,
+) -> None:
+    ok = save_daily_prediction_result(user_id, date_key, result, source=source)
+    if not ok:
+        raise RuntimeError("prediction_persist_failed")

@@ -1,11 +1,12 @@
 # Frontend-Backend Data Contract (Injury Risk)
 
-This document defines the exact daily data contract between Android/Firestore and backend `POST /predict`.
+This document defines the production daily contracts between Android/Firestore and backend prediction endpoints.
 Goal: prevent train/serve drift and prevent missing-field surprises before model work.
 
 ## Scope
 
-- Backend endpoint: `POST /predict`
+- Preferred backend endpoint: `POST /predict/daily` (minimal trigger; backend loads Firestore directly)
+- Advanced backend endpoint: `POST /predict` (full payload sent by client)
 - Request schema: `backend/schemas/inference.py` (`InjuryPredictionRequest`)
 - Current Android storage:
   - `users/{uid}/daily_health/{yyyy-MM-dd}`
@@ -13,7 +14,24 @@ Goal: prevent train/serve drift and prevent missing-field surprises before model
   - `users/{uid}/daily_nutrition/{yyyy-MM-dd}`
 - Weekly history UI: last 7 `finalRiskScore` points from `daily_health` (display only).
 
-## Canonical Daily Payload (client -> backend)
+## Recommended Production Trigger (client -> backend)
+
+Preferred minimal request:
+
+```json
+{
+  "userId": "uid",
+  "date": "yyyy-MM-dd"
+}
+```
+
+Behavior:
+- Backend loads same-day docs from Firestore (`daily_health`, `daily_checkins`, `daily_nutrition`) plus profile from `users/{uid}`.
+- Backend computes features + historical enrichment internally and runs inference.
+- Backend persists prediction output back to `users/{uid}/daily_health/{date}` (merge write) and also returns the same response to the client.
+- This keeps Firestore as a single source of truth and avoids split logic between client and server.
+
+## Full Payload Contract (optional, advanced mode)
 
 These keys should be sent every day when available:
 
@@ -44,8 +62,8 @@ These keys should be sent every day when available:
 ```
 
 Notes:
-- Backend currently accepts all fields as optional and imputes defaults.
-- For model quality, daily sender should target near-complete payload (at least required minimum below).
+- Backend accepts full payload for compatibility/debug workflows.
+- In production app flow, prefer minimal trigger endpoint over sending partial mixed payloads.
 
 ## Required Minimum Daily Fields (for stable model signal)
 
@@ -111,10 +129,18 @@ Important:
 - Current `/predict` reads up to 7 historical days from Firestore when both `userId` and `date` are provided.
 - If Firestore is unavailable or insufficient history exists, backend falls back to single-day proxy derived features.
 
+## Implementation Status
+
+Completed:
+
+1. Backend supports minimal trigger endpoint `POST /predict/daily`.
+2. Backend loads profile + daily docs directly from Firestore for that date.
+3. Backend still supports full `POST /predict` for advanced/compatibility use.
+
 ## Gaps To Close Before Next Model Iteration
 
-1. Migrate Android prediction call to production `POST /predict` contract (not legacy `demo_predict` shape).
-2. Ensure Android always includes profile fields `age`, `vo2Max`, `historyInjuryCount` in request payload.
+1. Migrate Android prediction call to production `POST /predict/daily` minimal trigger (not legacy `demo_predict`).
+2. Ensure Android always sends `userId` + `date` and handles backend response persistence/UI.
 3. Nutrition feature policy decided (see section below): keep raw nutrition fields out of v1 model columns, use them only to derive `daily_calories`.
 4. Decide whether `heartRateMax/Min` and `energyLevel` should be converted to model features.
 5. Add train-serve compatibility check: training columns must match serving columns exactly (order and names).
