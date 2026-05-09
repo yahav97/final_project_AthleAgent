@@ -21,6 +21,8 @@
    מסמך פגישת תיאום עם השותף בפרונט (חלוקת אחריות, החלטות, DoD ובדיקות).
 5. `DATA_CONTRACT_FRONTEND_BACKEND.md`  
    חוזה נתונים פורמלי (EN) בין Firestore/Frontend לבין ה-Backend לחיזוי.
+6. `TESTS_EXPLAINED_HE.md`  
+   מה כל קובץ וכל טסט ב-`backend/tests/` בודק — למפתחים שלא מכירים pytest או את המבנה.
 
 ## מה לא צריך יותר
 
