@@ -8,13 +8,11 @@ from ml.model_loader import get_model, get_model_status
 from schemas.inference import (
     AthleteData,
     DailyPredictionTriggerRequest,
-    InjuryPredictionRequest,
     InjuryPredictionResponse,
     SimpleData,
 )
 from services.prediction_service import (
     persist_prediction_result_or_raise,
-    predict_injury_risk,
     predict_injury_risk_from_firestore,
 )
 from utils.logging import logger
@@ -71,34 +69,6 @@ def demo_predict_injury(data: AthleteData):
     }
 
 
-@router.post("/predict", response_model=InjuryPredictionResponse)
-def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredictionResponse:
-    """Run production inference with strict no-fallback semantics.
-
-    Args:
-        payload: Firestore-shaped daily athlete signals.
-
-    Returns:
-        InjuryPredictionResponse: Model-based risk prediction response.
-
-    Raises:
-        HTTPException: 500 if model is blocked, input quality is insufficient, or
-            prediction execution fails.
-    """
-    try:
-        result = predict_injury_risk(payload)
-        if payload.userId and payload.date:
-            persist_prediction_result_or_raise(
-                payload.userId,
-                payload.date,
-                result,
-            )
-    except Exception as exc:
-        logger.exception("predict_route_error userId=%s err=%s", payload.userId, exc)
-        raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
-    return InjuryPredictionResponse(**result)
-
-
 @router.post("/predict/daily", response_model=InjuryPredictionResponse)
 def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredictionResponse:
     """
@@ -131,7 +101,7 @@ def predict_injury_sklearn(data: AthleteData):
     if not settings.ENABLE_LEGACY_SKLEARN_ENDPOINT:
         raise HTTPException(
             status_code=410,
-            detail="Legacy endpoint disabled. Use POST /predict production contract.",
+            detail="Legacy endpoint disabled. Use POST /predict/daily.",
         )
     model = get_model()
     if model is None:

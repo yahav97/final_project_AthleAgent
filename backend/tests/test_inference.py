@@ -7,22 +7,9 @@ from main import app
 client = TestClient(app)
 
 
-def test_predict_production_contract():
-    sample = {
-        "userId": "test_uid",
-        "date": "2026-04-19",
-        "sleepMinutes": 480,
-        "steps": 8200,
-        "distanceMeters": 6400,
-        "energyLevel": 4,
-        "muscleSoreness": 2,
-        "stressLevel": 35,
-        "totalCalories": 2400,
-        "totalProtein": 120,
-        "totalCarbs": 280,
-        "mealsLoggedCount": 3,
-    }
-    response = client.post("/predict", json=sample)
+def test_predict_daily_production_contract():
+    sample = {"userId": "test_uid", "date": "2026-04-19"}
+    response = client.post("/predict/daily", json=sample)
     if response.status_code == 500:
         body = response.json()
         assert "Prediction unavailable" in body["detail"]

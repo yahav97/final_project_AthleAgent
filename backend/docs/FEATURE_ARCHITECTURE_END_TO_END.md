@@ -6,7 +6,7 @@
 היעד המרכזי: למנוע Train-Serve Drift, להבטיח איכות חיזוי עקבית, ולתת חלוקת אחריות ברורה בין חברי הצוות.
 
 ### מצב נוכחי בקצרה
-- יש Contract ברור לבקשת `POST /predict` עם מיפוי רוב השדות היומיים.
+- יש Contract ברור ל-`POST /predict/daily` (טריגר `userId`+`date`) והבקאנד מרכיב פנימית את מיפוי השדות היומיים.
 - Preprocessing ממיר נתוני Firestore לפיצ'רים מחקריים ומייצר feature vector סופי.
 - הבקאנד מחשב rolling features עם היסטוריית שבוע (7 ימים) כאשר זמינה.
 - קיימת לוגיקת fallback לספורטאי חדש/היסטוריה חלקית.
@@ -28,8 +28,8 @@
 - `users/{uid}/daily_nutrition/{date}`: חלבון, פחמימות, מספר ארוחות
 
 ### אחריות שכבות
-- **Frontend (Android)**: מרכיב payload יומי אחיד ושולח ל-`/predict`.
-- **Backend API**: מקבל payload, משלים היסטוריה לפי `userId/date`, ממפה לפיצ'רים.
+- **Frontend (Android)**: שולח טריגר מינימלי (`userId`, `date`) ל-`POST /predict/daily`.
+- **Backend API**: טוען מ-Firestore את אותו יום + פרופיל, משלים היסטוריה לפי `userId/date`, ממפה לפיצ'רים.
 - **History Service**: מושך 7 ימים מ-Firestore ומחשב rolling features.
 - **Prediction Service**: מאחד הכל, מאמת תאימות למודל, מריץ `predict_proba`.
 
@@ -46,7 +46,7 @@ flowchart TD
   model[InjuryModel]
   response[RiskResponse]
 
-  androidApp -->|"daily payload + userId/date"| predictApi
+  androidApp -->|"userId + date (POST /predict/daily)"| predictApi
   predictApi --> preprocess
   predictApi --> historyService
   historyService -->|"7-day window"| firestore
@@ -59,7 +59,7 @@ flowchart TD
 
 ---
 
-## Canonical Contract (בקשת `/predict`)
+## Canonical Contract (נתונים יומיים — נטענים בשרת אחרי `POST /predict/daily`)
 
 ### שדות Context
 - `userId`
@@ -173,11 +173,9 @@ flowchart TD
 ## Frontend Hand-off (לביצוע ע"י השותף)
 
 ## P0 (חובה מיידית)
-- לעבור ל-`/predict` (להפסיק `demo_predict`).
-- לבנות `PredictionPayloadBuilder` יחיד שממזג:
-  - `users/{uid}` + `daily_health/{date}` + `daily_checkins/{date}` + `daily_nutrition/{date}`
-- לשלוח תמיד `userId` + `date`.
-- לשלוח שדות חובה יומיים או `0` מפורש כשאין נתון.
+- לעבור ל-`POST /predict/daily` (להפסיק `demo_predict`).
+- לוודא שנתוני היום נכתבים ל-Firestore לפני הקריאה (profile + daily docs), כדי שהבקאנד יוכל למשוך snapshot מלא.
+- לשלוח תמיד בגוף הבקשה רק `userId` + `date`.
 
 ## P1 (יציבות והפעלה)
 - לשמור תשובת חיזוי בחזרה ל-`daily_health/{date}`.
@@ -190,13 +188,13 @@ flowchart TD
 - instrumentation של גרסת payload (`predictSourceVersion`).
 
 ### Definition of Done לפרונט
-- כל קריאת `/predict` כוללת payload אחיד מכל 4 המקורות.
+- כל חיזוי יומי עובר דרך `POST /predict/daily` עם `userId` + `date`, והנתונים הרלוונטיים קיימים ב-Firestore לפני הקריאה.
 - כיסוי שדות חובה >= 90% ב-14 ימים רצופים ביוזרי טסט.
 - אין שגיאות schema חוזרות מהבקאנד.
 - confidence מוצג עקבית במסך.
 
 ### הודעה מוכנה לשותף
-בכל קריאה ל-`/predict` אתה שולח לי payload אחיד מ-Profile + Daily Health + Daily Checkin + Daily Nutrition, כולל `userId` ו-`date`. אני מחשב בצד שרת rolling של שבוע (7 ימים) ומחזיר חיזוי סופי + confidence, כדי שהפרונט יישאר רזה ו-stateless.
+בכל קריאה ל-`POST /predict/daily` אתה שולח רק `userId` ו-`date`; אני טוען מ-Firestore את Profile + Daily Health + Daily Checkin + Daily Nutrition לאותו יום, מחשב בצד שרת rolling של שבוע (7 ימים) ומחזיר חיזוי סופי + confidence.
 
 ---
 

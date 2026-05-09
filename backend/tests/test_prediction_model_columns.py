@@ -15,22 +15,29 @@ from services.preprocessing import validate_feature_vector_for_model
     not (Path(__file__).resolve().parents[1] / "injury_model.pkl").is_file(),
     reason="injury_model.pkl not present",
 )
-def test_predict_injury_risk_with_loaded_model_no_500():
+def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
+    from api.routes import predict as predict_routes
     from fastapi.testclient import TestClient
 
     from main import app
+    from services import prediction_service as ps
+
+    monkeypatch.setattr(
+        ps,
+        "fetch_daily_firestore_snapshot",
+        lambda uid, d: {
+            "profile": {},
+            "daily_health": {"sleepMinutes": 480, "steps": 8000},
+            "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2},
+            "daily_nutrition": {},
+        },
+    )
+    monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", lambda *a, **k: None)
 
     with TestClient(app) as client:
         r = client.post(
-            "/predict",
-            json={
-                "userId": "u1",
-                "date": "2026-04-30",
-                "sleepMinutes": 480,
-                "steps": 8000,
-                "stressLevel": 35,
-                "muscleSoreness": 2,
-            },
+            "/predict/daily",
+            json={"userId": "u1", "date": "2026-04-30"},
         )
     if r.status_code == 500:
         assert "Prediction unavailable" in r.json()["detail"]

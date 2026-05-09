@@ -25,14 +25,11 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 
 ## 3) מסלולי API שחייבים להכיר
 
-- `POST /predict/daily` (מומלץ לייצור)
+- `POST /predict/daily` (ייצור)
   - הקלט המינימלי: `userId`, `date`.
   - הבקאנד מושך לבד profile + daily docs מ-Firestore.
   - מחזיר `InjuryPredictionResponse`.
   - שומר תוצאה חזרה ל-`daily_health/{date}`.
-- `POST /predict` (מצב מתקדם/תאימות)
-  - קלט מלא מהקליינט.
-  - מיועד ל-debug או אינטגרציות מתקדמות.
 - `POST /demo_predict`
   - יוריסטיקה legacy/דמו.
   - לא נתיב ייצור.

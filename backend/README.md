@@ -2,18 +2,17 @@
 
 FastAPI backend for injury-risk inference. This service is treated as mission-critical:
 
-- If model gate checks pass, `/predict` returns a model-based response.
-- If gate checks fail or input is invalid, `/predict` returns HTTP 500 with a clear error.
+- If model gate checks pass, `POST /predict/daily` returns a model-based response.
+- If gate checks fail or input is invalid, `POST /predict/daily` returns HTTP 500 with a clear error.
 
 ## API Structure
 
-### `POST /predict`
+### `POST /predict/daily`
 
-Production inference endpoint.
+Production inference endpoint (minimal trigger). The backend loads `userId`/`date` docs from Firestore and builds the internal feature payload server-side.
 
-**Request (camelCase, Firestore-shaped):**
-- `userId`, `date`
-- health/checkin/nutrition fields (optional but quality affects inference)
+**Request:**
+- `userId`, `date` (yyyy-MM-dd)
 
 **Response JSON:**
 - `risk_score` (`0..1`)
@@ -49,7 +48,7 @@ Then it validates `run_manifest.json` before marking model as live:
 
 If gate validation fails:
 - model status becomes `Blocked`
-- `/predict` returns HTTP 500 (no fallback predictions)
+- `POST /predict/daily` returns HTTP 500 (no fallback predictions)
 
 ## Run Locally
 
@@ -98,7 +97,7 @@ python -m pytest tests/ -v
 ## Data storage
 
 - Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.
-- After `POST /predict` or `POST /predict/daily`, the API response field `recommendation` is persisted on the same day’s `daily_health` document as **`backendRecommendation`**.
+- After `POST /predict/daily`, the API response field `recommendation` is persisted on the same day’s `daily_health` document as **`backendRecommendation`**.
 
 ## Notes for Evaluation
 

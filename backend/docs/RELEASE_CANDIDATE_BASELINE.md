@@ -30,7 +30,7 @@ This document freezes the backend model-selection artifacts used for the current
 
 - Model loading is gated by manifest quality checks (recall and AUC sanity).
 - If gate checks fail, backend does not mark model live and serves transparent fallback with reason.
-- `POST /predict` response includes prediction provenance metadata:
+- `POST /predict/daily` response includes prediction provenance metadata:
   - `model_version`
   - `fallback_reason`
   - `confidence_bucket`

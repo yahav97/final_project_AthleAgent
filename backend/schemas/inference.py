@@ -90,7 +90,7 @@ class DailyPredictionTriggerRequest(BaseModel):
 
 
 class InjuryPredictionResponse(BaseModel):
-    """Production JSON response for POST /predict."""
+    """Production JSON response for POST /predict/daily."""
 
     risk_level: str
     risk_score: float = Field(..., description="Scalar risk score, e.g. 0.0–1.0")

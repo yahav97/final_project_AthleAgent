@@ -1,5 +1,7 @@
 # Android / Firestore integration notes
 
+**Backend change (no app code updated in this repo):** the backend no longer exposes `POST /predict`. If the Android client still calls that path, it must be switched to **`POST /predict/daily`** (minimal JSON below). Until the client is updated, those calls will fail at the HTTP layer.
+
 Preferred production endpoint is **`POST /predict/daily`** with minimal body:
 
 ```json
@@ -9,9 +11,7 @@ Preferred production endpoint is **`POST /predict/daily`** with minimal body:
 }
 ```
 
-`POST /predict` remains supported for advanced/debug flows where the client sends full payload (`InjuryPredictionRequest`).
-
-## Field mapping (Firestore → API)
+## Field mapping (Firestore → internal request)
 
 | Firestore / Android area | Example field | `InjuryPredictionRequest` field |
 |---------------------------|---------------|----------------------------------|
@@ -27,7 +27,7 @@ Preferred production endpoint is **`POST /predict/daily`** with minimal body:
 | same | `stressLevel` | `stressLevel` |
 | `users/{uid}/daily_nutrition/{date}` | totals / counts | `totalProtein`, `totalCarbs`, `mealsLoggedCount` |
 
-`userId` and `date` are required for `POST /predict/daily` and also enable backend persistence when using `POST /predict`.
+`userId` and `date` are required for `POST /predict/daily` and enable backend persistence of the prediction output.
 
 ## Architecture options (decision for the team)
 

@@ -1,4 +1,4 @@
-# Manual ML regression (POST /predict)
+# Manual ML regression (POST /predict/daily)
 
 After code changes to preprocessing or feature engineering, re-run automated tests, then spot-check with fixed JSON bodies and record `risk_score` / `risk_level` here or in your lab notebook.
 

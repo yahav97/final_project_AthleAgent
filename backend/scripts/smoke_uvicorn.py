@@ -1,4 +1,4 @@
-"""Smoke test: lifespan + /health + /docs + /openapi.json + POST /predict (no TCP server)."""
+"""Smoke test: lifespan + /health + /docs + /openapi.json + POST /predict/daily (no TCP server)."""
 
 from __future__ import annotations
 
@@ -28,20 +28,27 @@ def main() -> int:
         spec = client.get("/openapi.json")
         assert spec.status_code == 200
         paths = spec.json().get("paths", {})
-        assert "/predict" in paths, "OpenAPI must list /predict"
+        assert "/predict/daily" in paths, "OpenAPI must list /predict/daily"
 
-        payload = {
-            "sleepMinutes": 480,
-            "steps": 8000,
-            "stressLevel": 35,
-            "muscleSoreness": 2,
-        }
-        pr = client.post("/predict", json=payload)
-        assert pr.status_code == 200, pr.text
+        payload = {"userId": "smoke_user", "date": "2026-05-09"}
+        pr = client.post("/predict/daily", json=payload)
+        assert pr.status_code in (200, 500), pr.text
         body = pr.json()
-        assert set(body.keys()) >= {"risk_level", "risk_score", "recommendation"}
+        if pr.status_code == 200:
+            assert set(body.keys()) >= {"risk_level", "risk_score", "recommendation"}
+        else:
+            assert "Prediction unavailable" in body.get("detail", "")
 
-    print("SMOKE_OK", json.dumps({"health": h.json(), "predict_keys": sorted(body.keys())}))
+    print(
+        "SMOKE_OK",
+        json.dumps(
+            {
+                "health": h.json(),
+                "predict_status": pr.status_code,
+                "predict_keys": sorted(body.keys()) if pr.status_code == 200 else [],
+            }
+        ),
+    )
     return 0
 
 

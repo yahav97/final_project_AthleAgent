@@ -5,9 +5,8 @@ Goal: prevent train/serve drift and prevent missing-field surprises before model
 
 ## Scope
 
-- Preferred backend endpoint: `POST /predict/daily` (minimal trigger; backend loads Firestore directly)
-- Advanced backend endpoint: `POST /predict` (full payload sent by client)
-- Request schema: `backend/schemas/inference.py` (`InjuryPredictionRequest`)
+- Production backend endpoint: `POST /predict/daily` (minimal trigger; backend loads Firestore directly)
+- Internal assembled request type (server-side only): `backend/schemas/inference.py` (`InjuryPredictionRequest`)
 - Current Android storage:
   - `users/{uid}/daily_health/{yyyy-MM-dd}`
   - `users/{uid}/daily_checkins/{yyyy-MM-dd}`
@@ -47,39 +46,9 @@ Persisted fields in `daily_health` after successful prediction (merge write):
 - **Rules (deterministic):** a small fixed set of English templates chosen from model **probability** (`risk_score` / `predict_proba`) and **ACWR** (`acwr_ratio`), then a trailing **confidence** sentence based on history coverage (high / medium / low). Thresholds for recommendation wording are **not** identical to `risk_level` cutoffs (those come from the saved model bundle thresholds).
 - **Optional client copy:** the Android app may still call **Gemini** and store a separate coach-facing string (e.g. `aiRecommendation`). That path is **independent** of this contract and must not be confused with `backendRecommendation`.
 
-## Full Payload Contract (optional, advanced mode)
+## Internal assembled payload (server-side)
 
-These keys should be sent every day when available:
-
-```json
-{
-  "userId": "uid",
-  "date": "yyyy-MM-dd",
-  "age": 0,
-  "vo2Max": 0,
-  "historyInjuryCount": 0,
-  "sleepMinutes": 0,
-  "steps": 0,
-  "distanceMeters": 0,
-  "activeCalories": 0,
-  "totalCalories": 0,
-  "heartRateAvg": 0,
-  "heartRateMax": 0,
-  "heartRateMin": 0,
-  "weightKg": 0.0,
-  "bmrCalories": 0,
-  "energyLevel": 0,
-  "muscleSoreness": 0,
-  "stressLevel": 0,
-  "totalProtein": 0,
-  "totalCarbs": 0,
-  "mealsLoggedCount": 0
-}
-```
-
-Notes:
-- Backend accepts full payload for compatibility/debug workflows.
-- In production app flow, prefer minimal trigger endpoint over sending partial mixed payloads.
+The backend builds an `InjuryPredictionRequest` from Firestore (`profile`, `daily_health`, `daily_checkins`, `daily_nutrition` for the target date). Clients do **not** send this JSON over HTTP; it documents the merged field set used inside `prediction_service.py`.
 
 ## Required Minimum Daily Fields (for stable model signal)
 
@@ -100,7 +69,7 @@ If missing repeatedly, backend falls back to defaults and signal quality drops.
 
 ## Exact Mapping: Firestore -> API -> Model
 
-| Firestore source | Field | API key (`/predict`) | Model usage |
+| Firestore source | Field | Assembled key (`InjuryPredictionRequest`) | Model usage |
 |---|---|---|---|
 | `users/{uid}` (profile) | `age` | `age` | `age` |
 | `users/{uid}` (profile) | `vo2Max` | `vo2Max` | `vo2_max` |
@@ -135,33 +104,34 @@ Backend model features are fixed to:
 - `calorie_balance`, `sleep_debt_3d`, `hrv_drop`
 
 Important:
-- `age`, `historyInjuryCount`, `vo2Max` are now supported in `/predict`; if omitted, serving falls back to defaults.
+- `age`, `historyInjuryCount`, `vo2Max` are supported when present in Firestore; if omitted, serving falls back to defaults.
 - `acute/chronic/acwr/sleep_debt/hrv_drop` are single-day proxies in serving, not true rolling history from Firestore.
 
 ## Weekly History Clarification
 
 - Athlete/Coach dashboards show last 7 days of `finalRiskScore` saved in `daily_health`.
 - This weekly chart is display/history only.
-- Current `/predict` reads up to 7 historical days from Firestore when both `userId` and `date` are provided.
+- Serving reads up to 7 historical days from Firestore when resolving rolling features for a given `userId` and `date`.
 - If Firestore is unavailable or insufficient history exists, backend falls back to single-day proxy derived features.
 
 ## Implementation Status
 
 Completed:
 
-1. Backend supports minimal trigger endpoint `POST /predict/daily`.
+1. Backend exposes `POST /predict/daily` as the only HTTP inference entrypoint.
 2. Backend loads profile + daily docs directly from Firestore for that date.
-3. Backend still supports full `POST /predict` for advanced/compatibility use.
+3. Full daily signals are merged into `InjuryPredictionRequest` inside the service layer (not posted by the client).
 
 ## Gaps To Close Before Next Model Iteration
 
 1. Migrate Android prediction call to production `POST /predict/daily` minimal trigger (not legacy `demo_predict`).
-2. Ensure Android always sends `userId` + `date` and handles backend response persistence/UI.
-3. Nutrition feature policy decided (see section below): keep raw nutrition fields out of v1 model columns, use them only to derive `daily_calories`.
-4. Decide whether `heartRateMax/Min` and `energyLevel` should be converted to model features.
-5. Add train-serve compatibility check: training columns must match serving columns exactly (order and names).
-6. Add ingestion health checks: flag days with missing required minimum fields.
-7. Configure backend runtime credentials for Firestore (`GOOGLE_APPLICATION_CREDENTIALS`) in each environment.
+2. Ensure Android never targets removed **`POST /predict`** (backend-only endpoint removed); use **`POST /predict/daily`** only.
+3. Ensure Android always sends `userId` + `date` and handles backend response persistence/UI.
+4. Nutrition feature policy decided (see section below): keep raw nutrition fields out of v1 model columns, use them only to derive `daily_calories`.
+5. Decide whether `heartRateMax/Min` and `energyLevel` should be converted to model features.
+6. Add train-serve compatibility check: training columns must match serving columns exactly (order and names).
+7. Add ingestion health checks: flag days with missing required minimum fields.
+8. Configure backend runtime credentials for Firestore (`GOOGLE_APPLICATION_CREDENTIALS`) in each environment.
 
 ## Decision: "Lost Features" Policy (v1)
 
@@ -182,7 +152,7 @@ Promotion rule for v2:
 
 ## Release Gate (must pass before model tuning)
 
-- Android sends canonical daily payload keys to backend.
+- Android persists canonical daily field keys to **Firestore** on schedule; the inference HTTP call is only `userId` + `date` to `POST /predict/daily` (no full JSON body to the backend).
 - Required minimum daily fields populated for at least 14 consecutive days in test users.
 - No unknown train-only feature in training dataset.
 - No serve-only feature missing from training dataset.

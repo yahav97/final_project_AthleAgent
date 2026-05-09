@@ -30,7 +30,7 @@
 
 ## כללי עדכון
 
-- כל שינוי ב-API חיזוי (`/predict`, `/predict/daily`) מחייב עדכון ב-`DATA_CONTRACT_FRONTEND_BACKEND.md`.
+- כל שינוי ב-API חיזוי (`POST /predict/daily`; **`POST /predict` הוסר**) מחייב עדכון ב-`DATA_CONTRACT_FRONTEND_BACKEND.md` ובדיקת התאמה מול האפליקציה כשמעדכנים את הפרונט.
 - כל שינוי תפעולי/ארכיטקטוני בבקאנד או ב-ML מחייב עדכון ב-`ONBOARDING_BACKEND_ML_HE.md`.
 - כל שינוי במבנה/מדיניות שמירת נתונים ב-Firestore מחייב עדכון ב-`ATHLETE_DB_DATA_LIFECYCLE_HE.md`.
 - כל שינוי בתהליך הדמו מחייב עדכון ב-`PROTOTYPE_PRESENTATION_PREP_HE.md`.

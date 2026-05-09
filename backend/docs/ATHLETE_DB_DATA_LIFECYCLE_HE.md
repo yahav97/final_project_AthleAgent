@@ -41,7 +41,7 @@
 **Prediction output** (מהבקאנד לאחר חיזוי מוצלח):  
 - `finalRiskScore` (0-100)
 - `riskLevel`
-- `backendRecommendation` — טקסט המלצת ה-ML מהבקאנד (תבניות קבועות לפי הסתברות מודל + ACWR + משפט confidence להיסטוריה); זהה לשדה `recommendation` בתשובת `POST /predict` / `POST /predict/daily`. לא נוצר בצד הלקוח.
+- `backendRecommendation` — טקסט המלצת ה-ML מהבקאנד (תבניות קבועות לפי הסתברות מודל + ACWR + משפט confidence להיסטוריה); זהה לשדה `recommendation` בתשובת `POST /predict/daily`. לא נוצר בצד הלקוח.
 - `dataQualityScore`
 - `dataQualityStatus`
 - `predictionMeta`
@@ -146,6 +146,7 @@
 ## 7) פערים ידועים מול היעד
 
 - בפרונט הנוכחי עדיין קיימת קריאת legacy ל-`/demo_predict` בחלק מהמסכים.
+- הבקאנד כבר **לא** מציע `POST /predict`; אם מישהו מהאפליקציה עדיין קורא לנתיב הזה — צריך להסיר או להחליף ל-`/predict/daily` בעדכון פרונט עתידי (לא נוגעים כאן בקוד האפליקציה).
 - ביעד, כל המסכים צריכים להתיישר ל-`/predict/daily` בלבד.
 - חשוב ליישר שפה בין מסמכים: "7 ימים" = חלון חישובי, לא מחיקה מה-DB.
 
