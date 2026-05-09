@@ -61,6 +61,8 @@ todos:
 
 # Complete Backend Architecture - AthleAgent
 
+> **מצב נוכחי (2026):** המסמך שלהלן הוא תכנון/אפיון היסטורי מורחב. היישום בפועל ב-repo מתמקד ב-**FastAPI + חיזוי ML + Firestore** (אין PostgreSQL/SQLAlchemy בבקאנד). למקור אמת מעודכן ראו `backend/docs/` (במיוחד `DATA_CONTRACT_FRONTEND_BACKEND.md`, `ATHLETE_DB_DATA_LIFECYCLE_HE.md`, `README_HE.md`).
+
 ## מבנה הפרויקט (מורחב)
 
 ```
@@ -414,37 +416,30 @@ backend/
 
 ## Dependencies
 
+מקור האמת לתלויות הריצה של הבקאנד הוא **`requirements.txt` בשורש הפרויקט** (FastAPI, ML stack, `firebase-admin`, וכו'; **ללא** SQLAlchemy/PostgreSQL).
+
+הבלוק הבא משקף תכנון היסטורי של מסמך זה; אל תסתמכו עליו להתקנה:
+
 ```python
-# requirements.txt
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-sqlalchemy>=2.0.0
-alembic>=1.12.0
-psycopg2-binary>=2.9.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.6
-google-auth>=2.23.0
-google-generativeai>=0.3.0  # Gemini API
-pydantic[email]>=2.5.0
-python-dotenv>=1.0.0
-pillow>=10.0.0  # Image processing
-httpx>=0.25.0   # HTTP client for external APIs
+# תכנון ישן — לא מיושם ב-repo הנוכחי
+# fastapi, uvicorn, sqlalchemy, psycopg2-binary, python-jose, passlib, ...
 ```
 
 ## Environment Variables
 
+**נוכחי (Firestore + inference):** `FIREBASE_SERVICE_ACCOUNT_KEY` או `GOOGLE_APPLICATION_CREDENTIALS`, משתני מודל/`MODEL_PATH`, ו-CORS לפי הצורך. אין `DATABASE_URL` ל-PostgreSQL.
+
+דוגמה היסטורית מתכנון JWT/SQL (לא פעילה בבקאנד הנוכחי):
+
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/athleagent
-SECRET_KEY=your-secret-key-for-jwt
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
+# DATABASE_URL=...  # לא בשימוש
+# SECRET_KEY / JWT — לא בשימוש בשרת הנוכחי
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-1.5-pro  # or gemini-pro-vision
+GEMINI_MODEL=gemini-1.5-pro
 UPLOAD_DIR=./uploads/images
-MAX_UPLOAD_SIZE=10485760  # 10MB
+MAX_UPLOAD_SIZE=10485760
 ```
 
 ## Use Cases Implementation Mapping

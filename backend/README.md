@@ -95,6 +95,11 @@ cd backend
 python -m pytest tests/ -v
 ```
 
+## Data storage
+
+- Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.
+- After `POST /predict` or `POST /predict/daily`, the API response field `recommendation` is persisted on the same day’s `daily_health` document as **`backendRecommendation`**.
+
 ## Notes for Evaluation
 
 - RC1 is promoted through `ML_model/run_pipeline.py`.

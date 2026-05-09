@@ -145,7 +145,6 @@ def save_daily_prediction_result(
     user_id: str,
     date_key: str,
     result: dict[str, Any],
-    source: str = "backend_predict_daily",
 ) -> bool:
     """
     Persist prediction output under users/{uid}/daily_health/{date} using merge.
@@ -157,13 +156,11 @@ def save_daily_prediction_result(
         risk_score = float(result.get("risk_score") or 0.0)
         doc = {
             "finalRiskScore": round(risk_score * 100.0, 2),
-            "riskScore": risk_score,
             "riskLevel": result.get("risk_level"),
             "backendRecommendation": result.get("recommendation"),
             "dataQualityScore": result.get("data_quality_score"),
             "dataQualityStatus": result.get("data_quality_status"),
             "predictionMeta": result.get("meta") or {},
-            "predictionSource": source,
             "predictionUpdatedAt": datetime.utcnow().isoformat(),
         }
         db.collection("users").document(user_id).collection("daily_health").document(date_key).set(doc, merge=True)

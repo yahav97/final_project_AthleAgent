@@ -44,7 +44,7 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 הפלט המרכזי:
 - `risk_score` (0..1)
 - `risk_level` (`Low|Medium|High`)
-- `recommendation`
+- `recommendation` — נוצר בבקאנד בלבד; תבניות טקסט קבועות לפי הסתברות המודל ו-ACWR, ואז משפט confidence לפי איכות/היסטוריה; נשמר ב-Firestore כ-`backendRecommendation`
 - `data_quality_score`
 - `data_quality_status`
 - `meta` (`model_version`, `fallback_reason`, `confidence_bucket`)

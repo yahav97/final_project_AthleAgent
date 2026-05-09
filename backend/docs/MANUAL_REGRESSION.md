@@ -5,10 +5,10 @@ After code changes to preprocessing or feature engineering, re-run automated tes
 ## Commands
 
 ```bash
-cd backend
 python -m pytest tests/ -v
-python scripts/smoke_uvicorn.py
 ```
+
+python scripts/smoke_uvicorn.py
 
 ## Training metrics (fill after each `ML_model/train_model.py` run)
 
@@ -23,39 +23,52 @@ Copy the printed block from the training script output, for example:
 **1. Rest / low load**
 
 ```json
-{
   "sleepMinutes": 540,
-  "steps": 4000,
-  "stressLevel": 20,
-  "muscleSoreness": 1,
-  "totalCalories": 2400
-}
 ```
+
+"steps": 4000,
+
+"stressLevel": 20,
+
+"muscleSoreness": 1,
+
+"totalCalories": 2400
+
+}
 
 **2. Heavy day**
 
 ```json
-{
   "sleepMinutes": 300,
-  "steps": 16000,
-  "distanceMeters": 12000,
-  "activeCalories": 900,
-  "stressLevel": 70,
-  "muscleSoreness": 4,
-  "totalCalories": 2600
-}
 ```
+
+"steps": 16000,
+
+"distanceMeters": 12000,
+
+"activeCalories": 900,
+
+"stressLevel": 70,
+
+"muscleSoreness": 4,
+
+"totalCalories": 2600
+
+}
 
 **3. Poor sleep**
 
 ```json
-{
   "sleepMinutes": 240,
-  "steps": 8000,
-  "stressLevel": 50,
-  "muscleSoreness": 3
-}
 ```
+
+"steps": 8000,
+
+"stressLevel": 50,
+
+"muscleSoreness": 3
+
+}
 
 **4. Minimal body (defaults apply)**
 
@@ -66,24 +79,34 @@ Copy the printed block from the training script output, for example:
 **5. Nutrition-heavy day**
 
 ```json
-{
   "sleepMinutes": 420,
-  "steps": 9000,
-  "totalCalories": 3200,
-  "totalProtein": 150,
-  "totalCarbs": 400,
-  "mealsLoggedCount": 4,
-  "stressLevel": 40,
-  "muscleSoreness": 2
-}
 ```
+
+"steps": 9000,
+
+"totalCalories": 3200,
+
+"totalProtein": 150,
+
+"totalCarbs": 400,
+
+"mealsLoggedCount": 4,
+
+"stressLevel": 40,
+
+"muscleSoreness": 2
+
+}
 
 Record observed outputs (date / commit hash):
 
+
 | Scenario | risk_score | risk_level | Notes |
-|----------|------------|------------|-------|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
+| -------- | ---------- | ---------- | ----- |
+| 1        |            |            |       |
+| 2        |            |            |       |
+| 3        |            |            |       |
+| 4        |            |            |       |
+| 5        |            |            |       |
+
+

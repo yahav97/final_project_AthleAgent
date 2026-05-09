@@ -208,7 +208,7 @@ flowchart TD
 - לתעד examples רשמיים של payload ב-docs.
 
 ## P1
-- להוסיף שדה תגובה נפרד `confidence_level` (לא רק טקסט ב-recommendation).
+- להוסיף שדה תגובה נפרד `confidence_level` (לא רק טקסט ב-`recommendation`; היום חלק מרמת הביטחון משורשר גם כמשפט אנגלית קבוע אחרי גוף ההמלצה).
 - להוסיף endpoint debug פנימי (days_count, fallback_used, schema_ok).
 
 ## P2

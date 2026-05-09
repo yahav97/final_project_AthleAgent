@@ -31,6 +31,22 @@ Behavior:
 - Backend persists prediction output back to `users/{uid}/daily_health/{date}` (merge write) and also returns the same response to the client.
 - This keeps Firestore as a single source of truth and avoids split logic between client and server.
 
+Persisted fields in `daily_health` after successful prediction (merge write):
+- `finalRiskScore` (0-100)
+- `riskLevel`
+- `backendRecommendation`
+- `dataQualityScore`
+- `dataQualityStatus`
+- `predictionMeta`
+- `predictionUpdatedAt`
+
+### ML recommendation text (`recommendation` / `backendRecommendation`)
+
+- The HTTP field `recommendation` and the Firestore field `backendRecommendation` are the **same string** for a given successful prediction.
+- **Source of truth:** computed on the server in `backend/services/prediction_service.py` (not assembled in the mobile UI).
+- **Rules (deterministic):** a small fixed set of English templates chosen from model **probability** (`risk_score` / `predict_proba`) and **ACWR** (`acwr_ratio`), then a trailing **confidence** sentence based on history coverage (high / medium / low). Thresholds for recommendation wording are **not** identical to `risk_level` cutoffs (those come from the saved model bundle thresholds).
+- **Optional client copy:** the Android app may still call **Gemini** and store a separate coach-facing string (e.g. `aiRecommendation`). That path is **independent** of this contract and must not be confused with `backendRecommendation`.
+
 ## Full Payload Contract (optional, advanced mode)
 
 These keys should be sent every day when available:

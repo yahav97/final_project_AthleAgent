@@ -5,6 +5,7 @@
 ## 1) מטרת הפגישה
 
 ליישר מעבר מלא לזרימת חיזוי יומית יציבה:
+
 - פרונט שולח טריגר מינימלי.
 - בקאנד מושך נתונים מ-Firestore, מריץ מודל, מחזיר ושומר תוצאה.
 - אין פיצול לוגיקה עסקית או כתיבה כפולה.
@@ -12,9 +13,11 @@
 ## 2) חוזה עבודה מוסכם
 
 ### Endpoint ייצור
+
 - `POST /predict/daily`
 
 ### Request
+
 ```json
 {
   "userId": "firebase_uid",
@@ -23,9 +26,10 @@
 ```
 
 ### Response (עיקרי)
+
 - `risk_score`
 - `risk_level`
-- `recommendation`
+- `recommendation` (טקסט מהבקאנד; אותו תוכן נשמר ב-Firestore תחת `backendRecommendation`)
 - `data_quality_score`
 - `data_quality_status`
 - `meta`
@@ -67,16 +71,18 @@
 ## 6) משימות פעולה אחרי הפגישה
 
 ### פרונט
-- [ ] החלפה מלאה מ-`/demo_predict` ל-`/predict/daily`
-- [ ] התאמת models של request/response
-- [ ] מנגנון מניעת טריגר כפול
-- [ ] UX שגיאות מוסכם
+
+- החלפה מלאה מ-`/demo_predict` ל-`/predict/daily`
+- התאמת models של request/response
+- מנגנון מניעת טריגר כפול
+- UX שגיאות מוסכם
 
 ### בקאנד
-- [ ] אימות persist מלא בכל קריאה תקינה
-- [ ] לוגים ואבחון כשלים ברורים
-- [ ] מדיניות retry/idempotency מתועדת
-- [ ] בדיקת חיבור Firebase בכל סביבת הרצה
+
+- אימות persist מלא בכל קריאה תקינה
+- לוגים ואבחון כשלים ברורים
+- מדיניות retry/idempotency מתועדת
+- בדיקת חיבור Firebase בכל סביבת הרצה
 
 ## 7) Definition of Done משותף
 
@@ -85,3 +91,4 @@
 - תשובה נשמרת עקבית ב-Firestore ומוצגת נכון בפרונט.
 - כל תרחישי האינטגרציה הקריטיים עברו.
 - יש יכולת תחקור תקלות מלאה (frontend events + backend logs).
+

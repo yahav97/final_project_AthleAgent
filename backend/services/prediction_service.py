@@ -392,8 +392,7 @@ def persist_prediction_result_or_raise(
     user_id: str,
     date_key: str,
     result: dict[str, Any],
-    source: str,
 ) -> None:
-    ok = save_daily_prediction_result(user_id, date_key, result, source=source)
+    ok = save_daily_prediction_result(user_id, date_key, result)
     if not ok:
         raise RuntimeError("prediction_persist_failed")

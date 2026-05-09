@@ -38,27 +38,13 @@ async def startup_event():
     from ml.model_loader import load_model
 
     load_model(settings.MODEL_PATH)
-    logger.info("Starting %s v%s", settings.PROJECT_NAME, settings.VERSION)
-    if settings.ENABLE_LEGACY_AUTH_DB:
-        logger.info("Legacy auth + Postgres routes are enabled.")
-    else:
-        logger.info("Inference mode: legacy auth DB routes are disabled (ENABLE_LEGACY_AUTH_DB=false).")
+    logger.info("Starting %s v%s (Firestore-backed inference)", settings.PROJECT_NAME, settings.VERSION)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown."""
     logger.info("Shutting down server")
-
-
-if settings.ENABLE_LEGACY_AUTH_DB:
-    from api.routes.auth import router as auth_router
-
-    app.include_router(
-        auth_router,
-        prefix=settings.API_V1_PREFIX + "/auth",
-        tags=["Authentication"],
-    )
 
 
 if __name__ == "__main__":

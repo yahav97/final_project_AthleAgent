@@ -19,7 +19,13 @@
 
 **AthleAgent** היא מערכת חכמה למעקב וחיזוי סיכון לפציעות בעזרת מודל למידת מכונה.
 
-### ארכיטקטורה
+### מצב מערכת נוכחי (2026)
+
+- **נתוני אפליקציה ותוצאות חיזוי:** נשמרים ב-**Firebase / Firestore** (מסמכי משתמש, `daily_health`, וכו'). אין שרת SQL (PostgreSQL) בבקאנד הנוכחי.
+- **המלצת טקסט של המודל:** נוצרת ב-**בקאנד** (`recommendation` ב-API, `backendRecommendation` ב-Firestore); תבניות קבועות לפי הסתברות מודל + ACWR + משפט confidence. זה נפרד מהמלצת ניסוח אופציונלית מ-**Gemini** באפליקציה.
+- **תיעוד מעודכן:** `backend/docs/README_HE.md`, `DATA_CONTRACT_FRONTEND_BACKEND.md`, `ATHLETE_DB_DATA_LIFECYCLE_HE.md`.
+
+### ארכיטקטורה (סכימתי — מצב נוכחי)
 
 ```
 ┌─────────────────┐
@@ -27,7 +33,7 @@
 │  (Frontend)     │
 └────────┬────────┘
          │ HTTP/REST API
-         │ JWT Authentication
+         │ Firebase Auth (אפליקציה)
          ▼
 ┌─────────────────┐
 │  FastAPI        │  (Python)
@@ -37,20 +43,20 @@
     ┌────┴────┬──────────────┬─────────────┐
     │         │              │             │
     ▼         ▼              ▼             ▼
-┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│PostgreSQL│ │Gemini AI│ │Health    │ │ML Model  │
-│Database  │ │(Nutrition)│ │Connect   │ │(XGBoost/ │
-│          │ │          │ │(Android) │ │RF/SVM)   │
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Firestore │ │Gemini AI │ │Health    │ │ML Model  │
+│(App data)│ │(אופציונלי│ │Connect   │ │(scikit/  │
+│          │ │ בלקוח)   │ │(Android) │ │joblib)   │
 └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 ### טכנולוגיות
 
 - **Frontend**: Android (Kotlin), Health Connect SDK
-- **Backend**: FastAPI (Python), PostgreSQL, SQLAlchemy
-- **ML**: scikit-learn, XGBoost, joblib
-- **External APIs**: Google Gemini AI, Google OAuth
-- **Authentication**: JWT, Google Sign-In
+- **Backend**: FastAPI (Python), שירות חיזוי ML, אינטגרציה ל-Firestore לצורך קריאה/כתיבת תוצאות
+- **ML**: scikit-learn, (לפי הארטיפקט המקודם) joblib
+- **External APIs**: Google Gemini AI (למשל ניתוח תמונות באפליקציה), Firebase
+- **Authentication**: Firebase Auth בצד האפליקציה (לא JWT מבקאנד SQL ביישום הנוכחי)
 
 ---
 
@@ -1168,20 +1174,17 @@ risk_percentage (0-100)
 
 ### Backend (.env)
 
+> **נוכחי:** הבקאנד נשען על **Firestore** לנתוני אפליקציה ול-persist תוצאות חיזוי. אין `DATABASE_URL` ל-PostgreSQL ביישום זה. הגדרו אישורי Firebase Admin (למשל `FIREBASE_SERVICE_ACCOUNT_KEY` או `GOOGLE_APPLICATION_CREDENTIALS`).
+
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/athleagent
+# Firebase Admin / Firestore (קריאה וכתיבת תוצאות חיזוי)
+FIREBASE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
 
-# JWT
-SECRET_KEY=your-secret-key-min-32-chars
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-
-# Google OAuth
+# Google OAuth (אופציונלי — עזרי אימות טוקן אם בשימוש)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-# Gemini AI
+# Gemini AI (אופציונלי — לרוב בצד האפליקציה)
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-1.5-pro
 
@@ -1222,9 +1225,9 @@ GOOGLE_CLIENT_ID=your-android-google-client-id
 
 ### Backend
 
-1. **Database**: PostgreSQL (production)
+1. **Data store**: Firestore (production) — אין PostgreSQL ביישום הנוכחי
 2. **Server**: FastAPI with Uvicorn
-3. **Model**: `injury_model.pkl` deployed with backend
+3. **Model**: artifact path configured via `MODEL_PATH` / promoted manifest (see `backend/ml/model_loader.py`)
 4. **Environment**: Load from `.env` or environment variables
 
 ### Android

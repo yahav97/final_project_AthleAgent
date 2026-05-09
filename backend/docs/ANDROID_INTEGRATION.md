@@ -1,6 +1,15 @@
 # Android / Firestore integration notes
 
-The production endpoint is **`POST /predict`** with a JSON body matching [`InjuryPredictionRequest`](../schemas/inference.py) (camelCase keys). The Android app today still calls **`POST /demo_predict`** with a different shape (`AthleteData`); migrating the client is a partner task (requires explicit approval to edit `android_app/`).
+Preferred production endpoint is **`POST /predict/daily`** with minimal body:
+
+```json
+{
+  "userId": "uid",
+  "date": "yyyy-MM-dd"
+}
+```
+
+`POST /predict` remains supported for advanced/debug flows where the client sends full payload (`InjuryPredictionRequest`).
 
 ## Field mapping (Firestore → API)
 
@@ -18,13 +27,15 @@ The production endpoint is **`POST /predict`** with a JSON body matching [`Injur
 | same | `stressLevel` | `stressLevel` |
 | `users/{uid}/daily_nutrition/{date}` | totals / counts | `totalProtein`, `totalCarbs`, `mealsLoggedCount` |
 
-Optional identifiers: `userId`, `date` (`yyyy-MM-dd`) — useful for logging; the backend does not persist them today.
+`userId` and `date` are required for `POST /predict/daily` and also enable backend persistence when using `POST /predict`.
 
 ## Architecture options (decision for the team)
 
-1. **Direct HTTP:** Android builds JSON from Firestore docs and `POST`s to the FastAPI base URL (emulator: host machine IP; not `10.0.2.2` unless the server listens there). Results can be written back to Firestore by the app (e.g. `finalRiskScore` on `daily_health`).
+1. **Direct HTTP:** Android calls backend endpoint. Backend can persist prediction output to `users/{uid}/daily_health/{date}` (merge write), including fields like `finalRiskScore`, `riskLevel`, `backendRecommendation`, `predictionMeta`, and `predictionUpdatedAt`.
 2. **Cloud intermediary:** A Cloud Function triggered on Firestore writes calls FastAPI with a service account, then writes the prediction — keeps model URL off the device.
 
 ## Response contract
 
-JSON fields: `risk_level`, `risk_score` (0–1 probability), `recommendation` (string). Not the legacy `risk_percentage` field from `/demo_predict`.
+JSON fields: `risk_level`, `risk_score` (0-1 probability), `recommendation` (string), `data_quality_score`, `data_quality_status`, `meta`. Not the legacy `risk_percentage` field from `/demo_predict`.
+
+The `recommendation` string is **produced on the backend** (deterministic templates from model probability + ACWR + a history-confidence suffix). After a successful call with `userId` + `date`, the same text is merged into Firestore as **`backendRecommendation`** on `daily_health/{date}`. Any separate **Gemini**-generated coach text in the app (e.g. `aiRecommendation`) is outside this API contract.

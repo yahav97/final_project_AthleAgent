@@ -76,7 +76,7 @@ def test_predict_daily_minimal_trigger_contract(monkeypatch):
     monkeypatch.setattr(
         predict_routes,
         "persist_prediction_result_or_raise",
-        lambda user_id, date_key, result, source: called.__setitem__("persisted", True),
+        lambda user_id, date_key, result: called.__setitem__("persisted", True),
     )
     response = client.post("/predict/daily", json={"userId": "u1", "date": "2026-05-09"})
     assert response.status_code == 200

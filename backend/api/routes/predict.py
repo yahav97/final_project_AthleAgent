@@ -92,7 +92,6 @@ def predict_injury_production(payload: InjuryPredictionRequest) -> InjuryPredict
                 payload.userId,
                 payload.date,
                 result,
-                source="backend_predict_payload",
             )
     except Exception as exc:
         logger.exception("predict_route_error userId=%s err=%s", payload.userId, exc)
@@ -112,7 +111,6 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
             trigger.userId,
             trigger.date,
             result,
-            source="backend_predict_daily",
         )
     except Exception as exc:
         logger.exception("predict_daily_route_error userId=%s err=%s", trigger.userId, exc)

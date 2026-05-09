@@ -152,13 +152,12 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
 def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch):
     from services import prediction_service as ps
 
-    monkeypatch.setattr(ps, "save_daily_prediction_result", lambda user_id, date_key, result, source: False)
+    monkeypatch.setattr(ps, "save_daily_prediction_result", lambda user_id, date_key, result: False)
     with pytest.raises(RuntimeError, match="prediction_persist_failed"):
         ps.persist_prediction_result_or_raise(
             "u1",
             "2026-05-09",
             {"risk_score": 0.3, "risk_level": "Low"},
-            source="backend_predict_daily",
         )
 
 
