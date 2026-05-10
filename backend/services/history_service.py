@@ -174,8 +174,8 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
     """
     Fetch profile + today's health/check-in/nutrition + previous calendar day's health.
 
-    Serve-time merge policy: sleep + injuredYesterday from ``daily_health/{date}``;
-    physical/load metrics from ``daily_health/{date-1}`` (filled in predict_injury_risk_from_firestore).
+    Serve-time merge policy is applied in ``prediction_service``:
+    prefer ``daily_health/{date}`` values and fallback to ``daily_health/{date-1}`` when missing.
     """
     db = _get_firestore_client()
     if db is None:
@@ -220,7 +220,7 @@ def merge_nutrition_with_history(user_id: str, date_key: str, today: dict[str, A
     Only nutrition fields may be backfilled from history; load/recovery come from the client.
     """
     out = dict(today or {})
-    keys = ("totalProtein", "totalCarbs", "mealsLoggedCount")
+    keys = ("totalProtein", "totalCarbs", "mealsLoggedCount", "totalCalories")
 
     def field_missing(k: str) -> bool:
         return out.get(k) is None

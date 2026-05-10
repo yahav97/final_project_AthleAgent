@@ -48,9 +48,10 @@
 | `daily_health`    | `heartRateMin`                                 | `heartRateMin`                 | מסייע ל־`resting_hr`                                 |
 | `daily_health`    | `weightKg`                                     | `weightKg`                     | `bmi` (בקוד: הנחת גובה קבועה לחישוב)                 |
 | `daily_health`    | `bmrCalories`                                  | `bmrCalories`                  | שריפת קלוריות / איזון קלורי                          |
-| `daily_checkins`  | `energyLevel`                                  | `energyLevel`                  | נספח; לא עמודת מודל ישירה                            |
+| `daily_checkins`  | `energyLevel`                                  | `energyLevel`                  | `energy_level` (קנה מידה 1–10)                      |
 | `daily_checkins`  | `muscleSoreness`                               | `muscleSoreness`               | `muscle_soreness` (קנה מידה 1–10)                    |
 | `daily_checkins`  | `stressLevel`                                  | `stressLevel`                  | `stress_level` (קנה מידה 1–10)                       |
+| `daily_nutrition` | `totalCalories`                                | `nutritionTotalCalories`       | `nutrition_intake_calories` (צריכת קלוריות מארוחות)  |
 | `daily_nutrition` | `totalProtein`                                 | `totalProtein`                 | גזירת `daily_calories` (מאקרו)                       |
 | `daily_nutrition` | `totalCarbs`                                   | `totalCarbs`                   | גזירת `daily_calories` (מאקרו)                       |
 | `daily_nutrition` | `mealsLoggedCount`                             | `mealsLoggedCount`             | גזירת `daily_calories` כשיש ארוחות                   |
@@ -67,7 +68,7 @@
 
 כלומר **כן** — נתונים מפורטים per-meal נשמרים; השם ב-Firestore הוא תת־מסמכים תחת `daily_nutrition/.../meals`, לא רק שלושה שדות סיכום.
 
-**מה הבקאנד טוען לחיזוי:** `fetch_daily_firestore_snapshot` קורא רק את **מסמך יום התזונה** (`nutrition_doc.to_dict()`), **לא** את תת־האוסף `meals`. בנוסף, בבניית `InjuryPredictionRequest` ממופים רק `**totalProtein`**, `**totalCarbs**`, `**mealsLoggedCount**` — השדה `**totalCalories**` שנצבר במסמך התזונה **לא** מועבר לשרת בזרימה הזו (יש בשם `totalCalories` גם ב־`daily_health` לשריפה מ־Health Connect — זה ערך אחר). במודל אין עמודות נפרדות לחלבון/פחמימות; רק `**daily_calories`** ו־`**calorie_balance**` נגזרים מהמאקרו והשריפה כפי שמתואר למטה.
+**מה הבקאנד טוען לחיזוי:** `fetch_daily_firestore_snapshot` קורא רק את **מסמך יום התזונה** (`nutrition_doc.to_dict()`), **לא** את תת־האוסף `meals`. בבניית `InjuryPredictionRequest` ממופים `totalProtein`, `totalCarbs`, `mealsLoggedCount` וגם `totalCalories` (דרך `nutritionTotalCalories`). במודל אין עמודות נפרדות לחלבון/פחמימות; הן משמשות לגזירת `daily_calories`, ו־`totalCalories` של התזונה ממופה ל־`nutrition_intake_calories`. שימו לב: `totalCalories` ב־`daily_health` הוא שריפה (burn), ואילו `totalCalories` ב־`daily_nutrition` הוא צריכה (intake).
 
 בסכימת ה-API `**אין**` שדות תזונה נוספים מעבר לשלושה הנ״ל (אין שומן, סיבים וכו’ ב־`InjuryPredictionRequest`).
 
@@ -88,14 +89,17 @@
 `users/{uid}/daily_health/{yyyy-MM-dd}`
 
 
-| שדה ב-Firestore         | משמעות                                  |
-| ----------------------- | --------------------------------------- |
-| `finalRiskScore`        | ציון סיכון 0–100 (מהסתברות המודל × 100) |
-| `riskLevel`             | רמת סיכון טקסטואלית מהשרת               |
-| `backendRecommendation` | טקסט ההמלצה מהבקאנד                     |
-| `dataQualityScore`      | ציון איכות הקלט 0–1                     |
-| `dataQualityStatus`     | תווית איכות (למשל Excellent / Good / …) |
-| `predictionUpdatedAt`   | חותמת זמן ISO                           |
+| שדה ב-Firestore       | משמעות                                   |
+| --------------------- | ---------------------------------------- |
+| `finalRiskScore`      | ציון סיכון 0–100 (מהסתברות המודל × 100)  |
+| `riskLevel`           | רמת סיכון טקסטואלית מהשרת                |
+| `predictionConfidence`| בטחון חיזוי 0–100                         |
+| `predictionUpdatedAt` | חותמת זמן ISO                            |
+
+### 3.1 שדות קיימים במסמך שלא משמשים כקלט מודל באותו יום
+
+ב־`daily_health/{date}` יש שדות שמייצגים תוצאת חיזוי/תצוגה (`finalRiskScore`, `riskLevel`, `predictionConfidence`, `predictionUpdatedAt`, `aiRecommendation`) והשרת לא משתמש בהם כקלט ל־feature vector של אותו יום.  
+כקלט נלקחים אותות בריאות גולמיים (`sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `totalCalories`, `heartRate*`, `weightKg`, `bmrCalories`, `injuredYesterday`) יחד עם check-in ותזונה.
 
 
 ---
@@ -147,7 +151,8 @@
 
 ## 5. סיכום מהיר
 
-- **מ-Firestore נטענים** שדות הפרופיל (`age`, `historyInjuryCount`/`history_injury_count`), כל שדות יום הבריאות הרלוונטיים, צ׳ק-אין, ותזונה — לפי המיפוי בטבלה בסעיף 2. **תזונה:** רק `totalProtein` / `totalCarbs` / `mealsLoggedCount` (+ סכום קלוריות צריכה במסמך התזונה ל־`nutrition_intake_calories` כשקיים); גזירה ל־`**daily_calories`** ו־`**calorie_balance**`.
+- **מ-Firestore נטענים** שדות הפרופיל (`age`, `historyInjuryCount`/`history_injury_count`), שדות הבריאות היומיים, צ׳ק-אין, ותזונה — לפי המיפוי בטבלה בסעיף 2.  
+  **תזונה:** `totalProtein` / `totalCarbs` / `mealsLoggedCount` / `totalCalories` (intake), עם גזירה ל־`daily_calories` ו־`calorie_balance`.
 - **במודל (וקטור מלא)** 26 עמודות ב־`MODEL_FEATURE_COLUMNS`; חלקן נגזרות בקוד מצירוף השדות הנ״ל, וחלקן (עומס רולינג, חוב שינה, ירידת HRV) עשויות להתעדכן מ**היסטוריית** `daily_health`/`daily_checkins` כשקיימים מספיק ימים.
 - **חוזה מפורט באנגלית** (כולל מינימום שדות יומי מומלץ): `backend/docs/DATA_CONTRACT_FRONTEND_BACKEND.md`.
 

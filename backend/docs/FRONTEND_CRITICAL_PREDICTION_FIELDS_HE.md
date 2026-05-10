@@ -54,7 +54,7 @@
   `sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`
 
 - שדות **סובלניים** (`TOLERANT_FIELDS`) — **לא** מורידים ציון:  
-  `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `energyLevel`, `heartRateMax`, `heartRateMin`, `activeCalories`
+  `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `nutritionTotalCalories`, `energyLevel`, `heartRateMax`, `heartRateMin`, `activeCalories`
 
 אם יש **כלשהו** חוסר קשיח (`hard_missing` לא ריק), הציון מוגבל ל־**מקסימום 0.25** — ובפועל השרת יחסום אלא אם תנאי הריכוך מהיסטוריה מתקיימים (סעיף 4).
 

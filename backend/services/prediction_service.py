@@ -166,8 +166,9 @@ def injury_prediction_request_from_firestore_snapshot(
     """
     Build the same ``InjuryPredictionRequest`` as the production Firestore path.
 
-    Merge policy matches ``predict_injury_risk_from_firestore`` (sleep/injury flags today;
-    load/physiology from yesterday; check-ins today; nutrition today with history backfill).
+    Merge policy matches ``predict_injury_risk_from_firestore``:
+    prefer same-day documents for all health signals, fallback to date-1 snapshot when needed,
+    plus same-day check-ins and nutrition (with optional history backfill).
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
@@ -184,22 +185,27 @@ def injury_prediction_request_from_firestore_snapshot(
     if ij_raw is None:
         ij_raw = health_today.get("injured_yesterday")
 
+    def _today_then_yesterday(field: str) -> Any:
+        v = health_today.get(field)
+        return health_yesterday.get(field) if v is None else v
+    hr_avg_today = _firestore_doc_heartrate_avg(health_today)
+
     return InjuryPredictionRequest(
         userId=user_id,
         date=date_key,
         age=profile.get("age"),
         historyInjuryCount=hist_profile,
         injuredYesterday=_coerce_injured_yesterday(ij_raw),
-        sleepMinutes=health_today.get("sleepMinutes"),
-        steps=health_yesterday.get("steps"),
-        distanceMeters=health_yesterday.get("distanceMeters"),
-        activeCalories=health_yesterday.get("activeCalories"),
-        totalCalories=health_yesterday.get("totalCalories"),
-        heartRateAvg=_firestore_doc_heartrate_avg(health_yesterday),
-        heartRateMax=health_yesterday.get("heartRateMax"),
-        heartRateMin=health_yesterday.get("heartRateMin"),
-        weightKg=health_yesterday.get("weightKg"),
-        bmrCalories=health_yesterday.get("bmrCalories"),
+        sleepMinutes=_today_then_yesterday("sleepMinutes"),
+        steps=_today_then_yesterday("steps"),
+        distanceMeters=_today_then_yesterday("distanceMeters"),
+        activeCalories=_today_then_yesterday("activeCalories"),
+        totalCalories=_today_then_yesterday("totalCalories"),
+        heartRateAvg=hr_avg_today if hr_avg_today is not None else _firestore_doc_heartrate_avg(health_yesterday),
+        heartRateMax=_today_then_yesterday("heartRateMax"),
+        heartRateMin=_today_then_yesterday("heartRateMin"),
+        weightKg=_today_then_yesterday("weightKg"),
+        bmrCalories=_today_then_yesterday("bmrCalories"),
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),
@@ -306,10 +312,11 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     Single-source serving path: load inputs from Firestore and run production inference.
 
     Merge policy:
-    - ``daily_health/{date}``: sleep, injuredYesterday (survey), and any same-day-only keys we keep here.
-    - ``daily_health/{date-1}``: physical/load metrics (steps, HR, calories, weight, …).
+    - ``daily_health/{date}``: preferred source for health/load fields.
+    - ``daily_health/{date-1}``: fallback when same-day fields are missing.
     - ``daily_checkins/{date}``: subjective survey.
-    - ``daily_nutrition/{date}``: macros; missing fields filled from prior days via merge_nutrition_with_history.
+    - ``daily_nutrition/{date}``: nutrition aggregates; missing fields filled from prior days via
+      ``merge_nutrition_with_history``.
     """
     snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
     if not snapshot:
