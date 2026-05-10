@@ -30,14 +30,9 @@ This document freezes the backend model-selection artifacts used for the current
 
 - Model loading is gated by manifest quality checks (recall and AUC sanity).
 - If gate checks fail, backend does not mark model live and serves transparent fallback with reason.
-- `POST /predict/daily` response includes prediction provenance metadata:
-  - `model_version`
-  - `fallback_reason`
-  - `confidence_bucket`
-
 ## RC Persistence Contract Update
 
 - Application data and prediction outputs are stored in **Firestore** only (no SQL `predictions` table in the current backend).
 - Backend Firestore persist no longer writes `predictionSource` to `users/{uid}/daily_health/{date}`.
-- Persisted prediction fields are now: `finalRiskScore`, `riskLevel`, `backendRecommendation`, `dataQualityScore`, `dataQualityStatus`, `predictionMeta`, `predictionUpdatedAt`.
+- Persisted prediction fields are now: `finalRiskScore`, `riskLevel`, `backendRecommendation`, `dataQualityScore`, `dataQualityStatus`, `predictionUpdatedAt`.
 - `backendRecommendation` is server-generated ML copy (deterministic rules); it is the same text as the `recommendation` field in the JSON API response for that run.

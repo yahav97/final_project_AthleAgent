@@ -6,7 +6,15 @@ Loads settings from environment variables with sensible defaults.
 import os
 from pathlib import Path
 from typing import Optional
+
+from pydantic import Field
 from pydantic_settings import BaseSettings
+
+
+def _default_firebase_service_account_key() -> Optional[str]:
+    """If `backend/firebase-key.json` exists, use it (file must stay untracked)."""
+    p = Path(__file__).resolve().parent / "firebase-key.json"
+    return str(p) if p.is_file() else None
 
 
 class Settings(BaseSettings):
@@ -21,8 +29,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
 
-    # Firebase Admin / Firestore
-    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+    # Firebase Admin / Firestore (override via env / `.env`; optional local default above)
+    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = Field(
+        default_factory=_default_firebase_service_account_key
+    )
 
     # Gemini AI
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")

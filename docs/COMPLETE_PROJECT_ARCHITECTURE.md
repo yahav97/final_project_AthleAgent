@@ -219,7 +219,7 @@ train_model.py
 ### Features Used by Model
 
 **Base Features** (19 features):
-- `age`, `bmi`, `vo2_max`, `history_injury_count`
+- `age`, `bmi`, `history_injury_count`, `vo2_max` *(exists in the trained artifact for compatibility; **not** collected in the product — inference uses a fixed constant)*
 - `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`
 - `sleep_hours`, `hrv_score`, `resting_hr`
 - `daily_calories`, `total_calories_burned`, `calorie_balance`
@@ -422,7 +422,6 @@ class User(Base):
     role = Column(String)  # 'athlete' or 'coach'
     age = Column(Integer, nullable=True)
     bmi = Column(Float, nullable=True)
-    vo2_max = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 ```

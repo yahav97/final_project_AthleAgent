@@ -31,11 +31,11 @@ Preferred production endpoint is **`POST /predict/daily`** with minimal body:
 
 ## Architecture options (decision for the team)
 
-1. **Direct HTTP:** Android calls backend endpoint. Backend can persist prediction output to `users/{uid}/daily_health/{date}` (merge write), including fields like `finalRiskScore`, `riskLevel`, `backendRecommendation`, `predictionMeta`, and `predictionUpdatedAt`.
+1. **Direct HTTP:** Android calls backend endpoint. Backend can persist prediction output to `users/{uid}/daily_health/{date}` (merge write), including fields like `finalRiskScore`, `riskLevel`, `backendRecommendation`, and `predictionUpdatedAt`.
 2. **Cloud intermediary:** A Cloud Function triggered on Firestore writes calls FastAPI with a service account, then writes the prediction — keeps model URL off the device.
 
 ## Response contract
 
-JSON fields: `risk_level`, `risk_score` (0-1 probability), `recommendation` (string), `data_quality_score`, `data_quality_status`, `meta`. Not the legacy `risk_percentage` field from `/demo_predict`.
+JSON fields: `risk_level`, `risk_score` (0-1 probability), `recommendation` (string), `data_quality_score`, `data_quality_status`. Not the legacy `risk_percentage` field from `/demo_predict`.
 
 The `recommendation` string is **produced on the backend** (deterministic templates from model probability + ACWR + a history-confidence suffix). After a successful call with `userId` + `date`, the same text is merged into Firestore as **`backendRecommendation`** on `daily_health/{date}`. Any separate **Gemini**-generated coach text in the app (e.g. `aiRecommendation`) is outside this API contract.

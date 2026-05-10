@@ -5,6 +5,7 @@ import pandas as pd
 
 from config import settings
 from ml.model_loader import get_model, get_model_status
+from services.model_features import DEFAULT_FEATURE_VALUES
 from schemas.inference import (
     AthleteData,
     DailyPredictionTriggerRequest,
@@ -12,6 +13,7 @@ from schemas.inference import (
     SimpleData,
 )
 from services.prediction_service import (
+    _resolve_model_bundle,
     persist_prediction_result_or_raise,
     predict_injury_risk_from_firestore,
 )
@@ -103,12 +105,17 @@ def predict_injury_sklearn(data: AthleteData):
             status_code=410,
             detail="Legacy endpoint disabled. Use POST /predict/daily.",
         )
-    model = get_model()
-    if model is None:
+    loaded = get_model()
+    estimator, bundle_cols, *_rest = _resolve_model_bundle(loaded)
+    if estimator is None or not bundle_cols:
         return {"error": "Model not loaded"}
 
-    input_df = pd.DataFrame([data.model_dump()])
-    risk_probability = model.predict_proba(input_df)[0][1]
+    merged = dict(DEFAULT_FEATURE_VALUES)
+    for key, val in data.model_dump().items():
+        if val is not None:
+            merged[key] = float(val)
+    input_df = pd.DataFrame([[merged[c] for c in bundle_cols]], columns=bundle_cols)
+    risk_probability = estimator.predict_proba(input_df)[0][1]
 
     return {
         "risk_percentage": round(risk_probability * 100, 1),

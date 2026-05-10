@@ -56,8 +56,7 @@ def test_predict_response_json_schema_when_success():
         )
     except (ValueError, RuntimeError):
         return
-    assert {"risk_score", "risk_level", "recommendation", "meta"} <= set(data.keys())
-    assert {"model_version", "fallback_reason", "confidence_bucket"} <= set(data["meta"].keys())
+    assert {"risk_score", "risk_level", "prediction_confidence"} <= set(data.keys())
 
 
 def test_status_endpoint_multiple_calls_light_load():

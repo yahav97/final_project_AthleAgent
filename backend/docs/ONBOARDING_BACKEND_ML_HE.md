@@ -44,7 +44,6 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 - `recommendation` — נוצר בבקאנד בלבד; תבניות טקסט קבועות לפי הסתברות המודל ו-ACWR, ואז משפט confidence לפי איכות/היסטוריה; נשמר ב-Firestore כ-`backendRecommendation`
 - `data_quality_score`
 - `data_quality_status`
-- `meta` (`model_version`, `fallback_reason`, `confidence_bucket`)
 
 ## 5) צינור ML (בקצרה)
 

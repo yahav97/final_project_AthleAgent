@@ -27,7 +27,8 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
         "fetch_daily_firestore_snapshot",
         lambda uid, d: {
             "profile": {},
-            "daily_health": {"sleepMinutes": 480, "steps": 8000},
+            "daily_health": {"sleepMinutes": 480},
+            "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
             "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2},
             "daily_nutrition": {},
         },
@@ -44,7 +45,6 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
         return
     assert r.status_code == 200
     data = r.json()
-    assert "artifact" not in data.get("recommendation", "").lower()
     assert 0.0 <= float(data["risk_score"]) <= 1.0
 
 
@@ -67,7 +67,7 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
         )
 
 
-def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
+def test_predict_injury_risk_raises_when_model_missing(monkeypatch):
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
@@ -85,53 +85,6 @@ def test_predict_injury_risk_returns_confidence_bucket_in_meta(monkeypatch):
         )
 
 
-def test_predict_quality_relaxed_when_history_backfills_missing_signals(monkeypatch):
-    from services import prediction_service as ps
-
-    base_df = pd.DataFrame(
-        [
-            {
-                "acwr_ratio": 1.0,
-                "daily_distance_km": 0.0,
-                "workout_intensity_minutes": 0.0,
-                "sleep_hours": 0.0,
-                "resting_hr": 0.0,
-                "hrv_score": 0.0,
-            }
-        ]
-    )
-    monkeypatch.setattr(ps, "injury_request_to_model_dataframe", lambda payload: base_df.copy())
-    monkeypatch.setattr(
-        ps,
-        "_backfill_today_row_from_recent_history",
-        lambda df, payload: (df, {"load": True, "recovery": True}),
-    )
-    monkeypatch.setattr(ps, "_apply_history_confidence_fallback", lambda df, payload: (df, "medium"))
-    monkeypatch.setattr(
-        ps,
-        "calculate_data_quality_score",
-        lambda payload: {
-            "score": 0.2,
-            "hard_missing": ["load_signal", "recovery_signal"],
-            "sensitive_missing": [],
-            "has_hard_blocker": True,
-        },
-    )
-    monkeypatch.setattr(ps, "_count_defaulted_critical_features", lambda df: 0)
-    monkeypatch.setattr(ps, "get_model", lambda: None)
-    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-
-    with pytest.raises(RuntimeError, match="model_not_live:manifest_corrupted"):
-        predict_injury_risk(
-            InjuryPredictionRequest(
-                userId="u1",
-                date="2026-04-30",
-                stressLevel=30,
-                muscleSoreness=3,
-            )
-        )
-
-
 def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
     from services import prediction_service as ps
 
@@ -139,8 +92,9 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
         ps,
         "fetch_daily_firestore_snapshot",
         lambda user_id, date_key: {
-            "profile": {"age": 24, "vo2Max": 57, "historyInjuryCount": 1},
-            "daily_health": {"sleepMinutes": 470, "steps": 8300, "heartRateAvg": 58},
+            "profile": {},
+            "daily_health": {"sleepMinutes": 470},
+            "daily_health_yesterday": {"steps": 8300, "heartRateAvg": 58},
             "daily_checkins": {"muscleSoreness": 3, "stressLevel": 35, "energyLevel": 60},
             "daily_nutrition": {"totalProtein": 130, "totalCarbs": 290, "mealsLoggedCount": 3},
         },
@@ -148,12 +102,15 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
     monkeypatch.setattr(
         ps,
         "predict_injury_risk",
-        lambda payload: {"risk_level": "Low", "risk_score": 0.12, "recommendation": payload.userId},
+        lambda payload: {
+            "risk_level": "Low",
+            "risk_score": 0.12,
+            "prediction_confidence": 80.0,
+        },
     )
     out = ps.predict_injury_risk_from_firestore("u1", "2026-05-09")
     assert out["risk_level"] == "Low"
     assert abs(float(out["risk_score"]) - 0.12) < 1e-9
-    assert out["recommendation"] == "u1"
 
 
 def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch):
@@ -164,7 +121,7 @@ def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch)
         ps.persist_prediction_result_or_raise(
             "u1",
             "2026-05-09",
-            {"risk_score": 0.3, "risk_level": "Low"},
+            {"risk_score": 0.3, "risk_level": "Low", "prediction_confidence": 55.0},
         )
 
 
@@ -173,16 +130,19 @@ def test_validate_feature_vector_enforces_exact_training_order():
         [
             {
                 "sleep_hours": 7.0,
-                "age": 26.0,
-                "vo2_max": 55.0,
+                "bmi": 23.0,
+                "nutrition_intake_calories": 2400.0,
             }
         ]
     )
     aligned = validate_feature_vector_for_model(
         df,
-        {"feature_columns": ["age", "vo2_max", "sleep_hours"], "estimator": None},
+        {
+            "feature_columns": ["bmi", "nutrition_intake_calories", "sleep_hours"],
+            "estimator": None,
+        },
     )
-    assert list(aligned.columns) == ["age", "vo2_max", "sleep_hours"]
+    assert list(aligned.columns) == ["bmi", "nutrition_intake_calories", "sleep_hours"]
 
 
 def test_validate_feature_vector_raises_when_missing_column():

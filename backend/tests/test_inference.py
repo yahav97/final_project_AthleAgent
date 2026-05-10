@@ -20,23 +20,13 @@ def test_predict_daily_production_contract():
     assert set(data.keys()) == {
         "risk_level",
         "risk_score",
-        "recommendation",
-        "data_quality_score",
-        "data_quality_status",
-        "meta",
+        "prediction_confidence",
     }
     assert data["risk_level"] in ("Low", "Medium", "High")
     assert isinstance(data["risk_score"], (int, float))
     assert 0.0 <= float(data["risk_score"]) <= 1.0
-    assert isinstance(data["data_quality_score"], (int, float))
-    assert 0.0 <= float(data["data_quality_score"]) <= 1.0
-    assert data["data_quality_status"] in ("Excellent", "Good", "Fair", "Poor")
-    assert isinstance(data["meta"], dict)
-    assert "model_version" in data["meta"]
-    assert "fallback_reason" in data["meta"]
-    assert "confidence_bucket" in data["meta"]
-    assert data["meta"]["confidence_bucket"] in ("Low", "Medium", "High")
-    assert len(data["recommendation"]) > 5
+    assert isinstance(data["prediction_confidence"], (int, float))
+    assert 0.0 <= float(data["prediction_confidence"]) <= 100.0
 
 
 def test_predict_daily_minimal_trigger_contract(monkeypatch):
@@ -50,14 +40,7 @@ def test_predict_daily_minimal_trigger_contract(monkeypatch):
         lambda user_id, date_key: {
             "risk_level": "Medium",
             "risk_score": 0.42,
-            "recommendation": "Keep load stable today.",
-            "data_quality_score": 0.81,
-            "data_quality_status": "Good",
-            "meta": {
-                "model_version": "test_model",
-                "fallback_reason": "none",
-                "confidence_bucket": "Medium",
-            },
+            "prediction_confidence": 72.5,
         },
     )
     monkeypatch.setattr(
@@ -70,7 +53,6 @@ def test_predict_daily_minimal_trigger_contract(monkeypatch):
     data = response.json()
     assert data["risk_level"] == "Medium"
     assert abs(float(data["risk_score"]) - 0.42) < 1e-9
-    assert data["meta"]["model_version"] == "test_model"
     assert called["persisted"] is True
 
 
@@ -78,21 +60,21 @@ def test_predict_sklearn_legacy_endpoint_disabled_by_default():
     response = client.post(
         "/predict/sklearn",
         json={
-            "age": 25,
             "bmi": 22.1,
-            "history_injury_count": 0,
-            "vo2_max": 50,
+            "injured_yesterday": 0,
             "daily_distance_km": 4.0,
             "workout_intensity_minutes": 40,
             "avg_cadence": 165,
             "sleep_hours": 7.0,
             "hrv_score": 62,
             "resting_hr": 54,
+            "nutrition_intake_calories": 2500,
             "daily_calories": 2400,
             "total_calories_burned": 2500,
             "calorie_balance": -100,
             "stress_level": 4,
             "muscle_soreness": 3,
+            "energy_level": 5,
             "acute_load_7d": 4.5,
             "chronic_load_21d": 5.0,
             "acwr_ratio": 0.9,

@@ -7,21 +7,23 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class AthleteData(BaseModel):
-    age: int
+    """Legacy engineered row for optional /predict/sklearn (subset merged with defaults)."""
+
     bmi: float
-    history_injury_count: int
-    vo2_max: int
+    injured_yesterday: float = 0.0
     daily_distance_km: float
     workout_intensity_minutes: int
     avg_cadence: int
     sleep_hours: float
     hrv_score: int
     resting_hr: int
+    nutrition_intake_calories: float = 2500.0
     daily_calories: int
     total_calories_burned: int
     calorie_balance: int
     stress_level: int
     muscle_soreness: int
+    energy_level: float = 5.0
     acute_load_7d: float
     chronic_load_21d: float
     acwr_ratio: float
@@ -48,18 +50,12 @@ class InjuryPredictionRequest(BaseModel):
     userId: str | None = Field(default=None, description="Firebase Auth uid")
     date: str | None = Field(default=None, description="Day key yyyy-MM-dd")
 
-    # users/{uid}/profile (static or slowly-changing athlete profile)
-    age: int | None = None
-    vo2_max: int | None = Field(
+    # users/{uid}/daily_health (Health Connect sync + survey flags on same doc)
+    injuredYesterday: int | None = Field(
         default=None,
-        validation_alias=AliasChoices("vo2_max", "vo2Max"),
+        validation_alias=AliasChoices("injuredYesterday", "injured_yesterday"),
+        description="0/1 — injury on previous calendar day (stored on today's daily_health doc)",
     )
-    history_injury_count: int | None = Field(
-        default=None,
-        validation_alias=AliasChoices("history_injury_count", "historyInjuryCount"),
-    )
-
-    # users/{uid}/daily_health (Health Connect sync)
     sleepMinutes: int | None = None
     steps: int | None = None
     distanceMeters: int | None = None
@@ -80,6 +76,11 @@ class InjuryPredictionRequest(BaseModel):
     totalProtein: int | None = None
     totalCarbs: int | None = None
     mealsLoggedCount: int | None = None
+    nutritionTotalCalories: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("nutritionTotalCalories", "nutrition_total_calories"),
+        description="Meal-logged kcal sum that day (Firestore totalCalories on nutrition doc); not Health burn.",
+    )
 
 
 class DailyPredictionTriggerRequest(BaseModel):
@@ -93,8 +94,10 @@ class InjuryPredictionResponse(BaseModel):
     """Production JSON response for POST /predict/daily."""
 
     risk_level: str
-    risk_score: float = Field(..., description="Scalar risk score, e.g. 0.0–1.0")
-    recommendation: str
-    data_quality_score: float = Field(..., description="Current-day payload quality score in range 0.0–1.0")
-    data_quality_status: str = Field(..., description="Current-day quality label: Excellent/Good/Fair/Poor")
-    meta: dict[str, str] = Field(default_factory=dict, description="Prediction provenance metadata")
+    risk_score: float = Field(..., description="Injury positive-class probability, 0.0–1.0")
+    prediction_confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=100.0,
+        description="Confidence score 0–100 (history coverage + input completeness)",
+    )

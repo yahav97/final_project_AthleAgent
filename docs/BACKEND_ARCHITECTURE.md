@@ -145,7 +145,6 @@ backend/
 - role (VARCHAR) -- 'athlete' or 'coach'
 - age (INTEGER, nullable)
 - bmi (FLOAT, nullable)
-- vo2_max (INTEGER, nullable)
 - created_at (TIMESTAMP)
 - updated_at (TIMESTAMP)
 ```

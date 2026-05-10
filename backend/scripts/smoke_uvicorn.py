@@ -35,7 +35,7 @@ def main() -> int:
         assert pr.status_code in (200, 500), pr.text
         body = pr.json()
         if pr.status_code == 200:
-            assert set(body.keys()) >= {"risk_level", "risk_score", "recommendation"}
+            assert set(body.keys()) >= {"risk_level", "risk_score", "prediction_confidence"}
         else:
             assert "Prediction unavailable" in body.get("detail", "")
 

@@ -21,6 +21,8 @@
    מסמך פגישת תיאום עם השותף בפרונט (חלוקת אחריות, החלטות, DoD ובדיקות).
 5. `DATA_CONTRACT_FRONTEND_BACKEND.md`  
    חוזה נתונים פורמלי (EN) בין Firestore/Frontend לבין ה-Backend לחיזוי.
+5b. `FEATURE_PLAN_FIRESTORE_HE.md`  
+   תכנון פיצ’רים ML לפי מה שנאסף ב-Firestore — מפת פיצ’רים, החלטות לפני אימון מחדש, מטריצת פרונט/בקאנד.
 6. `TESTS_EXPLAINED_HE.md`  
    מה כל קובץ וכל טסט ב-`backend/tests/` בודק — למפתחים שלא מכירים pytest או את המבנה.
 
@@ -35,5 +37,6 @@
 - כל שינוי ב-API חיזוי (`POST /predict/daily`; **`POST /predict` הוסר**) מחייב עדכון ב-`DATA_CONTRACT_FRONTEND_BACKEND.md` ובדיקת התאמה מול האפליקציה כשמעדכנים את הפרונט.
 - כל שינוי תפעולי/ארכיטקטוני בבקאנד או ב-ML מחייב עדכון ב-`ONBOARDING_BACKEND_ML_HE.md`.
 - כל שינוי במבנה/מדיניות שמירת נתונים ב-Firestore מחייב עדכון ב-`ATHLETE_DB_DATA_LIFECYCLE_HE.md`.
+- כל שינוי ברשימת הפיצ’רים המתוכננת לאימון/שירות מחייב עדכון ב-`FEATURE_PLAN_FIRESTORE_HE.md`.
 - כל שינוי בתהליך הדמו מחייב עדכון ב-`PROTOTYPE_PRESENTATION_PREP_HE.md`.
 - כל שינוי החלטות אינטגרציה מול הפרונט מחייב עדכון ב-`FRONTEND_BACKEND_SYNC_MEETING_HE.md`.

@@ -15,15 +15,9 @@ Production inference endpoint (minimal trigger). The backend loads `userId`/`dat
 - `userId`, `date` (yyyy-MM-dd)
 
 **Response JSON:**
-- `risk_score` (`0..1`)
+- `risk_score` (`0..1`, injury positive-class probability)
 - `risk_level` (`Low|Medium|High`)
-- `recommendation`
-- `data_quality_score`
-- `data_quality_status`
-- `meta`
-  - `model_version`
-  - `fallback_reason` (`none` for live inference)
-  - `confidence_bucket` (`Low|Medium|High`)
+- `prediction_confidence` (`0..100`)
 
 ### `GET /status/ml`
 
@@ -97,7 +91,7 @@ python -m pytest tests/ -v
 ## Data storage
 
 - Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.
-- After `POST /predict/daily`, the API response field `recommendation` is persisted on the same day’s `daily_health` document as **`backendRecommendation`**.
+- After `POST /predict/daily`, merged fields on `daily_health/{date}` include **`finalRiskScore`**, **`riskLevel`**, **`predictionConfidence`**, **`predictionUpdatedAt`** (see `save_daily_prediction_result`).
 
 ## Notes for Evaluation
 

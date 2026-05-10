@@ -16,7 +16,7 @@
 לכל ספורטאי (`uid`) נשמרים המסמכים הבאים:
 
 - `users/{uid}`  
-  פרופיל בסיסי (לדוגמה: `age`, `vo2Max`, `historyInjuryCount`).
+  פרופיל בסיסי (לדוגמה: `age`, `historyInjuryCount`).
 
 - `users/{uid}/daily_health/{yyyy-MM-dd}`  
   נתוני Health יומיים + תוצאת חיזוי יומית.
@@ -44,7 +44,6 @@
 - `backendRecommendation` — טקסט המלצת ה-ML מהבקאנד (תבניות קבועות לפי הסתברות מודל + ACWR + משפט confidence להיסטוריה); זהה לשדה `recommendation` בתשובת `POST /predict/daily`. לא נוצר בצד הלקוח.
 - `dataQualityScore`
 - `dataQualityStatus`
-- `predictionMeta`
 - `predictionUpdatedAt`
 
 (ייתכן שבאותו מסמך קיימים גם שדות אחרים מהאפליקציה, למשל טקסט מ-Gemini ל-UI — שדה נפרד, לא חלק מחוזה המודל.)
@@ -59,15 +58,17 @@
 ### 2.3 `daily_nutrition/{date}`
 
 שדות עיקריים:
+- `totalCalories` (סכום קלוריות צריכה מהארוחות — לא לבלבל עם `totalCalories` ב-`daily_health` שהוא שריפה)
 - `totalProtein`
 - `totalCarbs`
 - `mealsLoggedCount`
+- `lastMealAddedAt`  
+תת־אוסף `meals`: פריטי ארוחה מפורטים (`calories`, `protein`, `carbs`, `timestamp`).
 
 ### 2.4 `users/{uid}` (profile)
 
 שדות רלוונטיים לחיזוי:
 - `age`
-- `vo2Max` (או `vo2_max`)
 - `historyInjuryCount` (או `history_injury_count`)
 
 ---

@@ -16,7 +16,7 @@ Based on research-validated risk factors:
 - Sleep debt > 5 hours: Cumulative sleep deprivation
 - HRV drop < -8: Significant autonomic nervous system stress
 - High stress levels: Psychological stress impact
-- Injury history: Previous injury as risk factor
+- Calorie surplus relative to burn: additional load signal
 
 Author: AthleAgent Project
 """
@@ -107,13 +107,9 @@ def generate_synthetic_data(
 
     for athlete_id in range(1, num_athletes + 1):
         # Generate athlete baseline characteristics (constant per athlete)
-        age = int(rng.integers(18, 40))
         height = float(rng.normal(1.75, 0.10))  # Average height ~175cm
         weight = float(rng.normal(75, 10))      # Average weight ~75kg
         bmi = round(weight / (height ** 2), 2)
-        vo2_max = int(rng.integers(40, 65))   # VO2 max in ml/kg/min
-        # Injury history: 60% no injuries, 20% 1 injury, 10% 2, 10% 3+
-        history_injury_count = int(rng.choice([0, 1, 2, 3], p=[0.6, 0.2, 0.1, 0.1]))
         base_hrv = int(rng.integers(40, 90))  # Baseline HRV (ms)
         base_resting_hr = int(rng.integers(45, 65))  # Baseline resting HR (bpm)
         dates = pd.date_range(start=START_DATE, periods=days_per_athlete)
@@ -131,8 +127,10 @@ def generate_synthetic_data(
         sleep_history: list[float] = []
         hrv_history: list[float] = []
         post_injury_cooldown = 0
+        prev_injury_tomorrow = 0
 
         for day in range(days_per_athlete):
+            injured_yesterday = int(prev_injury_tomorrow)
             weekly_cycle = np.sin((2 * np.pi * (day % 7)) / 7.0)
             recovery_boost = -0.25 if post_injury_cooldown > 0 else 0.0
             load_noise = float(rng.normal(0.0, 1.2))
@@ -168,8 +166,12 @@ def generate_synthetic_data(
             resting_hr = int(_bounded(base_resting_hr + 0.9 * stress_signal + 0.3 * daily_distance + rng.normal(0, 1.8), 40.0, 95.0))
 
             daily_calories = int(_bounded(rng.normal(2550 + 45 * training_phase, 260), 1600.0, 4200.0))
+            nutrition_intake_calories = int(
+                _bounded(float(daily_calories) + rng.normal(0.0, 180.0), 1200.0, 4500.0)
+            )
             active_burn = int(_bounded(daily_distance * rng.uniform(55, 75), 0.0, 1800.0))
-            bmr = int(10 * weight + 6.25 * (height * 100) - 5 * age + 5)
+            # Mifflin–St Jeor (male) with fixed reference age for synthetic burn only — not a model feature.
+            bmr = int(10 * weight + 6.25 * (height * 100) - 5 * 25 + 5)
             total_burned = int(_bounded(bmr + active_burn, 1400.0, 5200.0))
 
             muscle_soreness = int(
@@ -182,6 +184,15 @@ def generate_synthetic_data(
                 )
             )
             stress_level = int(round(stress_signal))
+            energy_level = int(
+                round(
+                    _bounded(
+                        10.0 - 0.52 * float(stress_level) + 0.28 * recovery_state + rng.normal(0.0, 1.25),
+                        1.0,
+                        10.0,
+                    )
+                )
+            )
 
             distance_history.append(float(daily_distance))
             sleep_history.append(float(sleep_hours))
@@ -211,6 +222,7 @@ def generate_synthetic_data(
             synergistic_overload = acwr_excess * sleep_stress
             synergistic_overload_exp = float(np.expm1(min(3.2, 1.15 * synergistic_overload)))
             recovery_protection = max(0.0, (sleep_hours - 7.4) + 0.06 * (hrv_score - base_hrv))
+            calorie_surplus = float(nutrition_intake_calories - total_burned) / 1500.0
 
             hazard_logit = (
                 -2.55
@@ -218,13 +230,14 @@ def generate_synthetic_data(
                 + 0.10 * sleep_stress
                 + 0.13 * hrv_stress
                 + 0.10 * stress_level
-                + 0.24 * history_injury_count
                 + 0.16 * synergistic_overload_exp
                 + 0.58 * max(0.0, -sleep_trend_5d)
                 + 0.34 * max(0.0, load_trend_5d)
                 + (0.35 if post_injury_cooldown > 0 else 0.0)
+                + 0.18 * injured_yesterday
+                - 0.08 * (energy_level / 10.0)
+                + 0.07 * calorie_surplus
                 - 0.30 * recovery_protection
-                - 0.32 * (vo2_max / 60.0)
                 - 0.22 * resilience
             )
             injury_probability = _bounded(_sigmoid(hazard_logit), 0.01, 0.92)
@@ -265,14 +278,18 @@ def generate_synthetic_data(
                 post_injury_cooldown = max(0, post_injury_cooldown - 1)
                 recovery_state += 0.06
 
+            prev_injury_tomorrow = injury_tomorrow
+
             row = {
-                'athlete_id': athlete_id, 'date': dates[day], 'age': age, 'bmi': bmi,
-                'history_injury_count': history_injury_count, 'vo2_max': vo2_max,
+                'athlete_id': athlete_id, 'date': dates[day], 'bmi': bmi,
+                'injured_yesterday': injured_yesterday,
                 'daily_distance_km': round(daily_distance, 2),
                 'workout_intensity_minutes': workout_intensity, 'avg_cadence': int(avg_cadence),
                 'sleep_hours': round(sleep_hours, 1), 'hrv_score': hrv_score, 'resting_hr': resting_hr,
+                'nutrition_intake_calories': nutrition_intake_calories,
                 'daily_calories': daily_calories, 'total_calories_burned': total_burned,
                 'stress_level': stress_level, 'muscle_soreness': min(10, muscle_soreness),
+                'energy_level': energy_level,
                 'injury_tomorrow': injury_tomorrow,
             }
             all_data.append(row)

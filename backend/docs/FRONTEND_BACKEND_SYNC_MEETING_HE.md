@@ -19,11 +19,12 @@
 ### Request
 
 ```json
-{
   "userId": "firebase_uid",
-  "date": "yyyy-MM-dd"
-}
 ```
+
+"date": "yyyy-MM-dd"
+
+}
 
 ### Response (עיקרי)
 
@@ -72,7 +73,7 @@
 
 ### פרונט
 
-- אימות שאין קריאות ל-**`POST /predict`** (הוסר מהבקאנד); רק **`POST /predict/daily`** נתמך ב-HTTP.
+- אימות שאין קריאות ל-`POST /predict` (הוסר מהבקאנד); רק `POST /predict/daily` נתמך ב-HTTP.
 - החלפה מלאה מ-`/demo_predict` ל-`/predict/daily`
 - התאמת models של request/response
 - מנגנון מניעת טריגר כפול

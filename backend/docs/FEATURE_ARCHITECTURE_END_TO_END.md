@@ -22,7 +22,7 @@
 ## Feature Supply Chain (מי מושך מאיפה)
 
 ### מקורות נתונים
-- `users/{uid}` (Profile): `age`, `vo2Max/vo2_max`, `historyInjuryCount/history_injury_count`
+- `users/{uid}` (Profile): `age`, `historyInjuryCount/history_injury_count`
 - `users/{uid}/daily_health/{date}`: שינה, עומס, דופק, מרחק, קלוריות, משקל
 - `users/{uid}/daily_checkins/{date}`: סטרס, כאב שרירים, אנרגיה
 - `users/{uid}/daily_nutrition/{date}`: חלבון, פחמימות, מספר ארוחות
@@ -67,8 +67,9 @@ flowchart TD
 
 ### שדות Profile
 - `age`
-- `vo2_max` (תמיכה גם ב-`vo2Max`)
 - `history_injury_count` (תמיכה גם ב-`historyInjuryCount`)
+
+*(עמודת המודל `vo2_max` קיימת רק לתאימות למאמן — מתמלאת בקבוע פנימי בשרת; לא שדה Firestore/מוצר.)*
 
 ### שדות Daily Health
 - `sleepMinutes`, `steps`, `distanceMeters`
@@ -226,7 +227,7 @@ flowchart TD
 ### בדיקות שחסרות (להוסיף)
 - E2E test: High confidence path עם 7 ימים מלאים.
 - E2E test: Firestore unavailable -> fallback low confidence.
-- Contract regression test: payload with alias variants (`vo2Max`/`vo2_max`).
+- Contract regression test: payload with alias variants for profile (`historyInjuryCount`/`history_injury_count`).
 
 ### Metrics לניטור
 - `predict_requests_total`

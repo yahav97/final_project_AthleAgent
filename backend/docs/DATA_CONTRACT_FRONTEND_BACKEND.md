@@ -3,6 +3,8 @@
 This document defines the production daily contracts between Android/Firestore and backend prediction endpoints.
 Goal: prevent train/serve drift and prevent missing-field surprises before model work.
 
+**Feature roadmap (HE, Firestore inventory vs ML):** see [`FEATURE_PLAN_FIRESTORE_HE.md`](FEATURE_PLAN_FIRESTORE_HE.md).
+
 ## Scope
 
 - Production backend endpoint: `POST /predict/daily` (minimal trigger; backend loads Firestore directly)
@@ -36,7 +38,6 @@ Persisted fields in `daily_health` after successful prediction (merge write):
 - `backendRecommendation`
 - `dataQualityScore`
 - `dataQualityStatus`
-- `predictionMeta`
 - `predictionUpdatedAt`
 
 ### ML recommendation text (`recommendation` / `backendRecommendation`)
@@ -72,13 +73,12 @@ If missing repeatedly, backend falls back to defaults and signal quality drops.
 | Firestore source | Field | Assembled key (`InjuryPredictionRequest`) | Model usage |
 |---|---|---|---|
 | `users/{uid}` (profile) | `age` | `age` | `age` |
-| `users/{uid}` (profile) | `vo2Max` | `vo2Max` | `vo2_max` |
 | `users/{uid}` (profile) | `historyInjuryCount` | `historyInjuryCount` | `history_injury_count` |
 | `daily_health` | `sleepMinutes` | `sleepMinutes` | `sleep_hours` |
 | `daily_health` | `steps` | `steps` | `daily_distance_km` fallback, `avg_cadence` |
 | `daily_health` | `distanceMeters` | `distanceMeters` | `daily_distance_km` primary |
 | `daily_health` | `activeCalories` | `activeCalories` | `workout_intensity_minutes`, load proxies |
-| `daily_health` | `totalCalories` | `totalCalories` | `daily_calories`, burned proxy |
+| `daily_health` | `totalCalories` | `totalCalories` | **`total_calories_burned`** (energy expenditure from Health Connect). Does **not** set intake `daily_calories`. |
 | `daily_health` | `heartRateAvg` | `heartRateAvg` | `resting_hr`, `hrv_score` proxy |
 | `daily_health` | `heartRateMax` | `heartRateMax` | accepted, not used today |
 | `daily_health` | `heartRateMin` | `heartRateMin` | accepted, not used today |
@@ -87,15 +87,16 @@ If missing repeatedly, backend falls back to defaults and signal quality drops.
 | `daily_checkins` | `energyLevel` | `energyLevel` | accepted, not used today |
 | `daily_checkins` | `muscleSoreness` | `muscleSoreness` | `muscle_soreness` (scaled) |
 | `daily_checkins` | `stressLevel` | `stressLevel` | `stress_level` (scaled) |
-| `daily_nutrition` | `totalProtein` | `totalProtein` | accepted, not used today |
-| `daily_nutrition` | `totalCarbs` | `totalCarbs` | accepted, not used today |
-| `daily_nutrition` | `mealsLoggedCount` | `mealsLoggedCount` | accepted, not used today |
+| `daily_nutrition` | `totalCalories` | *(not mapped)* | Intake sum stored by Android on nutrition doc; **not** wired into `InjuryPredictionRequest` yet — avoid confusing with `daily_health.totalCalories` (burn). Planned rename: `nutritionTotalCalories` — see [`FEATURE_PLAN_FIRESTORE_HE.md`](FEATURE_PLAN_FIRESTORE_HE.md). |
+| `daily_nutrition` | `totalProtein` | `totalProtein` | Feeds **intake estimate** → `daily_calories` via macros in `preprocessing.py` |
+| `daily_nutrition` | `totalCarbs` | `totalCarbs` | Same |
+| `daily_nutrition` | `mealsLoggedCount` | `mealsLoggedCount` | Same; also scales default intake when macros empty |
 
 ## Model Features in Serving (current)
 
 Backend model features are fixed to:
 
-- `age`, `bmi`, `history_injury_count`, `vo2_max`
+- `age`, `bmi`, `history_injury_count`, `vo2_max` *(column still present in the bundle; filled with a **fixed serving constant**, not from Firestore or clients)*
 - `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`
 - `sleep_hours`, `hrv_score`, `resting_hr`
 - `daily_calories`, `total_calories_burned`
@@ -104,8 +105,8 @@ Backend model features are fixed to:
 - `calorie_balance`, `sleep_debt_3d`, `hrv_drop`
 
 Important:
-- `age`, `historyInjuryCount`, `vo2Max` are supported when present in Firestore; if omitted, serving falls back to defaults.
-- `acute/chronic/acwr/sleep_debt/hrv_drop` are single-day proxies in serving, not true rolling history from Firestore.
+- `age`, `historyInjuryCount`: loaded from `users/{uid}` when present; otherwise defaults in `preprocessing`. **`vo2_max` is not a product field** — the trained estimator still expects the column; inference always sets it to `DEFAULT_FEATURE_VALUES["vo2_max"]` in code (no Firestore or client input).
+- `acute/chronic/acwr/sleep_debt/hrv_drop`: when enough historical rows exist from Firestore (`daily_health` + `daily_checkins`), rolling values are computed; otherwise the backend uses single-day proxies (`feature_engineering` / defaults).
 
 ## Weekly History Clarification
 

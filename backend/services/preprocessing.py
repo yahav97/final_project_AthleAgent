@@ -18,6 +18,7 @@ TOLERANT_FIELDS: tuple[str, ...] = (
     "totalProtein",
     "totalCarbs",
     "mealsLoggedCount",
+    "nutritionTotalCalories",
     "energyLevel",
     "heartRateMax",
     "heartRateMin",
@@ -54,6 +55,30 @@ def _soreness_to_model_scale(value: int | None) -> float:
     if v <= 5.0:
         v = max(1.0, min(10.0, v * 2.0 - 0.5))
     return float(max(1.0, min(10.0, v)))
+
+
+def _energy_to_model_scale(value: int | None) -> float:
+    """Map Android energy (often 0–100) to training scale 1–10 (same rule as stress)."""
+    if value is None:
+        return float(DEFAULT_FEATURE_VALUES["energy_level"])
+    v = float(value)
+    if v > 10.0:
+        v = max(1.0, min(10.0, round(v / 10.0)))
+    return float(max(1.0, min(10.0, v)))
+
+
+def _injured_yesterday_float(raw: object) -> float:
+    """Firestore ``injuredYesterday`` on today's doc → 0/1 feature."""
+    if raw is None:
+        return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
+    if raw is True:
+        return 1.0
+    if raw is False:
+        return 0.0
+    try:
+        return 1.0 if int(raw) else 0.0
+    except (TypeError, ValueError):
+        return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
 
 
 def _safe_float(value: object, fallback: float = 0.0) -> float:
@@ -151,6 +176,18 @@ def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) ->
         v = float(aligned["muscle_soreness"].iloc[0])
         if v < 1.0 or v > 10.0:
             raise ValueError(f"muscle_soreness out of expected scaled range [1,10]: {v}")
+    if "energy_level" in aligned.columns:
+        v = float(aligned["energy_level"].iloc[0])
+        if v < 1.0 or v > 10.0:
+            raise ValueError(f"energy_level out of expected scaled range [1,10]: {v}")
+    if "injured_yesterday" in aligned.columns:
+        v = float(aligned["injured_yesterday"].iloc[0])
+        if v < 0.0 or v > 1.0:
+            raise ValueError(f"injured_yesterday out of expected range [0,1]: {v}")
+    if "nutrition_intake_calories" in aligned.columns:
+        v = float(aligned["nutrition_intake_calories"].iloc[0])
+        if v < 0.0 or v > 8000.0:
+            raise ValueError(f"nutrition_intake_calories out of expected range [0,8000]: {v}")
     if "acwr_ratio" in aligned.columns:
         v = float(aligned["acwr_ratio"].iloc[0])
         if v < 0.35 or v > 2.8:
@@ -165,15 +202,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     Returns a DataFrame with exactly MODEL_FEATURE_COLUMNS (same order as training CSV).
     """
     d = payload.model_dump()
-    age = _safe_float(d.get("age"), DEFAULT_FEATURE_VALUES["age"])
-    age = float(max(14.0, min(60.0, age)))
-    vo2_max = _safe_float(d.get("vo2_max"), DEFAULT_FEATURE_VALUES["vo2_max"])
-    vo2_max = float(max(25.0, min(85.0, vo2_max)))
-    history_injury_count = _safe_float(
-        d.get("history_injury_count"),
-        DEFAULT_FEATURE_VALUES["history_injury_count"],
-    )
-    history_injury_count = float(max(0.0, min(10.0, round(history_injury_count))))
+    injured_yesterday = float(max(0.0, min(1.0, _injured_yesterday_float(d.get("injuredYesterday")))))
 
     sleep_minutes = d.get("sleepMinutes")
     sleep_hours = (
@@ -204,13 +233,32 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     protein_g = max(0.0, _safe_float(d.get("totalProtein"), 0.0))
     carbs_g = max(0.0, _safe_float(d.get("totalCarbs"), 0.0))
     meals_logged = max(0.0, _safe_float(d.get("mealsLoggedCount"), 0.0))
+    intake_sum_logged = max(0.0, _safe_float(d.get("nutritionTotalCalories"), 0.0))
+    intake_sum_logged = float(min(8000.0, intake_sum_logged))
     macro_energy = protein_g * 4.0 + carbs_g * 4.0
     # If only protein/carbs are available, estimate missing fat energy conservatively.
     estimated_intake_from_macros = macro_energy * 1.2 if macro_energy > 0 else 0.0
+    nutrition_intake_calories = (
+        intake_sum_logged
+        if intake_sum_logged > 0
+        else (
+            estimated_intake_from_macros
+            if estimated_intake_from_macros > 0
+            else float(DEFAULT_FEATURE_VALUES["nutrition_intake_calories"])
+        )
+    )
+    if meals_logged > 0 and intake_sum_logged <= 0 and estimated_intake_from_macros <= 0:
+        nutrition_intake_calories = float(
+            DEFAULT_FEATURE_VALUES["nutrition_intake_calories"] * min(1.25, 0.6 + meals_logged * 0.2)
+        )
+    nutrition_intake_calories = float(min(7000.0, max(0.0, nutrition_intake_calories)))
+
     daily_calories = (
         estimated_intake_from_macros if estimated_intake_from_macros > 0 else float(DEFAULT_FEATURE_VALUES["daily_calories"])
     )
-    if meals_logged > 0 and macro_energy <= 0:
+    if intake_sum_logged > 0:
+        daily_calories = float(max(800.0, min(7000.0, intake_sum_logged)))
+    if meals_logged > 0 and macro_energy <= 0 and intake_sum_logged <= 0:
         daily_calories = float(DEFAULT_FEATURE_VALUES["daily_calories"] * min(1.25, 0.6 + meals_logged * 0.2))
     daily_calories = float(min(7000.0, max(800.0, daily_calories)))
 
@@ -238,20 +286,20 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         hrv_score = float(max(30.0, min(100.0, 110.0 - resting_hr * 0.65)))
 
     partial: dict = {
-        "age": age,
         "bmi": float(bmi),
-        "history_injury_count": history_injury_count,
-        "vo2_max": vo2_max,
+        "injured_yesterday": injured_yesterday,
         "daily_distance_km": float(daily_distance_km),
         "workout_intensity_minutes": float(workout_intensity),
         "avg_cadence": float(avg_cadence),
         "sleep_hours": float(sleep_hours),
         "hrv_score": float(hrv_score),
         "resting_hr": float(resting_hr),
+        "nutrition_intake_calories": float(nutrition_intake_calories),
         "daily_calories": float(daily_calories),
         "total_calories_burned": float(total_burned),
         "stress_level": _stress_to_model_scale(d.get("stressLevel")),
         "muscle_soreness": _soreness_to_model_scale(d.get("muscleSoreness")),
+        "energy_level": _energy_to_model_scale(d.get("energyLevel")),
         "_active_calories": active_cal,
     }
 

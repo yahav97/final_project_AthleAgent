@@ -254,13 +254,25 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
 
 
 def pick_best_model(results_df: pd.DataFrame) -> pd.Series:
+    """Prefer models meeting recall at the comparison threshold; otherwise favor LogisticRegression.
+
+    After adding features, tree ensembles may „win” on FPR at 0.4 while failing deployment recall gates.
+    LogisticRegression typically retains stable recall for probability calibration + threshold tuning.
+    """
     guarded = results_df[
         (results_df["Recall@Threshold"] >= MIN_RECALL_HARD)
     ]
-    source = guarded if not guarded.empty else results_df
-    return source.sort_values(
-        by=["FPR@Threshold", "Recall@Threshold", "Precision@Threshold", "F1@Threshold", "ROC-AUC"],
-        ascending=[True, False, False, False, False],
+    if not guarded.empty:
+        return guarded.sort_values(
+            by=["FPR@Threshold", "Recall@Threshold", "Precision@Threshold", "F1@Threshold", "ROC-AUC"],
+            ascending=[True, False, False, False, False],
+        ).iloc[0]
+    lr = results_df[results_df["Model"] == "LogisticRegression"]
+    if not lr.empty:
+        return lr.iloc[0]
+    return results_df.sort_values(
+        by=["Recall@Threshold", "FPR@Threshold", "ROC-AUC"],
+        ascending=[False, True, False],
     ).iloc[0]
 
 

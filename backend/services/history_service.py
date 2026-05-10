@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime, timedelta
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from config import settings
+from utils.logging import logger
 
 
 def _to_date_key(value: str) -> datetime:
@@ -117,28 +119,135 @@ def _get_firestore_client():
         return None
 
 
+def stable_athlete_numeric_id(user_id: str) -> int:
+    """Deterministic int id for ML CSV ``athlete_id`` (same uid → same id across runs)."""
+    h = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+    n = int(h[:12], 16) % (2**31 - 1)
+    return n if n > 0 else 1
+
+
+def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
+    """
+    Label for training row ``(user_id, date_key)``:
+
+    On ``users/{uid}/daily_health/{D+1}``, the field ``injuredYesterday`` / ``injured_yesterday``
+    indicates whether an injury was reported for calendar day ``D``.
+
+    Returns:
+        ``0`` or ``1`` when the next-day document exists (missing injury field → ``0``).
+        ``None`` when the next-day ``daily_health`` document is absent (caller should skip).
+    """
+    db = _get_firestore_client()
+    if db is None:
+        return None
+    try:
+        next_key = (_to_date_key(date_key) + timedelta(days=1)).strftime("%Y-%m-%d")
+        doc = (
+            db.collection("users")
+            .document(user_id)
+            .collection("daily_health")
+            .document(next_key)
+            .get()
+        )
+    except Exception:
+        logger.exception("fetch_injury_tomorrow_label failed user_id=%s date=%s", user_id, date_key)
+        return None
+    if not doc.exists:
+        return None
+    data = doc.to_dict() or {}
+    raw = data.get("injuredYesterday")
+    if raw is None:
+        raw = data.get("injured_yesterday")
+    if raw is None:
+        return 0
+    if raw is True:
+        return 1
+    if raw is False:
+        return 0
+    try:
+        return 1 if int(raw) else 0
+    except (TypeError, ValueError):
+        return 0
+
+
 def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any]:
     """
-    Fetch one-day Firestore snapshot (profile + daily docs) for prediction serving.
+    Fetch profile + today's health/check-in/nutrition + previous calendar day's health.
+
+    Serve-time merge policy: sleep + injuredYesterday from ``daily_health/{date}``;
+    physical/load metrics from ``daily_health/{date-1}`` (filled in predict_injury_risk_from_firestore).
     """
     db = _get_firestore_client()
     if db is None:
         return {}
     try:
         user_ref = db.collection("users").document(user_id)
+        health_ref = user_ref.collection("daily_health").document(date_key)
+        yesterday_key = (_to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
+        health_yesterday_ref = user_ref.collection("daily_health").document(yesterday_key)
+        checkin_ref = user_ref.collection("daily_checkins").document(date_key)
+        nutrition_ref = user_ref.collection("daily_nutrition").document(date_key)
+        logger.info(
+            "fetch_daily_firestore_snapshot paths: profile=%s daily_health=%s daily_health_yesterday=%s "
+            "daily_checkins=%s daily_nutrition=%s",
+            user_ref.path,
+            health_ref.path,
+            health_yesterday_ref.path,
+            checkin_ref.path,
+            nutrition_ref.path,
+        )
         user_doc = user_ref.get()
-        health_doc = user_ref.collection("daily_health").document(date_key).get()
-        checkin_doc = user_ref.collection("daily_checkins").document(date_key).get()
-        nutrition_doc = user_ref.collection("daily_nutrition").document(date_key).get()
+        health_doc = health_ref.get()
+        health_yesterday_doc = health_yesterday_ref.get()
+        checkin_doc = checkin_ref.get()
+        nutrition_doc = nutrition_ref.get()
     except Exception:
         return {}
 
     return {
         "profile": user_doc.to_dict() if user_doc.exists else {},
         "daily_health": health_doc.to_dict() if health_doc.exists else {},
+        "daily_health_yesterday": health_yesterday_doc.to_dict() if health_yesterday_doc.exists else {},
         "daily_checkins": checkin_doc.to_dict() if checkin_doc.exists else {},
         "daily_nutrition": nutrition_doc.to_dict() if nutrition_doc.exists else {},
     }
+
+
+def merge_nutrition_with_history(user_id: str, date_key: str, today: dict[str, Any]) -> dict[str, Any]:
+    """
+    Fill missing nutrition aggregates from recent prior days (same user).
+
+    Only nutrition fields may be backfilled from history; load/recovery come from the client.
+    """
+    out = dict(today or {})
+    keys = ("totalProtein", "totalCarbs", "mealsLoggedCount")
+
+    def field_missing(k: str) -> bool:
+        return out.get(k) is None
+
+    if not any(field_missing(k) for k in keys):
+        return out
+
+    db = _get_firestore_client()
+    if db is None:
+        return out
+    try:
+        base = _to_date_key(date_key)
+        user_ref = db.collection("users").document(user_id)
+        for i in range(1, 15):
+            dk = (base - timedelta(days=i)).strftime("%Y-%m-%d")
+            doc = user_ref.collection("daily_nutrition").document(dk).get()
+            if not doc.exists:
+                continue
+            prev = doc.to_dict() or {}
+            for k in keys:
+                if field_missing(k) and prev.get(k) is not None:
+                    out[k] = prev[k]
+            if not any(field_missing(k) for k in keys):
+                break
+    except Exception:
+        logger.exception("merge_nutrition_with_history failed user_id=%s date=%s", user_id, date_key)
+    return out
 
 
 def save_daily_prediction_result(
@@ -154,13 +263,11 @@ def save_daily_prediction_result(
         return False
     try:
         risk_score = float(result.get("risk_score") or 0.0)
+        conf = float(result.get("prediction_confidence") or 0.0)
         doc = {
             "finalRiskScore": round(risk_score * 100.0, 2),
             "riskLevel": result.get("risk_level"),
-            "backendRecommendation": result.get("recommendation"),
-            "dataQualityScore": result.get("data_quality_score"),
-            "dataQualityStatus": result.get("data_quality_status"),
-            "predictionMeta": result.get("meta") or {},
+            "predictionConfidence": round(min(100.0, max(0.0, conf)), 2),
             "predictionUpdatedAt": datetime.utcnow().isoformat(),
         }
         db.collection("users").document(user_id).collection("daily_health").document(date_key).set(doc, merge=True)
