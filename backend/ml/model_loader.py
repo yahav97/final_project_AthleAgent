@@ -169,7 +169,8 @@ def get_model_status() -> dict[str, Any]:
             auc_value = float((_active_manifest.get("winner_metrics") or {}).get("ROC-AUC"))
         except (TypeError, ValueError):
             auc_value = None
-    degraded_rc = bool(_model_live and auc_value is not None and auc_value < 0.70)
+    degraded_auc_threshold = MIN_AUC_FOR_LIVE + 0.02
+    degraded_rc = bool(_model_live and auc_value is not None and auc_value < degraded_auc_threshold)
     return {
         "status": "Live" if _model_live else "Blocked",
         "gate_reason": _model_gate_reason,

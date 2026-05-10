@@ -125,6 +125,9 @@ def generate_synthetic_data(
         fatigue_state = float(rng.normal(0.0, 0.6))
         recovery_state = float(rng.normal(0.0, 0.5))
         prior_load_km = float(max(0.0, rng.normal(6.0, 2.0)))
+        # Athlete-specific periodicity for yearly + mesocycle behavior.
+        season_phase = float(rng.uniform(0.0, 2.0 * np.pi))
+        mesocycle_phase = float(rng.uniform(0.0, 2.0 * np.pi))
         distance_history: list[float] = []
         sleep_history: list[float] = []
         hrv_history: list[float] = []
@@ -134,16 +137,28 @@ def generate_synthetic_data(
         for day in range(days_per_athlete):
             injured_yesterday = int(prev_injury_tomorrow)
             weekly_cycle = np.sin((2 * np.pi * (day % 7)) / 7.0)
+            annual_cycle = np.sin((2 * np.pi * day / 365.0) + season_phase)
+            mesocycle = np.sin((2 * np.pi * day / 28.0) + mesocycle_phase)
+            # 3 build weeks + 1 deload week pattern.
+            microcycle_week = (day // 7) % 4
+            microcycle_load = 1.08 if microcycle_week in (0, 1, 2) else 0.86
             recovery_boost = -0.25 if post_injury_cooldown > 0 else 0.0
+            # Rare external stressors (travel/illness/life stress) with short persistence.
+            external_shock = 0.0
+            if rng.random() < 0.015:
+                external_shock = float(rng.uniform(0.8, 1.8))
             load_noise = float(rng.normal(0.0, 1.2))
             target_km = (
                 4.8 * training_phase
                 + 1.8 * weekly_cycle
+                + 0.9 * annual_cycle
+                + 0.7 * mesocycle
                 + 1.4 * fatigue_state
                 - 1.1 * recovery_state
                 + recovery_boost
                 + load_noise
             )
+            target_km *= microcycle_load
             # AR(1) smoothing for realistic day-to-day continuity in load.
             daily_distance = max(0.0, 0.55 * prior_load_km + 0.45 * target_km)
             if rng.random() < 0.12:
@@ -151,21 +166,52 @@ def generate_synthetic_data(
             daily_distance = _bounded(daily_distance, 0.0, 22.0)
             prior_load_km = daily_distance
 
-            workout_intensity = int(_bounded(daily_distance * rng.uniform(4.2, 6.1), 0.0, 180.0))
+            workout_intensity = int(
+                _bounded(daily_distance * rng.uniform(4.2, 6.1) * microcycle_load, 0.0, 180.0)
+            )
             avg_cadence = _bounded(166.0 + rng.normal(0, 6) + daily_distance * 0.35, 145.0, 192.0)
 
             stress_signal = _bounded(
-                4.6 + 1.0 * fatigue_state - 1.0 * recovery_state + rng.normal(0.0, 1.1),
+                4.6
+                + 1.0 * fatigue_state
+                - 1.0 * recovery_state
+                + 0.55 * external_shock
+                + rng.normal(0.0, 1.1),
                 1.0,
                 10.0,
             )
             sleep_hours = _bounded(
-                8.35 - 0.12 * stress_signal - 0.08 * daily_distance + rng.normal(0, 0.6),
+                8.35
+                - 0.12 * stress_signal
+                - 0.08 * daily_distance
+                - 0.25 * external_shock
+                + rng.normal(0, 0.6),
                 4.5,
                 9.8,
             )
-            hrv_score = int(_bounded(base_hrv - 1.6 * stress_signal - 0.65 * fatigue_state + 1.1 * recovery_state + rng.normal(0, 3.8), 30.0, 105.0))
-            resting_hr = int(_bounded(base_resting_hr + 0.9 * stress_signal + 0.3 * daily_distance + rng.normal(0, 1.8), 40.0, 95.0))
+            hrv_score = int(
+                _bounded(
+                    base_hrv
+                    - 1.6 * stress_signal
+                    - 0.65 * fatigue_state
+                    + 1.1 * recovery_state
+                    - 1.4 * external_shock
+                    + rng.normal(0, 3.8),
+                    30.0,
+                    105.0,
+                )
+            )
+            resting_hr = int(
+                _bounded(
+                    base_resting_hr
+                    + 0.9 * stress_signal
+                    + 0.3 * daily_distance
+                    + 1.2 * external_shock
+                    + rng.normal(0, 1.8),
+                    40.0,
+                    95.0,
+                )
+            )
 
             daily_calories = int(_bounded(rng.normal(2550 + 45 * training_phase, 260), 1600.0, 4200.0))
             nutrition_intake_calories = int(
@@ -189,12 +235,22 @@ def generate_synthetic_data(
             energy_level = int(
                 round(
                     _bounded(
-                        10.0 - 0.52 * float(stress_level) + 0.28 * recovery_state + rng.normal(0.0, 1.25),
+                        10.0
+                        - 0.52 * float(stress_level)
+                        + 0.28 * recovery_state
+                        - 0.35 * external_shock
+                        + rng.normal(0.0, 1.25),
                         1.0,
                         10.0,
                     )
                 )
             )
+            # Structured sensor dropouts: more likely under high stress/low recovery states.
+            sensor_dropout = rng.random() < (0.018 + 0.01 * max(0.0, stress_signal - 7.0))
+            if sensor_dropout:
+                sleep_hours = _bounded(sleep_hours + rng.normal(0.0, 0.45), 4.5, 9.8)
+                hrv_score = int(_bounded(hrv_score + rng.normal(0.0, 4.0), 30.0, 105.0))
+                resting_hr = int(_bounded(resting_hr + rng.normal(0.0, 2.4), 40.0, 95.0))
 
             distance_history.append(float(daily_distance))
             sleep_history.append(float(sleep_hours))
@@ -239,6 +295,7 @@ def generate_synthetic_data(
                 + 0.18 * injured_yesterday
                 - 0.08 * (energy_level / 10.0)
                 + 0.07 * calorie_surplus
+                + 0.12 * external_shock
                 + 0.02 * (athlete_age - 28.0) / 10.0
                 + 0.07 * min(6, career_injury_episodes)
                 - 0.30 * recovery_protection

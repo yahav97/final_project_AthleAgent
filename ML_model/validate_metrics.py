@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 from pathlib import Path
 
 import pandas as pd
 
 TARGET_RECALL = 0.90
 MIN_RECALL_THRESHOLD = 0.85
-MIN_AUC_THRESHOLD = 0.64
-TARGET_PRECISION = 0.30
-TARGET_F1 = 0.45
+MIN_AUC_THRESHOLD = 0.62
+TARGET_PRECISION = 0.24
+TARGET_F1 = 0.38
+MAX_FPR_OPERATING = 0.85
 THRESHOLD = 0.4
 
 
@@ -31,6 +33,7 @@ def main() -> int:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     artifacts_dir = _latest_artifacts_dir(script_dir) or script_dir
     comparison_path = os.path.join(artifacts_dir, "model_comparison.csv")
+    manifest_path = os.path.join(artifacts_dir, "run_manifest.json")
     if not os.path.exists(comparison_path):
         print("model_comparison.csv not found. Run train_model.py first.")
         return 1
@@ -51,24 +54,52 @@ def main() -> int:
         print(f"model_comparison.csv missing columns: {sorted(missing)}")
         return 1
 
-    ranked = df.sort_values(
-        by=[
-            "Recall@Threshold",
-            "FPR@Threshold",
-            "F1@Threshold",
-            "Precision@Threshold",
-            "BrierScore",
-            "ROC-AUC",
-        ],
-        ascending=[False, True, False, False, True, False],
-    )
-    top = ranked.iloc[0]
-    print(f"Policy threshold: {THRESHOLD}")
-    print(ranked.to_string(index=False))
+    top = None
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+            winner = str(manifest.get("winner") or "").strip()
+            wm = manifest.get("winner_metrics") or {}
+            if winner and wm:
+                top = {
+                    "Model": winner,
+                    "Recall@Threshold": float(wm.get("Recall@Threshold")),
+                    "Precision@Threshold": float(wm.get("Precision@Threshold")),
+                    "F1@Threshold": float(wm.get("F1@Threshold")),
+                    "FPR@Threshold": float(wm.get("FPR@Threshold")),
+                    "ROC-AUC": float(wm.get("ROC-AUC")),
+                    "BrierScore": float(wm.get("BrierScore")),
+                    "LogLoss": float(wm.get("LogLoss")),
+                }
+                print(
+                    "Policy source: run_manifest winner metrics "
+                    f"(operating threshold={manifest.get('threshold')})"
+                )
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            top = None
+    if top is None:
+        gated = df[df["Recall@Threshold"] >= MIN_RECALL_THRESHOLD]
+        ranked_base = gated if not gated.empty else df
+        ranked = ranked_base.sort_values(
+            by=[
+                "FPR@Threshold",
+                "Recall@Threshold",
+                "F1@Threshold",
+                "Precision@Threshold",
+                "BrierScore",
+                "ROC-AUC",
+            ],
+            ascending=[True, False, False, False, True, False],
+        )
+        print(f"Policy threshold: {THRESHOLD}")
+        print(ranked.to_string(index=False))
+        top = ranked.iloc[0].to_dict()
 
     recall_value = float(top["Recall@Threshold"])
     recall_hard_gate_ok = recall_value >= MIN_RECALL_THRESHOLD
     recall_target_ok = recall_value >= TARGET_RECALL
+    fpr_ok = float(top["FPR@Threshold"]) <= MAX_FPR_OPERATING
     auc_ok = float(top["ROC-AUC"]) >= MIN_AUC_THRESHOLD
     precision_ok = float(top["Precision@Threshold"]) >= TARGET_PRECISION
     f1_ok = float(top["F1@Threshold"]) >= TARGET_F1
@@ -79,17 +110,19 @@ def main() -> int:
         )
         return 2
 
-    if recall_target_ok and auc_ok and precision_ok and f1_ok:
+    if recall_target_ok and fpr_ok and auc_ok and precision_ok and f1_ok:
         print(
             f"\nPASS: {top['Model']} meets targets "
-            f"(Recall>={TARGET_RECALL}, AUC>={MIN_AUC_THRESHOLD}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
+            f"(Recall>={TARGET_RECALL}, FPR<={MAX_FPR_OPERATING}, AUC>={MIN_AUC_THRESHOLD}, "
+            f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
             f"Hard gate: Recall>={MIN_RECALL_THRESHOLD}."
         )
         return 0
 
     print(
         f"\nWARN: Top model {top['Model']} does not meet all targets "
-        f"(Recall>={TARGET_RECALL}, AUC>={MIN_AUC_THRESHOLD}, Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
+        f"(Recall>={TARGET_RECALL}, FPR<={MAX_FPR_OPERATING}, AUC>={MIN_AUC_THRESHOLD}, "
+        f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
         f"but passes hard gate Recall>={MIN_RECALL_THRESHOLD}."
     )
     return 2

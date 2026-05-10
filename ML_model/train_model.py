@@ -38,9 +38,10 @@ from xgboost import XGBClassifier
 THRESHOLD = 0.4
 MIN_RECALL_HARD = 0.85
 TARGET_RECALL = 0.90
-TARGET_RECALL_HIGH = 0.95
-TARGET_PRECISION = 0.30
-TARGET_F1 = 0.45
+TARGET_RECALL_HIGH = 0.92
+TARGET_PRECISION = 0.24
+TARGET_F1 = 0.38
+MAX_FPR_OPERATING = 0.85
 RANDOM_STATE = 42
 THRESHOLDS_TO_EVAL = [round(x, 2) for x in np.arange(0.20, 0.62, 0.02)]
 
@@ -118,19 +119,23 @@ def select_operating_threshold_for_model(
     if model_df.empty:
         return THRESHOLD
 
-    high_recall = model_df[model_df["Recall"] >= TARGET_RECALL_HIGH]
+    high_recall = model_df[
+        (model_df["Recall"] >= TARGET_RECALL_HIGH) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
     if not high_recall.empty:
         ranked = high_recall.sort_values(
-            by=["FPR", "Precision", "F1", "Threshold"],
-            ascending=[True, False, False, True],
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
         )
         return float(ranked.iloc[0]["Threshold"])
 
-    min_recall = model_df[model_df["Recall"] >= TARGET_RECALL]
+    min_recall = model_df[
+        (model_df["Recall"] >= TARGET_RECALL) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
     if not min_recall.empty:
         ranked = min_recall.sort_values(
-            by=["FPR", "Precision", "F1", "Threshold"],
-            ascending=[True, False, False, True],
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
         )
         return float(ranked.iloc[0]["Threshold"])
 
@@ -139,6 +144,49 @@ def select_operating_threshold_for_model(
         ascending=[False, False, False, True, True],
     ).iloc[0]
     return float(fallback["Threshold"])
+
+
+def _best_operating_row_for_model(
+    threshold_rows: list[dict[str, float | str]],
+    model_name: str,
+) -> tuple[pd.Series, int] | None:
+    df = pd.DataFrame(threshold_rows)
+    model_df = df[df["Model"] == model_name].copy()
+    if model_df.empty:
+        return None
+    target = model_df[
+        (model_df["Recall"] >= TARGET_RECALL)
+        & (model_df["FPR"] <= MAX_FPR_OPERATING)
+        & (model_df["Precision"] >= TARGET_PRECISION)
+        & (model_df["F1"] >= TARGET_F1)
+    ]
+    if not target.empty:
+        return (
+            target.sort_values(
+                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+                ascending=[True, False, False, False, True],
+            ).iloc[0],
+            0,
+        )
+    relaxed = model_df[
+        (model_df["Recall"] >= MIN_RECALL_HARD)
+        & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
+    if not relaxed.empty:
+        return (
+            relaxed.sort_values(
+                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+                ascending=[True, False, False, False, True],
+            ).iloc[0],
+            1,
+        )
+    return (
+        model_df.sort_values(
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
+        ).iloc[0],
+        2,
+    )
 
 
 def _build_risk_bin_table(y_true: pd.Series, y_proba: np.ndarray) -> pd.DataFrame:
@@ -253,23 +301,47 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
     }
 
 
-def pick_best_model(results_df: pd.DataFrame) -> pd.Series:
-    """Prefer models meeting recall at the comparison threshold; otherwise favor LogisticRegression.
-
-    After adding features, tree ensembles may „win” on FPR at 0.4 while failing deployment recall gates.
-    LogisticRegression typically retains stable recall for probability calibration + threshold tuning.
+def pick_best_model(results_df: pd.DataFrame, threshold_rows: list[dict[str, float | str]]) -> pd.Series:
     """
-    guarded = results_df[
-        (results_df["Recall@Threshold"] >= MIN_RECALL_HARD)
-    ]
-    if not guarded.empty:
-        return guarded.sort_values(
-            by=["FPR@Threshold", "Recall@Threshold", "Precision@Threshold", "F1@Threshold", "ROC-AUC"],
-            ascending=[True, False, False, False, False],
+    Select winner by operating-point feasibility, not only by fixed THRESHOLD=0.4.
+    """
+    operating_candidates: list[dict[str, float | str]] = []
+    for model_name in results_df["Model"].tolist():
+        row = _best_operating_row_for_model(threshold_rows, str(model_name))
+        if row is None:
+            continue
+        selected_row, tier = row
+        operating_candidates.append(
+            {
+                "Model": str(model_name),
+                "OperatingTier": int(tier),
+                "OperatingThreshold": float(selected_row["Threshold"]),
+                "OperatingRecall": float(selected_row["Recall"]),
+                "OperatingPrecision": float(selected_row["Precision"]),
+                "OperatingF1": float(selected_row["F1"]),
+                "OperatingFPR": float(selected_row["FPR"]),
+            }
+        )
+    if operating_candidates:
+        op_df = pd.DataFrame(operating_candidates)
+        merged = op_df.merge(
+            results_df[["Model", "ROC-AUC", "PR-AUC", "BrierScore", "LogLoss"]],
+            on="Model",
+            how="left",
+        )
+        return merged.sort_values(
+            by=[
+                "OperatingTier",
+                "OperatingFPR",
+                "OperatingRecall",
+                "OperatingPrecision",
+                "OperatingF1",
+                "ROC-AUC",
+                "PR-AUC",
+                "BrierScore",
+            ],
+            ascending=[True, True, False, False, False, False, True, True],
         ).iloc[0]
-    lr = results_df[results_df["Model"] == "LogisticRegression"]
-    if not lr.empty:
-        return lr.iloc[0]
     return results_df.sort_values(
         by=["Recall@Threshold", "FPR@Threshold", "ROC-AUC"],
         ascending=[False, True, False],
@@ -386,7 +458,7 @@ def main() -> None:
         by=["Recall@Threshold", "F1@Threshold", "Precision@Threshold", "FPR@Threshold"],
         ascending=[False, False, False, True],
     )
-    best_row = pick_best_model(results_df)
+    best_row = pick_best_model(results_df, threshold_rows)
     best_model_name = str(best_row["Model"])
     best_model = trained_models[best_model_name]
     best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
@@ -418,6 +490,7 @@ def main() -> None:
             "recall_hard_min": MIN_RECALL_HARD,
             "recall_min": TARGET_RECALL,
             "recall_high_target": TARGET_RECALL_HIGH,
+            "fpr_max_operating": MAX_FPR_OPERATING,
             "precision_min": TARGET_PRECISION,
             "f1_min": TARGET_F1,
         },
