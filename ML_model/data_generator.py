@@ -110,6 +110,8 @@ def generate_synthetic_data(
         height = float(rng.normal(1.75, 0.10))  # Average height ~175cm
         weight = float(rng.normal(75, 10))      # Average weight ~75kg
         bmi = round(weight / (height ** 2), 2)
+        athlete_age = int(rng.integers(18, 41))
+        career_injury_episodes = 0
         base_hrv = int(rng.integers(40, 90))  # Baseline HRV (ms)
         base_resting_hr = int(rng.integers(45, 65))  # Baseline resting HR (bpm)
         dates = pd.date_range(start=START_DATE, periods=days_per_athlete)
@@ -170,8 +172,8 @@ def generate_synthetic_data(
                 _bounded(float(daily_calories) + rng.normal(0.0, 180.0), 1200.0, 4500.0)
             )
             active_burn = int(_bounded(daily_distance * rng.uniform(55, 75), 0.0, 1800.0))
-            # Mifflin–St Jeor (male) with fixed reference age for synthetic burn only — not a model feature.
-            bmr = int(10 * weight + 6.25 * (height * 100) - 5 * 25 + 5)
+            # Mifflin–St Jeor (male); age is also a model feature in production.
+            bmr = int(10 * weight + 6.25 * (height * 100) - 5 * athlete_age + 5)
             total_burned = int(_bounded(bmr + active_burn, 1400.0, 5200.0))
 
             muscle_soreness = int(
@@ -237,6 +239,8 @@ def generate_synthetic_data(
                 + 0.18 * injured_yesterday
                 - 0.08 * (energy_level / 10.0)
                 + 0.07 * calorie_surplus
+                + 0.02 * (athlete_age - 28.0) / 10.0
+                + 0.07 * min(6, career_injury_episodes)
                 - 0.30 * recovery_protection
                 - 0.22 * resilience
             )
@@ -274,6 +278,7 @@ def generate_synthetic_data(
                 post_injury_cooldown = int(rng.integers(4, 10))
                 fatigue_state += 0.6
                 recovery_state -= 0.45
+                career_injury_episodes += 1
             else:
                 post_injury_cooldown = max(0, post_injury_cooldown - 1)
                 recovery_state += 0.06
@@ -281,7 +286,11 @@ def generate_synthetic_data(
             prev_injury_tomorrow = injury_tomorrow
 
             row = {
-                'athlete_id': athlete_id, 'date': dates[day], 'bmi': bmi,
+                'athlete_id': athlete_id,
+                'date': dates[day],
+                'bmi': bmi,
+                'age': athlete_age,
+                'history_injury_count': career_injury_episodes,
                 'injured_yesterday': injured_yesterday,
                 'daily_distance_km': round(daily_distance, 2),
                 'workout_intensity_minutes': workout_intensity, 'avg_cadence': int(avg_cadence),

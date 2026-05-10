@@ -88,7 +88,7 @@ python -m pytest tests/ -v
 | `test_dataframe_shape_and_no_nan` | מהבקשה נוצר DataFrame בשורה אחת, עם כל העמודות המוגדרות ב-`MODEL_FEATURE_COLUMNS`, בלי NaN. |
 | `test_stress_mapping_from_0_100_scale` | `stressLevel` מהסקאלה של האפליקציה ממופה לטווח שהמודל מצפה לו. |
 | `test_types_float64` | כל העמודות מסוג מספרי צף — מתאים ל-sklearn. |
-| `test_profile_fields_override_defaults_when_provided` | גיל והיסטוריית פציעות מהפרופיל נכנסים לשורת הפיצ'רים; `vo2_max` במודל נשאר קבוע מהשרת. |
+| `test_profile_fields_override_defaults_when_provided` | גיל והיסטוריית פציעות מהפרופיל נכנסים לשורת הפיצ'רים. |
 | `test_quality_score_tolerates_missing_nutrition_fields` | בלי תזונה עדיין אפשר ציון איכות סביר ואין חסימה קשיחה. |
 | `test_quality_score_sets_hard_blocker_without_load_signal` | בלי סיגנל עומס (צעדים/מרחק וכו') — יש חסימת איכות (`load_signal`). |
 

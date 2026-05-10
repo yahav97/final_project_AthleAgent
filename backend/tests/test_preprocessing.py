@@ -42,6 +42,13 @@ def test_nutrition_intake_overrides_default_when_provided():
     assert float(df["nutrition_intake_calories"].iloc[0]) == 3100.0
 
 
+def test_age_and_history_injury_from_profile_when_provided():
+    req = InjuryPredictionRequest(sleepMinutes=420, age=31, historyInjuryCount=2)
+    df = injury_request_to_model_dataframe(req)
+    assert float(df["age"].iloc[0]) == 31.0
+    assert float(df["history_injury_count"].iloc[0]) == 2.0
+
+
 def test_quality_score_tolerates_missing_nutrition_fields():
     req = InjuryPredictionRequest(
         userId="u1",

@@ -11,7 +11,7 @@ from services.prediction_service import (
 def test_training_base_column_contract():
     excluded = set(TRAINING_CSV_EXCLUDE_COLUMNS)
     base = [c for c in MODEL_FEATURE_COLUMNS if c not in excluded]
-    assert len(base) == 20
+    assert len(base) == 22
 
 
 def test_stable_athlete_numeric_id_is_deterministic():
@@ -29,6 +29,19 @@ def test_injury_prediction_request_prefers_heart_rate_avg_alias():
     }
     req = injury_prediction_request_from_firestore_snapshot("u1", "2026-05-01", snap)
     assert req.heartRateAvg == 71
+
+
+def test_injury_prediction_request_maps_profile_age_and_history_when_present():
+    snap = {
+        "profile": {"age": 29, "historyInjuryCount": 2},
+        "daily_health": {"sleepMinutes": 420},
+        "daily_health_yesterday": {"steps": 5000},
+        "daily_checkins": {},
+        "daily_nutrition": {},
+    }
+    req = injury_prediction_request_from_firestore_snapshot("u1", "2026-05-04", snap)
+    assert req.age == 29
+    assert req.historyInjuryCount == 2
 
 
 def test_injury_prediction_request_heart_rate_avg_wins_over_avg():
@@ -62,5 +75,5 @@ def test_training_base_feature_dict_shape(monkeypatch):
     }
     payload = injury_prediction_request_from_firestore_snapshot("u2", "2026-05-03", snap)
     row = training_base_feature_dict_from_request(payload)
-    assert len(row) == 20
+    assert len(row) == 22
     assert "acwr_ratio_ma7" not in row

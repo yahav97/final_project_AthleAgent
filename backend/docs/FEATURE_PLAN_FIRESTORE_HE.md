@@ -51,7 +51,7 @@ flowchart LR
 
 | שדות שהבקאנד **צריך** לחיזוי (מתועדים; לא נוצרים בהרשמה) | מצב |
 |----------------------------------------------------------|-----|
-| `age`, `historyInjuryCount` / `history_injury_count` | **פער איסוף:** אין כרגע מסך שמבטיח כתיבה — ברירות מחדל בשרת כשחסר בפרופיל (`vo2_max` אינו שדה מוצר; קבוע טכני במודל בלבד) |
+| `age`, `historyInjuryCount` / `history_injury_count` | **פער איסוף:** אין כרגע מסך שמבטיח כתיבה — ברירות מחדל בשרת כשחסר בפרופיל |
 
 ### 2.2 `users/{uid}/daily_health/{yyyy-MM-dd}`
 
@@ -111,7 +111,7 @@ flowchart LR
 - **לבחור תת־קבוצה** לדאטה החדש ול־pickle (`feature_columns`), או
 - **להרחיב/לצמצם** את הרשימה בקוד ובאימון יחד (שינוי מבני).
 
-רשימת ה־superset כוללת בין השאר: `age`, `bmi`, `history_injury_count`, `vo2_max`, `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`, מאפייני rolling נוספים (`acwr_ratio_ma7`, …). אילו מהן נכנסות לדאטה החדש ולמודל — **נקבע רק אחרי סגירת רשימת הפיצ’רים**, לא לפי דאטה ישן.
+רשימת ה־superset כוללת בין השאר: `age`, `bmi`, `history_injury_count`, `injured_yesterday`, `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`, מאפייני rolling נוספים (`acwr_ratio_ma7`, …). אילו מהן נכנסות לדאטה החדש ולמודל — **נקבע רק אחרי סגירת רשימת הפיצ’רים**, לא לפי דאטה ישן.
 
 ---
 

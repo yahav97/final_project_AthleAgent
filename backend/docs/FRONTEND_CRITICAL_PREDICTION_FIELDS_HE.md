@@ -68,7 +68,7 @@
 
 | קטגוריה | שדות בבקשת ה־API (camelCase) | למה זה חשוב |
 |---------|------------------------------|-------------|
-| פרופיל ספורטאי | `age`, `historyInjuryCount` / `history_injury_count` | לפי דוח חשיבות, **`history_injury_count`** מהחזקים ביותר; גיל מכוון בסיס. **`vo2_max` אינו שדה במוצר** — במודל נשארת עמודה טכנית עם קבוע פנימי בשרת בלבד. |
+| פרופיל ספורטאי | `age`, `historyInjuryCount` / `history_injury_count` | לפי דוח חשיבות, **`history_injury_count`** מהחזקים ביותר; גיל מכוון בסיס. |
 | בריאות יומית | `sleepMinutes`, `steps` / `distanceMeters`, `heartRateAvg`, `heartRateMin` | משפיעים על שינה, דופק מנוחה, פרוקסי ל־HRV במודל |
 | צ׳ק־אין | `stressLevel`, `muscleSoreness` | בין המאפיינים החשובים בדוח האימון |
 

@@ -1,6 +1,6 @@
 """Feature column contract for injury_model.pkl (must match ML_model/athlete_injury_data.csv)."""
 
-# Production contract: these columns are passed to the estimator after preprocessing (currently 24).
+# Production contract: these columns are passed to the estimator after preprocessing (currently 26).
 # Training CSV rows omit the four rolling-summary columns below; `ML_model/train_model.add_sequential_features`
 # recomputes them from per-athlete history so labels align with the synthetic pipeline.
 TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = (
@@ -12,6 +12,9 @@ TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = (
 
 MODEL_FEATURE_COLUMNS: list[str] = [
     "bmi",
+    # users/{uid} profile — optional in Firestore until the app ships these fields
+    "age",
+    "history_injury_count",
     # Survey on today's daily_health: injury on previous calendar day (Firestore injuredYesterday)
     "injured_yesterday",
     "daily_distance_km",
@@ -47,6 +50,8 @@ TRAINING_BASE_FEATURE_COLUMNS: tuple[str, ...] = tuple(
 # Population-style medians for imputation when the mobile payload is sparse
 DEFAULT_FEATURE_VALUES: dict[str, float] = {
     "bmi": 23.5,
+    "age": 28.0,
+    "history_injury_count": 0.0,
     "injured_yesterday": 0.0,
     "daily_distance_km": 3.5,
     "workout_intensity_minutes": 45.0,

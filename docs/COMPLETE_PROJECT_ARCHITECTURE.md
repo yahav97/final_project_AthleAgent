@@ -218,13 +218,7 @@ train_model.py
 
 ### Features Used by Model
 
-**Base Features** (19 features):
-- `age`, `bmi`, `history_injury_count`, `vo2_max` *(exists in the trained artifact for compatibility; **not** collected in the product — inference uses a fixed constant)*
-- `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`
-- `sleep_hours`, `hrv_score`, `resting_hr`
-- `daily_calories`, `total_calories_burned`, `calorie_balance`
-- `acute_load_7d`, `chronic_load_21d`, `acwr_ratio`
-- `sleep_debt_3d`, `hrv_drop`
+**Base Features:** canonical names and order live in `backend/services/model_features.py` (`MODEL_FEATURE_COLUMNS`) — profile (`age`, `history_injury_count`), `injured_yesterday`, distance/load/cadence/sleep/HR proxies, nutrition intake and calorie balance, check-in scales, rolling ACWR/sleep/HRV summaries.
 
 **Weak Features Removed** (automatically detected):
 - `stress_level` (importance < 0.03)

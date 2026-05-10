@@ -104,35 +104,39 @@
 
 החוזה הקבוע לשרת מוגדר ב־`MODEL_FEATURE_COLUMNS` ב־`backend/services/model_features.py`. זהו סדר העמודות של שורת הפיצ’רים לפני תאימות ל־`feature_columns` שנשמרו ב־pickle.
 
-### 4.1 כל 24 העמודות
+### 4.1 כל 26 העמודות (`MODEL_FEATURE_COLUMNS`)
+
+סדר זהה ל־`backend/services/model_features.py` (לפני subset של המאמן השמור ב־bundle).
 
 
-| #   | עמודת מודל (snake_case)     | מקור טיפוסי                                            |
-| --- | --------------------------- | ------------------------------------------------------ |
-| 1   | `age`                       | פרופיל / ברירת מחדל                                    |
-| 2   | `bmi`                       | מ־`weightKg` + הנחת גובה, או ברירת מחדל                |
-| 3   | `history_injury_count`      | פרופיל / ברירת מחדל                                    |
-| 4   | `vo2_max`                   | **לא נאסף במוצר** — קבוע פנימי (`DEFAULT_FEATURE_VALUES`) לתאימות pickle |
-| 5   | `daily_distance_km`         | `distanceMeters` / `steps`                             |
-| 6   | `workout_intensity_minutes` | מרחק + `activeCalories`                                |
-| 7   | `avg_cadence`               | מ־`steps` ומרחק                                        |
-| 8   | `sleep_hours`               | מ־`sleepMinutes`                                       |
-| 9   | `hrv_score`                 | פרוקסי מ־דופק מנוחה                                    |
-| 10  | `resting_hr`                | `heartRateMin` / `heartRateAvg`                        |
-| 11  | `daily_calories`            | תזונה / מאקרו / ברירות מחדל                            |
-| 12  | `total_calories_burned`     | `totalCalories`, BMR, פעילות                           |
-| 13  | `stress_level`              | `stressLevel` (מודדים לסקאלה 1–10)                     |
-| 14  | `muscle_soreness`           | `muscleSoreness` (מודדים לסקאלה 1–10)                  |
-| 15  | `acute_load_7d`             | פרוקסי יום בודד או **חישוב מהיסטוריה** כשיש מספיק ימים |
-| 16  | `chronic_load_21d`          | כנ״ל                                                   |
-| 17  | `acwr_ratio`                | כנ״ל                                                   |
-| 18  | `acwr_ratio_ma7`            | התאמה ליום בודד או עדכון מהיסטוריה                     |
-| 19  | `acwr_ratio_std21`          | נגזר מ־ACWR/HRV בפריסה חד-יומית                        |
-| 20  | `calorie_balance`           | `daily_calories` − `total_calories_burned`             |
-| 21  | `sleep_hours_ma7`           | התאמה ליום בודד או עדכון מהיסטוריה                     |
-| 22  | `sleep_hours_std21`         | נגזר מ־שינה בפריסה חד-יומית                            |
-| 23  | `sleep_debt_3d`             | פרוקסי או **גלילה מהיסטוריה**                          |
-| 24  | `hrv_drop`                  | פרוקסי או **גלילה מהיסטוריה**                          |
+| #   | עמודת מודל (snake_case)      | מקור טיפוסי                                                              |
+| --- | ---------------------------- | ------------------------------------------------------------------------ |
+| 1   | `bmi`                        | מ־`weightKg` + הנחת גובה, או ברירת מחדל                                  |
+| 2   | `age`                        | פרופיל / ברירת מחדל                                                      |
+| 3   | `history_injury_count`       | פרופיל / ברירת מחדל                                                      |
+| 4   | `injured_yesterday`          | `daily_health` היום — `injuredYesterday` (פציעה ביום הקודם)               |
+| 5   | `daily_distance_km`        | `distanceMeters` / `steps`                                               |
+| 6   | `workout_intensity_minutes`  | מרחק + `activeCalories`                                                  |
+| 7   | `avg_cadence`                | מ־`steps` ומרחק                                                          |
+| 8   | `sleep_hours`                | מ־`sleepMinutes`                                                         |
+| 9   | `hrv_score`                  | פרוקסי מ־דופק מנוחה                                                      |
+| 10  | `resting_hr`                 | `heartRateMin` / `heartRateAvg`                                           |
+| 11  | `nutrition_intake_calories`  | נגזר מתזונה (`totalCalories` במסמך תזונה אם קיים) או ברירת מחדל           |
+| 12  | `daily_calories`             | מאקרו / ארוחות / ברירות מחדל                                             |
+| 13  | `total_calories_burned`      | `totalCalories` ב־`daily_health`, BMR, פעילות                             |
+| 14  | `stress_level`               | `stressLevel` (קנה מידה 1–10)                                            |
+| 15  | `muscle_soreness`            | `muscleSoreness` (קנה מידה 1–10)                                           |
+| 16  | `energy_level`               | `energyLevel` בצ׳ק־אין (קנה מידה 1–10)                                   |
+| 17  | `acute_load_7d`              | פרוקסי יום בודד או חישוב מהיסטוריה                                       |
+| 18  | `chronic_load_21d`           | כנ״ל                                                                     |
+| 19  | `acwr_ratio`                 | כנ״ל                                                                     |
+| 20  | `acwr_ratio_ma7`             | התאמה ליום בודד או עדכון מהיסטוריה                                       |
+| 21  | `acwr_ratio_std21`           | נגזר מ־ACWR/HRV בפריסה חד־יומית                                           |
+| 22  | `calorie_balance`            | `daily_calories` − `total_calories_burned`                               |
+| 23  | `sleep_hours_ma7`            | התאמה ליום בודד או עדכון מהיסטוריה                                       |
+| 24  | `sleep_hours_std21`          | נגזר משינה בפריסה חד־יומית                                                |
+| 25  | `sleep_debt_3d`              | פרוקסי או גלילה מהיסטוריה                                                |
+| 26  | `hrv_drop`                   | פרוקסי או גלילה מהיסטוריה                                                |
 
 
 ### 4.2 subset אחרי אימון
@@ -143,7 +147,7 @@
 
 ## 5. סיכום מהיר
 
-- **מ-Firestore נטענים** שדות הפרופיל (`age`, `historyInjuryCount`/`history_injury_count`), כל שדות יום הבריאות הרלוונטיים, צ׳ק-אין, ותזונה — לפי המיפוי בטבלה בסעיף 2. עמודת המודל `vo2_max` **אינה קלט מוצר** — נשמרת ב־`MODEL_FEATURE_COLUMNS` רק לתאימות למאמן; בזמן ריצה תמיד ערך קבוע מהשרת. **תזונה:** רק `totalProtein` / `totalCarbs` / `mealsLoggedCount`; הן נכנסות למודל דרך `**daily_calories`** ו־`**calorie_balance**` (לא כעמודות מאקרו נפרדות).
-- **במודל (וקטור מלא)** 24 עמודות ב־`MODEL_FEATURE_COLUMNS`; חלקן נגזרות בקוד מצירוף השדות הנ״ל, וחלקן (עומס רולינג, חוב שינה, ירידת HRV) עשויות להתעדכן מ**היסטוריית** `daily_health`/`daily_checkins` כשקיימים מספיק ימים.
+- **מ-Firestore נטענים** שדות הפרופיל (`age`, `historyInjuryCount`/`history_injury_count`), כל שדות יום הבריאות הרלוונטיים, צ׳ק-אין, ותזונה — לפי המיפוי בטבלה בסעיף 2. **תזונה:** רק `totalProtein` / `totalCarbs` / `mealsLoggedCount` (+ סכום קלוריות צריכה במסמך התזונה ל־`nutrition_intake_calories` כשקיים); גזירה ל־`**daily_calories`** ו־`**calorie_balance**`.
+- **במודל (וקטור מלא)** 26 עמודות ב־`MODEL_FEATURE_COLUMNS`; חלקן נגזרות בקוד מצירוף השדות הנ״ל, וחלקן (עומס רולינג, חוב שינה, ירידת HRV) עשויות להתעדכן מ**היסטוריית** `daily_health`/`daily_checkins` כשקיימים מספיק ימים.
 - **חוזה מפורט באנגלית** (כולל מינימום שדות יומי מומלץ): `backend/docs/DATA_CONTRACT_FRONTEND_BACKEND.md`.
 

@@ -61,6 +61,8 @@ def test_predict_sklearn_legacy_endpoint_disabled_by_default():
         "/predict/sklearn",
         json={
             "bmi": 22.1,
+            "age": 28,
+            "history_injury_count": 0,
             "injured_yesterday": 0,
             "daily_distance_km": 4.0,
             "workout_intensity_minutes": 40,

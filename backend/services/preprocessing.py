@@ -184,6 +184,14 @@ def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) ->
         v = float(aligned["injured_yesterday"].iloc[0])
         if v < 0.0 or v > 1.0:
             raise ValueError(f"injured_yesterday out of expected range [0,1]: {v}")
+    if "age" in aligned.columns:
+        v = float(aligned["age"].iloc[0])
+        if v < 12.0 or v > 90.0:
+            raise ValueError(f"age out of expected range [12,90]: {v}")
+    if "history_injury_count" in aligned.columns:
+        v = float(aligned["history_injury_count"].iloc[0])
+        if v < 0.0 or v > 50.0:
+            raise ValueError(f"history_injury_count out of expected range [0,50]: {v}")
     if "nutrition_intake_calories" in aligned.columns:
         v = float(aligned["nutrition_intake_calories"].iloc[0])
         if v < 0.0 or v > 8000.0:
@@ -275,6 +283,24 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         bmi = float(weight_kg) / (height_m**2)
     bmi = float(max(15.0, min(45.0, bmi)))
 
+    age_val = float(DEFAULT_FEATURE_VALUES["age"])
+    age_raw = d.get("age")
+    if age_raw is not None:
+        try:
+            age_val = float(max(12.0, min(90.0, int(age_raw))))
+        except (TypeError, ValueError):
+            age_val = float(DEFAULT_FEATURE_VALUES["age"])
+
+    history_injury_count = float(DEFAULT_FEATURE_VALUES["history_injury_count"])
+    hist_raw = d.get("historyInjuryCount")
+    if hist_raw is None:
+        hist_raw = d.get("history_injury_count")
+    if hist_raw is not None:
+        try:
+            history_injury_count = float(max(0.0, min(50.0, int(hist_raw))))
+        except (TypeError, ValueError):
+            history_injury_count = float(DEFAULT_FEATURE_VALUES["history_injury_count"])
+
     hr_avg = _safe_float(d.get("heartRateAvg"), DEFAULT_FEATURE_VALUES["resting_hr"])
     hr_min = _safe_float(d.get("heartRateMin"), hr_avg)
     resting_proxy = hr_min if hr_min > 0 else hr_avg
@@ -287,6 +313,8 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     partial: dict = {
         "bmi": float(bmi),
+        "age": age_val,
+        "history_injury_count": history_injury_count,
         "injured_yesterday": injured_yesterday,
         "daily_distance_km": float(daily_distance_km),
         "workout_intensity_minutes": float(workout_intensity),

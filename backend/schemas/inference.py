@@ -10,6 +10,8 @@ class AthleteData(BaseModel):
     """Legacy engineered row for optional /predict/sklearn (subset merged with defaults)."""
 
     bmi: float
+    age: float = 28.0
+    history_injury_count: float = 0.0
     injured_yesterday: float = 0.0
     daily_distance_km: float
     workout_intensity_minutes: int
@@ -49,6 +51,14 @@ class InjuryPredictionRequest(BaseModel):
 
     userId: str | None = Field(default=None, description="Firebase Auth uid")
     date: str | None = Field(default=None, description="Day key yyyy-MM-dd")
+
+    # users/{uid} profile (optional until shipped on mobile)
+    age: int | None = Field(default=None, description="Athlete age in years")
+    historyInjuryCount: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("historyInjuryCount", "history_injury_count"),
+        description="Lifetime injury count from profile when available",
+    )
 
     # users/{uid}/daily_health (Health Connect sync + survey flags on same doc)
     injuredYesterday: int | None = Field(

@@ -94,18 +94,10 @@ If missing repeatedly, backend falls back to defaults and signal quality drops.
 
 ## Model Features in Serving (current)
 
-Backend model features are fixed to:
-
-- `age`, `bmi`, `history_injury_count`, `vo2_max` *(column still present in the bundle; filled with a **fixed serving constant**, not from Firestore or clients)*
-- `daily_distance_km`, `workout_intensity_minutes`, `avg_cadence`
-- `sleep_hours`, `hrv_score`, `resting_hr`
-- `daily_calories`, `total_calories_burned`
-- `stress_level`, `muscle_soreness`
-- `acute_load_7d`, `chronic_load_21d`, `acwr_ratio`
-- `calorie_balance`, `sleep_debt_3d`, `hrv_drop`
+Canonical order and names: `backend/services/model_features.py` → `MODEL_FEATURE_COLUMNS` (26 columns), including `bmi`, `age`, `history_injury_count`, `injured_yesterday`, distance/load/cadence/sleep/HR proxies, `nutrition_intake_calories`, intake/burn balance, check-in scales, rolling load/recovery summaries. The deployed bundle may use a **subset** (`feature_columns` in the artifact); alignment is enforced at `predict_proba` time.
 
 Important:
-- `age`, `historyInjuryCount`: loaded from `users/{uid}` when present; otherwise defaults in `preprocessing`. **`vo2_max` is not a product field** — the trained estimator still expects the column; inference always sets it to `DEFAULT_FEATURE_VALUES["vo2_max"]` in code (no Firestore or client input).
+- `age`, `historyInjuryCount`: loaded from `users/{uid}` when present; otherwise defaults in `preprocessing`.
 - `acute/chronic/acwr/sleep_debt/hrv_drop`: when enough historical rows exist from Firestore (`daily_health` + `daily_checkins`), rolling values are computed; otherwise the backend uses single-day proxies (`feature_engineering` / defaults).
 
 ## Weekly History Clarification

@@ -69,8 +69,6 @@ flowchart TD
 - `age`
 - `history_injury_count` (תמיכה גם ב-`historyInjuryCount`)
 
-*(עמודת המודל `vo2_max` קיימת רק לתאימות למאמן — מתמלאת בקבוע פנימי בשרת; לא שדה Firestore/מוצר.)*
-
 ### שדות Daily Health
 - `sleepMinutes`, `steps`, `distanceMeters`
 - `activeCalories`, `totalCalories`, `bmrCalories`

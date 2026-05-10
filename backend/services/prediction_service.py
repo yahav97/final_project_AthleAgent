@@ -169,11 +169,16 @@ def injury_prediction_request_from_firestore_snapshot(
     Merge policy matches ``predict_injury_risk_from_firestore`` (sleep/injury flags today;
     load/physiology from yesterday; check-ins today; nutrition today with history backfill).
     """
+    profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
     health_yesterday = snapshot.get("daily_health_yesterday") or {}
     checkins = snapshot.get("daily_checkins") or {}
     nutrition_raw = snapshot.get("daily_nutrition") or {}
     nutrition = merge_nutrition_with_history(user_id, date_key, nutrition_raw)
+
+    hist_profile = profile.get("historyInjuryCount")
+    if hist_profile is None:
+        hist_profile = profile.get("history_injury_count")
 
     ij_raw = health_today.get("injuredYesterday")
     if ij_raw is None:
@@ -182,6 +187,8 @@ def injury_prediction_request_from_firestore_snapshot(
     return InjuryPredictionRequest(
         userId=user_id,
         date=date_key,
+        age=profile.get("age"),
+        historyInjuryCount=hist_profile,
         injuredYesterday=_coerce_injured_yesterday(ij_raw),
         sleepMinutes=health_today.get("sleepMinutes"),
         steps=health_yesterday.get("steps"),
