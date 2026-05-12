@@ -4,10 +4,11 @@
 
 | פרט | ערך |
 |---|---|
-| **מודל** | XGBoostRaw |
+| **מודל** | XGBoostDeep |
 | **מספר פיצ'רים סופי** | 34 |
-| **סף החלטה** | 0.30 |
-| **Recall** | 90.3% |
+| **סף החלטה (High Risk)** | 0.18 |
+| **Recall** | 86.6% |
+| **ROC-AUC** | 0.723 |
 | **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
 
 ---
@@ -100,30 +101,17 @@
 | `hrvRmssd` | `hrv_score` | ישיר (חסום 30–105). אם חסר: `110 − resting_hr × 0.65` |
 | `restingHeartRate` / `heartRateMin` | `resting_hr` | Resting HR ← Min HR ← Avg HR (לפי זמינות) |
 
-### חישוב `workout_intensity_minutes` (נגזר, לא מהשעון)
+### חישובים נגזרים (לא מהשעון)
 
-```
-workout_intensity = daily_distance_km × 5.5 + active_calories / 40
-```
-
-חסום 0–240 דקות. **לא מגיע ישירות מ-Health Connect**.
-
-### חישוב `calorie_balance` (נגזר)
-
-```
-calorie_balance = daily_calories − total_calories_burned
-```
-
-### חישוב `avg_speed` / `max_speed` (fallback)
-
-- אם יש מהשעון → שימוש ישיר
-- אם אין → `avg_speed = daily_distance_km / (workout_intensity / 60)`
-- `max_speed = avg_speed × 1.3`
-
-### חישוב `avg_cadence` (fallback)
-
-- אם יש מהשעון → שימוש ישיר
-- אם אין → `steps / workout_intensity_minutes`
+| פיצ'ר | נוסחה |
+|---|---|
+| `workout_intensity_minutes` | `daily_distance_km × 5.5 + active_calories / 40` (חסום 0–240) |
+| `calorie_balance` | `daily_calories − total_calories_burned` |
+| `load_recovery_imbalance` | `acwr_ratio × sleep_debt_3d` |
+| `speed_intensity_ratio` | `max_speed / (avg_speed + 0.1)` (חסום עד 5.0) |
+| `avg_speed` (fallback) | אם אין מהשעון → `daily_distance_km / (workout_intensity / 60)` |
+| `max_speed` (fallback) | אם אין מהשעון → `avg_speed × 1.3` |
+| `avg_cadence` (fallback) | אם אין מהשעון → `steps / workout_intensity_minutes` |
 
 ---
 
@@ -134,63 +122,139 @@ calorie_balance = daily_calories − total_calories_burned
 | פיצ'ר | מה מחשב | נתון בסיס | חלון |
 |---|---|---|---|
 | `acute_load_7d` | ממוצע מרחק ב-7 ימים אחרונים | `daily_distance_km` | 7 ימים |
-| `chronic_load_21d` | **קירוב** של בסיס כרוני: `weekly_mean × 0.85 + weekly_std × 0.35 + 0.5` | `daily_distance_km` | 7 ימים (אומדן) |
+| `chronic_load_21d` | **קירוב** מ-7 ימים: `weekly_mean × 0.85 + weekly_std × 0.35 + 0.5` | `daily_distance_km` | 7 ימים (אומדן) |
 | `acwr_ratio` | `acute_load_7d / chronic_load_21d` חסום 0.35–2.8 | מחושב | — |
+| `acwr_ratio_ma7` | ממוצע ACWR על 7 ימים | `acwr_ratio` | 7 ימים |
 | `sleep_debt_3d` | סכום חוב שינה (8 − sleep) ב-3 ימים אחרונים | `sleep_hours` | 3 ימים |
+| `sleep_hours_ma7` | ממוצע שינה על 7 ימים | `sleep_hours` | 7 ימים |
 | `hrv_drop` | HRV היום − ממוצע HRV של 7 ימים, חסום ±15 | `hrv_score` | 7 ימים |
-| `acwr_ratio_ma7` | כשיש היסטוריה: ממוצע ACWR על 7 ימים. כשאין: = `acwr_ratio` היום | `acwr_ratio` | 7 ימים |
-| `sleep_hours_ma7` | כשיש היסטוריה: ממוצע שינה 7 ימים. כשאין: = `sleep_hours` היום | `sleep_hours` | 7 ימים |
 
-### מדיניות confidence (כמה ימים צריך?)
+### מדיניות confidence — מה קורה כשחסר מידע היסטורי?
 
 | ימי היסטוריה זמינים | רמת ביטחון | מה קורה |
 |---|---|---|
-| 7 ימים | **high** | משתמש בפיצ'רים מחושבים מהיסטוריה |
-| 4–6 ימים | **medium** | משתמש בפיצ'רים מחושבים (מבוססי rolling עם `min_periods=1`) |
-| 0–3 ימים | **low** | ערכי ברירת מחדל קבועים (defaults) לכל פיצ'רי ההיסטוריה |
+| 7 ימים | **high** | משתמש בפיצ'רים מחושבים מהיסטוריה אמיתית |
+| 4–6 ימים | **medium** | משתמש בפיצ'רים מחושבים (rolling עם `min_periods=1` — ממוצע על מה שיש) |
+| 0–3 ימים | **low** | **ערכי ברירת מחדל ניטרליים** לכל פיצ'רי ההיסטוריה |
+
+כשאין מספיק ימים, כל הפיצ'רים הנגזרים מקבלים defaults קבועים שלא מושכים לכיוון סיכון:
+
+| פיצ'ר | Default | משמעות |
+|---|---|---|
+| `acute_load_7d` | 4.5 | עומס "ממוצע" |
+| `chronic_load_21d` | 5.1 | בסיס כרוני סביר |
+| `acwr_ratio` | 1.0 | עומס מאוזן |
+| `acwr_ratio_ma7` | 1.0 | עומס מאוזן |
+| `sleep_debt_3d` | 1.0 | חוב שינה מינימלי |
+| `sleep_hours_ma7` | 7.0 | שינה ממוצעת |
+| `hrv_drop` | 0.0 | אין שינוי |
+
+**בהיסטוריה עצמה** (כלומר ביום מסוים שחסר בו נתון ספציפי מתוך ה-7 ימים), המערכת מחשבת defaults פנימיים:
+- אין `distanceMeters`? → `steps × 0.0008`. אין גם steps? → 0
+- אין `sleepMinutes`? → 7.0 שעות
+- אין `restingHeartRate`? → 54.0. אין `heartRateAvg`? → 54.0
+- HRV תמיד מחושב מדופק: `110 − resting_hr × 0.65`
 
 ---
 
-## שלב 4 — הפיצ'רים הסופיים שנכנסים למודל (36)
+## שלב 4 — ערכי ברירת מחדל לנתון יומי (כשחסר)
 
-### לפי סדר חשיבות (Gain)
+### תזונה — יש defaults
+
+**כן, יש ערכי ברירת מחדל לתזונה.** נתוני תזונה הם הדבר שהכי סביר שיהיה חסר. הלוגיקה:
+
+| מצב | מה קורה |
+|---|---|
+| יש `totalCalories` מ-nutrition | משתמש ישירות |
+| אין totalCalories, יש protein + carbs | `(protein × 4 + carbs × 4) × 1.2` (אומדן עם שומן) |
+| אין כלום, יש `mealsLoggedCount` | `2500 × (0.6 + meals × 0.2)` — קירוב לפי כמות ארוחות |
+| אין כלום בכלל | **2500 קלוריות** (default) |
+| Fallback מימים קודמים | חיפוש עד 14 ימים אחורה ב-`daily_nutrition` |
+
+ערכי ברירת מחדל לפיצ'רי תזונה:
+
+| פיצ'ר | Default |
+|---|---|
+| `nutrition_intake_calories` | 2500 |
+| `daily_calories` | 2500 |
+| `total_calories_burned` | 2450 |
+| `calorie_balance` | 0 (ניטרלי) |
+
+### כל שאר הפיצ'רים — defaults מלאים
+
+| פיצ'ר | Default | הערה |
+|---|---|---|
+| `sleep_hours` | 7.0 | שינה ניטרלית |
+| `stress_level` | 5.0 | סטרס ניטרלי |
+| `muscle_soreness` | 5.0 | כאב ניטרלי |
+| `energy_level` | 5.0 | אנרגיה ניטרלית |
+| `injured_yesterday` | 0.0 | לא נפצע |
+| `history_injury_count` | 0.0 | אין היסטוריה |
+| `daily_distance_km` | 3.5 | מרחק ממוצע |
+| `workout_intensity_minutes` | 45.0 | — |
+| `avg_cadence` | 168.0 | — |
+| `elevation_gained_m` | 50.0 | — |
+| `floors_climbed` | 5 | — |
+| `avg_speed` | 8.0 | — |
+| `max_speed` | 11.0 | — |
+| `avg_power` | 0.0 | אין מד כוח |
+| `active_calories_burned` | 350.0 | — |
+| `hrv_score` | 62.0 | — |
+| `resting_hr` | 54.0 | — |
+| `respiratory_rate` | 15.0 | — |
+| `spo2` | 97.0 | — |
+| `bmi` | 23.5 | — |
+| `body_fat_pct` | 16.0 | — |
+| `vo2_max` | 48.0 | — |
+| `age` | 28.0 | — |
+| `load_recovery_imbalance` | 1.0 | — |
+| `speed_intensity_ratio` | 1.3 | — |
+
+**כל ה-defaults נבחרו להיות "ניטרליים"** — הם לא מושכים את החיזוי לסיכון גבוה או נמוך.
+
+---
+
+## שלב 5 — הפיצ'רים הסופיים (34) לפי סדר חשיבות
 
 | # | פיצ'ר | חשיבות | מקור הנתון | חישוב |
 |---|---|---|---|---|
-| 1 | `stress_level` | **25.4%** | `daily_checkins.stressLevel` | המרת סקאלה |
-| 2 | `injured_yesterday` | **22.9%** | `daily_health.injuredYesterday` | bool → 0/1 |
-| 3 | `hrv_drop` | **5.8%** | היסטוריה 7 ימים של `hrvRmssd` | HRV_today − mean(HRV_7d) |
-| 4 | `acwr_ratio` | **3.7%** | היסטוריה 7 ימים של `distanceMeters` | acute_7d / chronic_estimate |
-| 5 | `sleep_debt_3d` | **3.7%** | היסטוריה 3 ימים של `sleepMinutes` | sum(max(0, 8 − sleep)) |
-| 6 | `muscle_soreness` | **3.5%** | `daily_checkins.muscleSoreness` | המרת סקאלה (1–5 → 1–10) |
-| 7 | `daily_distance_km` | **3.2%** | `daily_health.distanceMeters` | מטרים / 1000 |
-| 8 | `sleep_hours` | **2.7%** | `daily_health.sleepMinutes` | דקות / 60 |
-| 9 | `history_injury_count` | **2.5%** | `users/{uid}.historyInjuryCount` | ישיר |
-| 10 | `workout_intensity_minutes` | **2.1%** | חישוב | distance × 5.5 + calories / 40 |
-| 11 | `active_calories_burned` | **1.8%** | `daily_health.activeCalories` | ישיר |
-| 12 | `chronic_load_21d` | **1.3%** | היסטוריה 7 ימים | אומדן כרוני מ-7 ימים |
-| 13 | `acute_load_7d` | **1.2%** | היסטוריה 7 ימים של `distanceMeters` | mean(distance_7d) |
-| 14 | `floors_climbed` | **1.2%** | `daily_health.floorsClimbed` | ישיר |
-| 15 | `elevation_gained_m` | **1.0%** | `daily_health.elevationGainedMeters` | ישיר |
-| 16 | `sleep_hours_ma7` | **0.9%** | היסטוריה 7 ימים | mean(sleep_7d) |
-| 17 | `spo2` | **0.9%** | `daily_health.oxygenSaturation` | ישיר |
-| 18 | `energy_level` | **0.9%** | `daily_checkins.energyLevel` | המרת סקאלה |
-| 19 | `total_calories_burned` | **0.9%** | `daily_health.totalCalories` | ישיר (או BMR + active) |
-| 20 | `respiratory_rate` | **0.9%** | `daily_health.respiratoryRate` | ישיר |
-| 21 | `vo2_max` | **0.9%** | `daily_health.vo2Max` | ישיר |
-| 22 | `acwr_ratio_ma7` | **0.9%** | היסטוריה / proxy | ממוצע ACWR 7 ימים או = acwr היום |
-| 23 | `nutrition_intake_calories` | **0.9%** | `daily_nutrition.totalCalories` | ישיר (או חישוב ממאקרו) |
-| 24 | `daily_calories` | **0.9%** | `daily_nutrition` | ישיר או חישוב |
-| 25 | `avg_power` | **0.9%** | `daily_health.avgPower` | ישיר (0 אם אין מד כוח) |
-| 26 | `bmi` | **0.9%** | `daily_health.weightKg` + `heightCm` | weight / height² |
-| 27 | `hrv_score` | **0.9%** | `daily_health.hrvRmssd` | ישיר (חסום 30–105) |
-| 28 | `calorie_balance` | **0.8%** | חישוב | daily_calories − total_burned |
-| 29 | `avg_speed` | **0.8%** | `daily_health.avgSpeed` | ישיר / fallback |
-| 30 | `age` | **0.8%** | `users/{uid}.age` | ישיר |
-| 31 | `max_speed` | **0.8%** | `daily_health.maxSpeed` | ישיר / fallback |
-| 32 | `body_fat_pct` | **0.8%** | `daily_health.bodyFatPct` | ישיר |
-| 33 | `resting_hr` | **0.8%** | `daily_health.restingHeartRate` | ישיר (fallback מ-min/avg) |
-| 34 | `avg_cadence` | **0.8%** | `daily_health.avgCadence` | ישיר / fallback |
+| 1 | `hrv_drop` | **14.9%** | היסטוריה 7 ימים של `hrvRmssd` | HRV_today − mean(HRV_7d) |
+| 2 | `stress_level` | **8.1%** | `daily_checkins.stressLevel` | המרת סקאלה |
+| 3 | `load_recovery_imbalance` | **8.0%** | חישוב | acwr_ratio × sleep_debt_3d |
+| 4 | `injured_yesterday` | **7.1%** | `daily_health.injuredYesterday` | bool → 0/1 |
+| 5 | `acwr_ratio` | **7.0%** | היסטוריה 7 ימים של `distanceMeters` | acute_7d / chronic_estimate |
+| 6 | `history_injury_count` | **5.0%** | `users/{uid}.historyInjuryCount` | ישיר |
+| 7 | `sleep_debt_3d` | **4.4%** | היסטוריה 3 ימים של `sleepMinutes` | sum(max(0, 8 − sleep)) |
+| 8 | `daily_distance_km` | **2.4%** | `daily_health.distanceMeters` | מטרים / 1000 |
+| 9 | `sleep_hours` | **2.3%** | `daily_health.sleepMinutes` | דקות / 60 |
+| 10 | `active_calories_burned` | **2.0%** | `daily_health.activeCalories` | ישיר |
+| 11 | `workout_intensity_minutes` | **2.0%** | חישוב | distance × 5.5 + calories / 40 |
+| 12 | `muscle_soreness` | **1.9%** | `daily_checkins.muscleSoreness` | המרת סקאלה |
+| 13 | `chronic_load_21d` | **1.7%** | היסטוריה 7 ימים | אומדן כרוני |
+| 14 | `acwr_ratio_ma7` | **1.6%** | היסטוריה 7 ימים | mean(acwr_7d) |
+| 15 | `acute_load_7d` | **1.5%** | היסטוריה 7 ימים של `distanceMeters` | mean(distance_7d) |
+| 16 | `energy_level` | **1.5%** | `daily_checkins.energyLevel` | המרת סקאלה |
+| 17 | `floors_climbed` | **1.5%** | `daily_health.floorsClimbed` | ישיר |
+| 18 | `elevation_gained_m` | **1.5%** | `daily_health.elevationGainedMeters` | ישיר |
+| 19 | `respiratory_rate` | **1.5%** | `daily_health.respiratoryRate` | ישיר |
+| 20 | `avg_power` | **1.5%** | `daily_health.avgPower` | ישיר |
+| 21 | `sleep_hours_ma7` | **1.5%** | היסטוריה 7 ימים | mean(sleep_7d) |
+| 22 | `body_fat_pct` | **1.4%** | `daily_health.bodyFatPct` | ישיר |
+| 23 | `calorie_balance` | **1.4%** | חישוב | daily_calories − total_burned |
+| 24 | `vo2_max` | **1.4%** | `daily_health.vo2Max` | ישיר |
+| 25 | `hrv_score` | **1.4%** | `daily_health.hrvRmssd` | ישיר |
+| 26 | `nutrition_intake_calories` | **1.4%** | `daily_nutrition.totalCalories` | ישיר / חישוב ממאקרו |
+| 27 | `total_calories_burned` | **1.4%** | `daily_health.totalCalories` | ישיר / BMR + active |
+| 28 | `spo2` | **1.4%** | `daily_health.oxygenSaturation` | ישיר |
+| 29 | `daily_calories` | **1.4%** | `daily_nutrition` | ישיר / חישוב |
+| 30 | `max_speed` | **1.4%** | `daily_health.maxSpeed` | ישיר / fallback |
+| 31 | `bmi` | **1.4%** | `daily_health.weightKg` + `heightCm` | weight / height² |
+| 32 | `age` | **1.4%** | `users/{uid}.age` | ישיר |
+| 33 | `speed_intensity_ratio` | **1.4%** | חישוב | max_speed / (avg_speed + 0.1) |
+| 34 | `avg_speed` | **1.4%** | `daily_health.avgSpeed` | ישיר / fallback |
+
+**Top 7** (חוסמים ~54.9% מהחשיבות):
+`hrv_drop`, `stress_level`, `load_recovery_imbalance`, `injured_yesterday`, `acwr_ratio`, `history_injury_count`, `sleep_debt_3d`
 
 ---
 
@@ -199,14 +263,14 @@ calorie_balance = daily_calories − total_calories_burned
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        FIREBASE                                  │
-├──────────────┬──────────────┬───────────────┬──────────────────-─┤
+├──────────────┬──────────────┬───────────────┬────────────────────┤
 │ users/{uid}  │ daily_health │ daily_checkins│ daily_nutrition    │
 │              │ (7 ימים)     │ (היום)        │ (היום + fallback)  │
 │ • age        │ • sleep      │ • stress      │ • calories         │
 │ • injuries   │ • distance   │ • soreness    │ • protein          │
 │              │ • HR/HRV     │ • energy      │ • carbs            │
 │              │ • calories   │               │                    │
-│              │ • speed/power│               │                    │
+│              │ • speed/power│               │ default: 2500 kcal │
 │              │ • SpO2/resp  │               │                    │
 │              │ • elevation  │               │                    │
 └──────┬───────┴──────┬───────┴───────┬───────┴────────┬───────────┘
@@ -220,76 +284,37 @@ calorie_balance = daily_calories − total_calories_burned
 │  • Fallbacks (אם חסר → שימוש באתמול / ברירת מחדל)               │
 │  • חישוב BMI מגובה+משקל                                          │
 │  • הערכת workout_intensity                                        │
+│  • חישוב load_recovery_imbalance, speed_intensity_ratio          │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              FEATURE ENGINEERING (היסטוריה)                       │
+│              FEATURE ENGINEERING (היסטוריה 7 ימים)               │
+│                                                                   │
+│  confidence = high (7 ימים) / medium (4-6) / low (0-3)          │
 │                                                                   │
 │  חלון 7 ימים:                                                    │
-│  • acute_load_7d = mean(distance, 7 days)                        │
+│  • acute_load_7d = mean(distance, 7d)                            │
 │  • chronic_load_21d = אומדן מ-7 ימים                             │
 │  • acwr_ratio = acute / chronic                                   │
-│  • acwr_ratio_ma7 = mean(acwr, 7 days)                           │
-│  • sleep_hours_ma7 = mean(sleep, 7 days)                         │
+│  • acwr_ratio_ma7 = mean(acwr, 7d)                               │
+│  • sleep_hours_ma7 = mean(sleep, 7d)                             │
+│  • hrv_drop = hrv_today − mean(hrv, 7d)                         │
 │                                                                   │
 │  חלון 3 ימים:                                                    │
-│  • sleep_debt_3d = sum(max(0, 8−sleep), 3 days)                  │
+│  • sleep_debt_3d = sum(max(0, 8−sleep), 3d)                      │
 │                                                                   │
-│  חלון 7 ימים + היום:                                             │
-│  • hrv_drop = hrv_today − mean(hrv, 7 days)                     │
-│                                                                   │
-│  (הוסרו: acwr_ratio_std21, sleep_hours_std21 — לא נדרשים)        │
+│  confidence=low? → כל הנ"ל מקבלים ערכי ברירת מחדל ניטרליים       │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    XGBoost MODEL                                  │
+│                  XGBoostDeep MODEL                                │
 │                                                                   │
 │          34 פיצ'רים → predict_proba → סיכון 0.0–1.0             │
 │                                                                   │
-│          סף: 0.30 → High Risk                                    │
-│          סף: 0.18 → Medium Risk                                  │
-│          מתחת    → Low Risk                                      │
+│          ≥ 0.18 → High Risk                                      │
+│          ≥ 0.11 → Medium Risk                                    │
+│          < 0.11 → Low Risk                                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
----
-
-## חשיבות פיצ'רים — איך נקבעה?
-
-### שיטה: Gain (XGBoost)
-
-XGBoost מחשב את ה-**Gain** — השיפור ב-Loss Function שהושג בכל פיצול (split) בעצים. הפיצ'ר שנותן את הפיצולים הכי "מרוויחים" מקבל חשיבות גבוהה יותר.
-
-- **לא נקבע ידנית** — המודל מגלה לבד מה חשוב
-- סכום כל החשיבויות = 100%
-- 260 עצים, כל אחד עם עומק מקסימלי 5 → אלפי פיצולים שמתמצתים לטבלת חשיבות
-
-### למה stress ו-injured_yesterday כל כך דומיננטיים?
-
-| פיצ'ר | חשיבות | סיבה |
-|---|---|---|
-| `stress_level` | 25.4% | מסכם את המצב הכולל: קורלטיבי ל-HRV, שינה, עייפות. פיצול יחיד מפריד טוב |
-| `injured_yesterday` | 22.9% | סיגנל בינארי חד — אחרי פציעה ההסתברות לפציעה נוספת עולה דרמטית |
-| **יחד** | **48.3%** | כמעט חצי מהמידע שהמודל צריך |
-
-### Top 5 = 61.5% מהחשיבות
-
-`stress_level` + `injured_yesterday` + `hrv_drop` + `acwr_ratio` + `sleep_debt_3d`
-
----
-
-## ערכי ברירת מחדל (כשנתון חסר)
-
-| פיצ'ר | Default | משמעות |
-|---|---|---|
-| `sleep_hours` | 7.0 | שינה "ממוצעת" |
-| `stress_level` | 5.0 | סטרס ניטרלי |
-| `muscle_soreness` | 5.0 | כאב ניטרלי |
-| `acwr_ratio` | 1.0 | עומס מאוזן |
-| `hrv_drop` | 0.0 | אין שינוי ב-HRV |
-| `sleep_debt_3d` | 1.0 | חוב שינה מינימלי |
-| `injured_yesterday` | 0.0 | לא נפצע |
-
-ערכי ברירת המחדל נבחרו כ-"ניטרליים" — הם לא מושכים את החיזוי לכיוון סיכון גבוה או נמוך.
