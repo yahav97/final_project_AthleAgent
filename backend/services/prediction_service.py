@@ -54,9 +54,7 @@ def _apply_history_confidence_fallback(df, payload: InjuryPredictionRequest) -> 
         "chronic_load_21d",
         "acwr_ratio",
         "acwr_ratio_ma7",
-        "acwr_ratio_std21",
         "sleep_hours_ma7",
-        "sleep_hours_std21",
         "sleep_debt_3d",
         "hrv_drop",
     ):
@@ -86,9 +84,7 @@ def _count_defaulted_critical_features(df) -> int:
         "chronic_load_21d",
         "acwr_ratio",
         "acwr_ratio_ma7",
-        "acwr_ratio_std21",
         "sleep_hours_ma7",
-        "sleep_hours_std21",
         "sleep_debt_3d",
         "hrv_drop",
     )

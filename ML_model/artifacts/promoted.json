@@ -1,6 +1,6 @@
 {
-  "artifacts_dir": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260511_212527",
-  "model_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260511_212527\\injury_model.pkl",
-  "manifest_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260511_212527\\run_manifest.json",
+  "artifacts_dir": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260512_061756",
+  "model_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260512_061756\\injury_model.pkl",
+  "manifest_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260512_061756\\run_manifest.json",
   "degraded_rc": false
 }

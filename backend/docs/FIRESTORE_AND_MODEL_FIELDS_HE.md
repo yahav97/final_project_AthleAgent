@@ -135,12 +135,10 @@
 | 18  | `chronic_load_21d`           | כנ״ל                                                                     |
 | 19  | `acwr_ratio`                 | כנ״ל                                                                     |
 | 20  | `acwr_ratio_ma7`             | התאמה ליום בודד או עדכון מהיסטוריה                                       |
-| 21  | `acwr_ratio_std21`           | נגזר מ־ACWR/HRV בפריסה חד־יומית                                           |
-| 22  | `calorie_balance`            | `daily_calories` − `total_calories_burned`                               |
-| 23  | `sleep_hours_ma7`            | התאמה ליום בודד או עדכון מהיסטוריה                                       |
-| 24  | `sleep_hours_std21`          | נגזר משינה בפריסה חד־יומית                                                |
-| 25  | `sleep_debt_3d`              | פרוקסי או גלילה מהיסטוריה                                                |
-| 26  | `hrv_drop`                   | פרוקסי או גלילה מהיסטוריה                                                |
+| 21  | `calorie_balance`            | `daily_calories` − `total_calories_burned`                               |
+| 22  | `sleep_hours_ma7`            | התאמה ליום בודד או עדכון מהיסטוריה                                       |
+| 23  | `sleep_debt_3d`              | פרוקסי או גלילה מהיסטוריה                                                |
+| 24  | `hrv_drop`                   | פרוקסי או גלילה מהיסטוריה                                                |
 
 
 ### 4.2 subset אחרי אימון

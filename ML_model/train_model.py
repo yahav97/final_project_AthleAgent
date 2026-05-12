@@ -390,14 +390,8 @@ def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
     out["acwr_ratio_ma7"] = grouped["acwr_ratio"].transform(
         lambda x: x.rolling(7, min_periods=1).mean()
     )
-    out["acwr_ratio_std21"] = grouped["acwr_ratio"].transform(
-        lambda x: x.rolling(21, min_periods=1).std().fillna(0.0)
-    )
     out["sleep_hours_ma7"] = grouped["sleep_hours"].transform(
         lambda x: x.rolling(7, min_periods=1).mean()
-    )
-    out["sleep_hours_std21"] = grouped["sleep_hours"].transform(
-        lambda x: x.rolling(21, min_periods=1).std().fillna(0.0)
     )
     return out
 

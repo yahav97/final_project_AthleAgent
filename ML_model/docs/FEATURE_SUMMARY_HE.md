@@ -1,207 +1,295 @@
-# סיכום פיצ'רים של מודל חיזוי פציעות — AthleAgent
+# זרימת נתונים ופיצ'רים — מודל חיזוי פציעות AthleAgent
 
-## מידע כללי
+## סקירה כללית
 
 | פרט | ערך |
 |---|---|
-| **מודל נבחר** | XGBoostRaw (XGBoost ללא כיול) |
-| **מספר פיצ'רים** | 36 |
-| **סף החלטה (Threshold)** | 0.30 |
+| **מודל** | XGBoostRaw |
+| **מספר פיצ'רים סופי** | 34 |
+| **סף החלטה** | 0.30 |
 | **Recall** | 90.3% |
-| **Precision** | 27.4% |
-| **ROC-AUC** | 0.654 |
-| **מדד חישוב חשיבות** | Gain (שיפור ה-Loss בענפים בהם הפיצ'ר משתתף) |
+| **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
 
 ---
 
-## טבלת חשיבות פיצ'רים — מהגבוה לנמוך
+## שלב 1 — מה נמשך מפיירבייס?
 
-| # | פיצ'ר | חשיבות (Gain) | קטגוריה | תיאור |
-|---|---|---|---|---|
-| 1 | `stress_level` | **0.2539** | סובייקטיבי | רמת סטרס נפשי (1–10), דיווח עצמי של הספורטאי |
-| 2 | `injured_yesterday` | **0.2295** | היסטוריה | האם הספורטאי נפצע אתמול (0/1) — מחזיק מידע על רצף פציעות |
-| 3 | `hrv_drop` | **0.0581** | נגזר/פיזיולוגי | ירידה ב-HRV ביחס לממוצע 7 ימים — סמן למערכת העצבים האוטונומית |
-| 4 | `acwr_ratio` | **0.0374** | נגזר/עומס | יחס עומס אקוטי-לכרוני (7 ימים / 21 ימים) — מדד מרכזי בספרות (Gabbett 2016) |
-| 5 | `sleep_debt_3d` | **0.0366** | נגזר/התאוששות | חוב שינה מצטבר ב-3 הימים האחרונים (הפרש מ-8 שעות) |
-| 6 | `muscle_soreness` | **0.0352** | סובייקטיבי | כאב שרירים (1–10), דיווח עצמי |
-| 7 | `daily_distance_km` | **0.0322** | עומס אימון | מרחק ריצה/פעילות יומי בק"מ |
-| 8 | `sleep_hours` | **0.0271** | התאוששות | שעות שינה בלילה האחרון |
-| 9 | `history_injury_count` | **0.0248** | היסטוריה | מספר פציעות מצטבר בקריירה |
-| 10 | `workout_intensity_minutes` | **0.0207** | עומס אימון | דקות אימון באינטנסיביות גבוהה |
-| 11 | `active_calories_burned` | **0.0176** | עומס אימון | קלוריות שנשרפו בפעילות (ללא BMR) |
-| 12 | `chronic_load_21d` | **0.0134** | נגזר/עומס | ממוצע מרחק נע ל-21 ימים — "הבסיס הכרוני" של העומס |
-| 13 | `acute_load_7d` | **0.0116** | נגזר/עומס | ממוצע מרחק נע ל-7 ימים — "העומס האקוטי" |
-| 14 | `floors_climbed` | **0.0115** | עומס אימון | מספר קומות טיפוס ביום |
-| 15 | `elevation_gained_m` | **0.0096** | עומס אימון | עלייה מצטברת במטרים |
-| 16 | `acwr_ratio_std21` | **0.0094** | נגזר/עומס | סטיית תקן של ACWR ב-21 ימים — יציבות העומס |
-| 17 | `sleep_hours_ma7` | **0.0094** | נגזר/התאוששות | ממוצע נע 7 ימים של שעות שינה |
-| 18 | `spo2` | **0.0092** | פיזיולוגי | רוויון חמצן בדם (%) |
-| 19 | `energy_level` | **0.0092** | סובייקטיבי | רמת אנרגיה (1–10), דיווח עצמי |
-| 20 | `total_calories_burned` | **0.0090** | אנרגיה | סה"כ קלוריות שנשרפו (BMR + פעילות) |
-| 21 | `sleep_hours_std21` | **0.0089** | נגזר/התאוששות | סטיית תקן שינה ב-21 ימים — יציבות השינה |
-| 22 | `respiratory_rate` | **0.0088** | פיזיולוגי | קצב נשימה במנוחה (נשימות/דקה) |
-| 23 | `vo2_max` | **0.0087** | הרכב גוף | VO₂max — כושר אירובי (מ"ל/ק"ג/דקה) |
-| 24 | `acwr_ratio_ma7` | **0.0087** | נגזר/עומס | ממוצע נע 7 ימים של ACWR |
-| 25 | `nutrition_intake_calories` | **0.0086** | תזונה | צריכה קלורית יומית |
-| 26 | `daily_calories` | **0.0086** | תזונה | קלוריות יומיות (צריכה כללית) |
-| 27 | `avg_power` | **0.0086** | עומס אימון | הספק ממוצע בוואט (רק מי שיש לו מד כוח) |
-| 28 | `bmi` | **0.0086** | הרכב גוף | BMI — מדד מסת גוף |
-| 29 | `hrv_score` | **0.0085** | פיזיולוגי | ציון HRV גולמי (ms) |
-| 30 | `calorie_balance` | **0.0084** | נגזר/תזונה | מאזן קלורי (צריכה − שריפה) |
-| 31 | `avg_speed` | **0.0083** | עומס אימון | מהירות ממוצעת (קמ"ש) |
-| 32 | `age` | **0.0082** | פרופיל | גיל הספורטאי |
-| 33 | `max_speed` | **0.0081** | עומס אימון | מהירות מרבית (קמ"ש) |
-| 34 | `body_fat_pct` | **0.0080** | הרכב גוף | אחוז שומן גוף |
-| 35 | `resting_hr` | **0.0079** | פיזיולוגי | דופק מנוחה (פעימות/דקה) |
-| 36 | `avg_cadence` | **0.0078** | עומס אימון | קצב צעדים ממוצע (צעדים/דקה) |
+### מקורות הנתונים (Collections)
 
----
-
-## חלוקה לקטגוריות
-
-### 1. סובייקטיבי — דיווח עצמי של הספורטאי
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `stress_level` | 25.4% | רמת סטרס נפשי (1–10) |
-| `muscle_soreness` | 3.5% | כאב שרירים (1–10) |
-| `energy_level` | 0.9% | רמת אנרגיה (1–10) |
-
-### 2. היסטוריית פציעות
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `injured_yesterday` | 22.9% | פציעה אתמול — בינארי |
-| `history_injury_count` | 2.5% | סה"כ פציעות קודמות |
-
-### 3. עומס אימון — מדדים ישירים
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `daily_distance_km` | 3.2% | מרחק יומי |
-| `workout_intensity_minutes` | 2.1% | דקות אימון אינטנסיבי |
-| `active_calories_burned` | 1.8% | קלוריות פעילות |
-| `floors_climbed` | 1.2% | קומות טיפוס |
-| `elevation_gained_m` | 1.0% | עלייה במטרים |
-| `avg_power` | 0.9% | הספק ממוצע |
-| `avg_speed` | 0.8% | מהירות ממוצעת |
-| `max_speed` | 0.8% | מהירות מרבית |
-| `avg_cadence` | 0.8% | קצב צעדים |
-
-### 4. עומס אימון — מדדים נגזרים (Rolling Windows)
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `acwr_ratio` | 3.7% | יחס עומס אקוטי/כרוני |
-| `chronic_load_21d` | 1.3% | עומס כרוני 21 ימים |
-| `acute_load_7d` | 1.2% | עומס אקוטי 7 ימים |
-| `acwr_ratio_std21` | 0.9% | יציבות ACWR ב-21 ימים |
-| `acwr_ratio_ma7` | 0.9% | ממוצע נע של ACWR |
-
-### 5. התאוששות ושינה
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `hrv_drop` | 5.8% | ירידת HRV מהבסיס — סמן עייפות |
-| `sleep_debt_3d` | 3.7% | חוב שינה מצטבר 3 ימים |
-| `sleep_hours` | 2.7% | שעות שינה |
-| `sleep_hours_ma7` | 0.9% | ממוצע שינה 7 ימים |
-| `sleep_hours_std21` | 0.9% | יציבות שינה 21 ימים |
-
-### 6. פיזיולוגיה
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `spo2` | 0.9% | רוויון חמצן |
-| `respiratory_rate` | 0.9% | קצב נשימה במנוחה |
-| `hrv_score` | 0.9% | HRV גולמי |
-| `resting_hr` | 0.8% | דופק מנוחה |
-
-### 7. הרכב גוף ופרופיל
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `vo2_max` | 0.9% | כושר אירובי |
-| `bmi` | 0.9% | מדד מסת גוף |
-| `age` | 0.8% | גיל |
-| `body_fat_pct` | 0.8% | אחוז שומן |
-
-### 8. תזונה ואנרגיה
-| פיצ'ר | חשיבות | מה מודד |
-|---|---|---|
-| `total_calories_burned` | 0.9% | סה"כ שריפה |
-| `nutrition_intake_calories` | 0.9% | צריכה קלורית |
-| `daily_calories` | 0.9% | קלוריות יומיות |
-| `calorie_balance` | 0.8% | מאזן קלורי |
-
----
-
-## איך נקבעה חשיבות הפיצ'רים?
-
-### שיטת חישוב: Gain (Information Gain)
-
-XGBoost משתמש בשיטת **Gain** לחישוב חשיבות פיצ'רים. כל עץ בהרכב (Ensemble) מחולק לענפים (Splits), וכל ענף בוחר פיצ'ר אחד כדי לבצע את הפיצול. ה-Gain מודד את **השיפור ב-Loss Function** שהושג על ידי הפיצול הזה.
-
-**חישוב:**
-1. בכל עץ, כל פיצול מחשב את ה-**Gain** — ההפרש ב-Loss לפני ואחרי הפיצול.
-2. לכל פיצ'ר מסוכמים כל ערכי ה-Gain מכל הפיצולים בכל 260 העצים (`n_estimators=260`).
-3. הסכום מנורמל כך שסך כל הפיצ'רים שווה ל-1.0 (100%).
-4. הפיצ'ר עם הערך הגבוה ביותר הוא הכי "שימושי" למודל בזמן קבלת החלטות.
-
-### למה Gain ולא שיטות אחרות?
-
-| שיטה | מה מודדת | יתרון | חיסרון |
+| Collection | Document | מה נמשך | טווח זמן |
 |---|---|---|---|
-| **Gain** ✅ | שיפור ב-Loss בכל פיצול | מודד את ההשפעה בפועל על דיוק המודל | מוטה לטובת פיצ'רים עם קרדינליות גבוהה |
-| Weight | מספר פעמים שפיצ'ר שימש בפיצולים | פשוט לחישוב | לא מביא בחשבון את גודל ההשפעה |
-| Cover | מספר הדוגמאות שהושפעו | מודד "רוחב" ההשפעה | לא מודד "עומק" ההשפעה |
-| SHAP | תרומה שולית ממוצעת | מדויק ביותר, מביא בחשבון אינטראקציות | יקר חישובית |
+| `users/{uid}` | פרופיל | age, historyInjuryCount | קבוע (פעם אחת) |
+| `users/{uid}/daily_health/{date}` | בריאות היום | שינה, צעדים, מרחק, דופק, HRV, קלוריות, משקל, גובה, SpO2, נשימה, מהירות, הספק וכו' | **יום נוכחי** |
+| `users/{uid}/daily_health/{date-1}` | בריאות אתמול | אותם שדות — fallback אם היום חסר | **אתמול** |
+| `users/{uid}/daily_health/{date-6}...{date-1}` | היסטוריה | מרחק, שינה, דופק | **7 ימים אחורה** |
+| `users/{uid}/daily_checkins/{date}` | דיווח עצמי | stressLevel, muscleSoreness, energyLevel | **יום נוכחי** |
+| `users/{uid}/daily_nutrition/{date}` | תזונה | totalProtein, totalCarbs, mealsLoggedCount, totalCalories | **יום נוכחי** (fallback עד 14 ימים) |
 
-Gain נבחר כי הוא ברירת המחדל של XGBoost ונותן תמונה טובה של איזה פיצ'רים "עובדים" בפועל בתוך העצים.
+### שדות שנמשכים מפיירבייס — פירוט מלא
 
-### למה `stress_level` ו-`injured_yesterday` דומיננטיים?
+#### מ-`daily_health` (Health Connect / שעון חכם)
 
-שני פיצ'רים אלה לבדם מחזיקים **~48% מכלל החשיבות**. הסיבה נעוצה באופן שהנתונים נוצרו (Synthetic Data Generator):
-
-1. **`stress_level`** (25.4%) — בנתונים הסינתטיים, ה-Hazard Logit כולל מקדם ישיר של `0.10 * stress_level`, אבל מעבר לכך `stress_level` קורלטיבי חזק ל-`sleep_hours`, `hrv_score`, `resting_hr`, ו-`fatigue_state`. כלומר, הוא "סיכום" אפקטיבי של מצב הספורטאי. XGBoost מזהה שפיצול על סטרס נותן Gain גבוה כי הוא מפריד טוב בין פצועים ללא-פצועים.
-
-2. **`injured_yesterday`** (22.9%) — מחזיק מידע ישיר על "קירבה זמנית לפציעה". אחרי פציעה, יש cooldown period (4–10 ימים) בו ה-hazard עולה. פיצ'ר בינארי שנותן סיגנל חד כזה הוא מאוד שימושי ל-XGBoost.
-
-3. **`hrv_drop`** (5.8%) — שלישי בחשיבות. ירידת HRV מהבסיס היא סמן פיזיולוגי אמיתי לעומס-יתר, ובנתונים הסינתטיים היא נגזרת ישירות מ-stress, fatigue, recovery ו-external shocks.
-
-### הפיצ'רים הנגזרים (Engineered Features)
-
-חלק מהפיצ'רים אינם מגיעים ישירות מהחיישנים אלא מחושבים:
-
-| פיצ'ר נגזר | נוסחת חישוב | מקור |
+| שדה בפיירבייס | סוג נתון | מקור |
 |---|---|---|
-| `acute_load_7d` | ממוצע נע 7 ימים של `daily_distance_km` | Rolling window |
-| `chronic_load_21d` | ממוצע נע 21 ימים של `daily_distance_km` | Rolling window |
-| `acwr_ratio` | `acute_load_7d / chronic_load_21d` (חסום בטווח 0.35–2.8) | חישוב |
-| `acwr_ratio_ma7` | ממוצע נע 7 ימים של `acwr_ratio` | Rolling window |
-| `acwr_ratio_std21` | סטיית תקן 21 ימים של `acwr_ratio` | Rolling window |
-| `sleep_debt_3d` | סכום `max(0, 8 - sleep_hours)` על 3 ימים אחרונים | Rolling window |
-| `sleep_hours_ma7` | ממוצע נע 7 ימים של `sleep_hours` | Rolling window |
-| `sleep_hours_std21` | סטיית תקן 21 ימים של `sleep_hours` | Rolling window |
-| `hrv_drop` | `hrv_score` ביום הנוכחי − ממוצע 7 ימים של `hrv_score` (חסום ±15) | Rolling window |
-| `calorie_balance` | `daily_calories - total_calories_burned` | חישוב |
-| `total_calories_burned` | `BMR + active_calories_burned` | חישוב |
+| `sleepMinutes` | דקות שינה | Health Connect → Sleep |
+| `steps` | צעדים | Health Connect → Steps |
+| `distanceMeters` | מרחק במטרים | Health Connect → Distance |
+| `activeCalories` | קלוריות פעילות | Health Connect → ActiveCalories |
+| `totalCalories` | סה"כ שריפה | Health Connect → TotalCalories |
+| `heartRateAvg` | דופק ממוצע | Health Connect → HeartRate |
+| `heartRateMax` | דופק מקסימלי | Health Connect → HeartRate |
+| `heartRateMin` | דופק מינימלי | Health Connect → HeartRate |
+| `hrvRmssd` | HRV (ms) | Health Connect → HeartRateVariabilityRmssd |
+| `restingHeartRate` | דופק מנוחה | Health Connect → RestingHeartRate |
+| `weightKg` | משקל | Health Connect → Weight |
+| `heightCm` | גובה | Health Connect → Height |
+| `bmrCalories` | BMR | Health Connect → BasalMetabolicRate |
+| `bodyFatPct` | אחוז שומן | Health Connect → BodyFat |
+| `vo2Max` | VO₂max | Health Connect → Vo2Max |
+| `elevationGainedMeters` | עלייה במטרים | Health Connect → ElevationGained |
+| `floorsClimbed` | קומות | Health Connect → FloorsClimbed |
+| `avgSpeed` | מהירות ממוצעת | Health Connect → Speed |
+| `maxSpeed` | מהירות מקסימלית | Health Connect → Speed |
+| `avgPower` | הספק ממוצע (וואט) | Health Connect → Power |
+| `avgCadence` | קצב צעדים | Health Connect → StepsCadence |
+| `respiratoryRate` | קצב נשימה | Health Connect → RespiratoryRate |
+| `oxygenSaturation` | SpO₂ % | Health Connect → OxygenSaturation |
+| `injuredYesterday` | פציעה אתמול (0/1) | דיווח עצמי שנשמר ב-daily_health |
 
----
+#### מ-`daily_checkins` (דיווח עצמי באפליקציה)
 
-## מאפייני המודל (XGBoostRaw)
-
-| פרמטר | ערך |
+| שדה בפיירבייס | סוג נתון |
 |---|---|
-| `n_estimators` | 260 |
-| `max_depth` | 5 |
-| `learning_rate` | 0.06 |
-| `subsample` | 0.9 |
-| `colsample_bytree` | 0.9 |
-| `scale_pos_weight` | 2.2 |
-| `eval_metric` | logloss |
+| `stressLevel` | רמת סטרס (1–10 או 0–100) |
+| `muscleSoreness` | כאב שרירים (1–5) |
+| `energyLevel` | רמת אנרגיה (1–10 או 0–100) |
 
-`scale_pos_weight=2.2` מעניק משקל גבוה יותר לדוגמאות חיוביות (פציעה) כדי לפצות על חוסר איזון במחלקות (~21% שיעור פציעה).
+#### מ-`daily_nutrition` (תזונה)
+
+| שדה בפיירבייס | סוג נתון |
+|---|---|
+| `totalProtein` | גרם חלבון |
+| `totalCarbs` | גרם פחמימות |
+| `mealsLoggedCount` | מספר ארוחות שנרשמו |
+| `totalCalories` | סה"כ קלוריות שנצרכו |
+
+#### מ-`users/{uid}` (פרופיל)
+
+| שדה בפיירבייס | סוג נתון |
+|---|---|
+| `age` | גיל |
+| `historyInjuryCount` | מספר פציעות קודמות |
 
 ---
 
-## סיכום
+## שלב 2 — חישובים ותמורות (Preprocessing)
 
-- **Top 5 פיצ'רים** (stress_level, injured_yesterday, hrv_drop, acwr_ratio, sleep_debt_3d) מחזיקים **~61.5%** מכלל החשיבות.
-- פיצ'רים סובייקטיביים (סטרס, כאב שרירים) ופיצ'רים היסטוריים (פציעה אתמול, מספר פציעות) הם הכי משמעותיים.
-- פיצ'רים פיזיולוגיים נגזרים (HRV drop, ACWR, חוב שינה) חשובים יותר מהערכים הגולמיים שלהם.
-- פיצ'רים דמוגרפיים ושל הרכב גוף (גיל, BMI, שומן) בעלי חשיבות נמוכה — הם קבועים לכל ספורטאי ולכן פחות מפלים בין ימים.
-- חשיבות הפיצ'רים נקבעה **אוטומטית** על ידי XGBoost (Gain), לא באופן ידני.
+כל נתון גולמי מפיירבייס עובר עיבוד לפני שנכנס למודל:
+
+### המרות סקאלה
+
+| נתון גולמי | → פיצ'ר במודל | המרה |
+|---|---|---|
+| `sleepMinutes` | `sleep_hours` | חלוקה ב-60, חסום 3–12 |
+| `distanceMeters` | `daily_distance_km` | חלוקה ב-1000. אם חסר — `steps × 0.0008` |
+| `stressLevel` | `stress_level` | אם > 10 → חלוקה ב-10 (המרה מ-0–100 ל-1–10) |
+| `muscleSoreness` | `muscle_soreness` | אם ≤ 5 → כפל ב-2 (המרה מ-1–5 ל-1–10) |
+| `energyLevel` | `energy_level` | אם > 10 → חלוקה ב-10 |
+| `injuredYesterday` | `injured_yesterday` | true→1, false→0 |
+| `weightKg` + `heightCm` | `bmi` | `weight / (height_m²)`, חסום 15–45 |
+| `hrvRmssd` | `hrv_score` | ישיר (חסום 30–105). אם חסר: `110 − resting_hr × 0.65` |
+| `restingHeartRate` / `heartRateMin` | `resting_hr` | Resting HR ← Min HR ← Avg HR (לפי זמינות) |
+
+### חישוב `workout_intensity_minutes` (נגזר, לא מהשעון)
+
+```
+workout_intensity = daily_distance_km × 5.5 + active_calories / 40
+```
+
+חסום 0–240 דקות. **לא מגיע ישירות מ-Health Connect**.
+
+### חישוב `calorie_balance` (נגזר)
+
+```
+calorie_balance = daily_calories − total_calories_burned
+```
+
+### חישוב `avg_speed` / `max_speed` (fallback)
+
+- אם יש מהשעון → שימוש ישיר
+- אם אין → `avg_speed = daily_distance_km / (workout_intensity / 60)`
+- `max_speed = avg_speed × 1.3`
+
+### חישוב `avg_cadence` (fallback)
+
+- אם יש מהשעון → שימוש ישיר
+- אם אין → `steps / workout_intensity_minutes`
+
+---
+
+## שלב 3 — פיצ'רים נגזרים מהיסטוריה (7 ימים)
+
+אלה הפיצ'רים שמחושבים מ-7 ימי `daily_health` שנמשכים מפיירבייס:
+
+| פיצ'ר | מה מחשב | נתון בסיס | חלון |
+|---|---|---|---|
+| `acute_load_7d` | ממוצע מרחק ב-7 ימים אחרונים | `daily_distance_km` | 7 ימים |
+| `chronic_load_21d` | **קירוב** של בסיס כרוני: `weekly_mean × 0.85 + weekly_std × 0.35 + 0.5` | `daily_distance_km` | 7 ימים (אומדן) |
+| `acwr_ratio` | `acute_load_7d / chronic_load_21d` חסום 0.35–2.8 | מחושב | — |
+| `sleep_debt_3d` | סכום חוב שינה (8 − sleep) ב-3 ימים אחרונים | `sleep_hours` | 3 ימים |
+| `hrv_drop` | HRV היום − ממוצע HRV של 7 ימים, חסום ±15 | `hrv_score` | 7 ימים |
+| `acwr_ratio_ma7` | כשיש היסטוריה: ממוצע ACWR על 7 ימים. כשאין: = `acwr_ratio` היום | `acwr_ratio` | 7 ימים |
+| `sleep_hours_ma7` | כשיש היסטוריה: ממוצע שינה 7 ימים. כשאין: = `sleep_hours` היום | `sleep_hours` | 7 ימים |
+
+### מדיניות confidence (כמה ימים צריך?)
+
+| ימי היסטוריה זמינים | רמת ביטחון | מה קורה |
+|---|---|---|
+| 7 ימים | **high** | משתמש בפיצ'רים מחושבים מהיסטוריה |
+| 4–6 ימים | **medium** | משתמש בפיצ'רים מחושבים (מבוססי rolling עם `min_periods=1`) |
+| 0–3 ימים | **low** | ערכי ברירת מחדל קבועים (defaults) לכל פיצ'רי ההיסטוריה |
+
+---
+
+## שלב 4 — הפיצ'רים הסופיים שנכנסים למודל (36)
+
+### לפי סדר חשיבות (Gain)
+
+| # | פיצ'ר | חשיבות | מקור הנתון | חישוב |
+|---|---|---|---|---|
+| 1 | `stress_level` | **25.4%** | `daily_checkins.stressLevel` | המרת סקאלה |
+| 2 | `injured_yesterday` | **22.9%** | `daily_health.injuredYesterday` | bool → 0/1 |
+| 3 | `hrv_drop` | **5.8%** | היסטוריה 7 ימים של `hrvRmssd` | HRV_today − mean(HRV_7d) |
+| 4 | `acwr_ratio` | **3.7%** | היסטוריה 7 ימים של `distanceMeters` | acute_7d / chronic_estimate |
+| 5 | `sleep_debt_3d` | **3.7%** | היסטוריה 3 ימים של `sleepMinutes` | sum(max(0, 8 − sleep)) |
+| 6 | `muscle_soreness` | **3.5%** | `daily_checkins.muscleSoreness` | המרת סקאלה (1–5 → 1–10) |
+| 7 | `daily_distance_km` | **3.2%** | `daily_health.distanceMeters` | מטרים / 1000 |
+| 8 | `sleep_hours` | **2.7%** | `daily_health.sleepMinutes` | דקות / 60 |
+| 9 | `history_injury_count` | **2.5%** | `users/{uid}.historyInjuryCount` | ישיר |
+| 10 | `workout_intensity_minutes` | **2.1%** | חישוב | distance × 5.5 + calories / 40 |
+| 11 | `active_calories_burned` | **1.8%** | `daily_health.activeCalories` | ישיר |
+| 12 | `chronic_load_21d` | **1.3%** | היסטוריה 7 ימים | אומדן כרוני מ-7 ימים |
+| 13 | `acute_load_7d` | **1.2%** | היסטוריה 7 ימים של `distanceMeters` | mean(distance_7d) |
+| 14 | `floors_climbed` | **1.2%** | `daily_health.floorsClimbed` | ישיר |
+| 15 | `elevation_gained_m` | **1.0%** | `daily_health.elevationGainedMeters` | ישיר |
+| 16 | `sleep_hours_ma7` | **0.9%** | היסטוריה 7 ימים | mean(sleep_7d) |
+| 17 | `spo2` | **0.9%** | `daily_health.oxygenSaturation` | ישיר |
+| 18 | `energy_level` | **0.9%** | `daily_checkins.energyLevel` | המרת סקאלה |
+| 19 | `total_calories_burned` | **0.9%** | `daily_health.totalCalories` | ישיר (או BMR + active) |
+| 20 | `respiratory_rate` | **0.9%** | `daily_health.respiratoryRate` | ישיר |
+| 21 | `vo2_max` | **0.9%** | `daily_health.vo2Max` | ישיר |
+| 22 | `acwr_ratio_ma7` | **0.9%** | היסטוריה / proxy | ממוצע ACWR 7 ימים או = acwr היום |
+| 23 | `nutrition_intake_calories` | **0.9%** | `daily_nutrition.totalCalories` | ישיר (או חישוב ממאקרו) |
+| 24 | `daily_calories` | **0.9%** | `daily_nutrition` | ישיר או חישוב |
+| 25 | `avg_power` | **0.9%** | `daily_health.avgPower` | ישיר (0 אם אין מד כוח) |
+| 26 | `bmi` | **0.9%** | `daily_health.weightKg` + `heightCm` | weight / height² |
+| 27 | `hrv_score` | **0.9%** | `daily_health.hrvRmssd` | ישיר (חסום 30–105) |
+| 28 | `calorie_balance` | **0.8%** | חישוב | daily_calories − total_burned |
+| 29 | `avg_speed` | **0.8%** | `daily_health.avgSpeed` | ישיר / fallback |
+| 30 | `age` | **0.8%** | `users/{uid}.age` | ישיר |
+| 31 | `max_speed` | **0.8%** | `daily_health.maxSpeed` | ישיר / fallback |
+| 32 | `body_fat_pct` | **0.8%** | `daily_health.bodyFatPct` | ישיר |
+| 33 | `resting_hr` | **0.8%** | `daily_health.restingHeartRate` | ישיר (fallback מ-min/avg) |
+| 34 | `avg_cadence` | **0.8%** | `daily_health.avgCadence` | ישיר / fallback |
+
+---
+
+## תרשים זרימה מסכם
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FIREBASE                                  │
+├──────────────┬──────────────┬───────────────┬──────────────────-─┤
+│ users/{uid}  │ daily_health │ daily_checkins│ daily_nutrition    │
+│              │ (7 ימים)     │ (היום)        │ (היום + fallback)  │
+│ • age        │ • sleep      │ • stress      │ • calories         │
+│ • injuries   │ • distance   │ • soreness    │ • protein          │
+│              │ • HR/HRV     │ • energy      │ • carbs            │
+│              │ • calories   │               │                    │
+│              │ • speed/power│               │                    │
+│              │ • SpO2/resp  │               │                    │
+│              │ • elevation  │               │                    │
+└──────┬───────┴──────┬───────┴───────┬───────┴────────┬───────────┘
+       │              │               │                │
+       ▼              ▼               ▼                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    PREPROCESSING                                  │
+│                                                                   │
+│  • המרות יחידות (דקות→שעות, מטרים→קמ)                           │
+│  • המרות סקאלה (0-100→1-10)                                      │
+│  • Fallbacks (אם חסר → שימוש באתמול / ברירת מחדל)               │
+│  • חישוב BMI מגובה+משקל                                          │
+│  • הערכת workout_intensity                                        │
+└─────────────────────────────────┬───────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              FEATURE ENGINEERING (היסטוריה)                       │
+│                                                                   │
+│  חלון 7 ימים:                                                    │
+│  • acute_load_7d = mean(distance, 7 days)                        │
+│  • chronic_load_21d = אומדן מ-7 ימים                             │
+│  • acwr_ratio = acute / chronic                                   │
+│  • acwr_ratio_ma7 = mean(acwr, 7 days)                           │
+│  • sleep_hours_ma7 = mean(sleep, 7 days)                         │
+│                                                                   │
+│  חלון 3 ימים:                                                    │
+│  • sleep_debt_3d = sum(max(0, 8−sleep), 3 days)                  │
+│                                                                   │
+│  חלון 7 ימים + היום:                                             │
+│  • hrv_drop = hrv_today − mean(hrv, 7 days)                     │
+│                                                                   │
+│  (הוסרו: acwr_ratio_std21, sleep_hours_std21 — לא נדרשים)        │
+└─────────────────────────────────┬───────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    XGBoost MODEL                                  │
+│                                                                   │
+│          34 פיצ'רים → predict_proba → סיכון 0.0–1.0             │
+│                                                                   │
+│          סף: 0.30 → High Risk                                    │
+│          סף: 0.18 → Medium Risk                                  │
+│          מתחת    → Low Risk                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## חשיבות פיצ'רים — איך נקבעה?
+
+### שיטה: Gain (XGBoost)
+
+XGBoost מחשב את ה-**Gain** — השיפור ב-Loss Function שהושג בכל פיצול (split) בעצים. הפיצ'ר שנותן את הפיצולים הכי "מרוויחים" מקבל חשיבות גבוהה יותר.
+
+- **לא נקבע ידנית** — המודל מגלה לבד מה חשוב
+- סכום כל החשיבויות = 100%
+- 260 עצים, כל אחד עם עומק מקסימלי 5 → אלפי פיצולים שמתמצתים לטבלת חשיבות
+
+### למה stress ו-injured_yesterday כל כך דומיננטיים?
+
+| פיצ'ר | חשיבות | סיבה |
+|---|---|---|
+| `stress_level` | 25.4% | מסכם את המצב הכולל: קורלטיבי ל-HRV, שינה, עייפות. פיצול יחיד מפריד טוב |
+| `injured_yesterday` | 22.9% | סיגנל בינארי חד — אחרי פציעה ההסתברות לפציעה נוספת עולה דרמטית |
+| **יחד** | **48.3%** | כמעט חצי מהמידע שהמודל צריך |
+
+### Top 5 = 61.5% מהחשיבות
+
+`stress_level` + `injured_yesterday` + `hrv_drop` + `acwr_ratio` + `sleep_debt_3d`
+
+---
+
+## ערכי ברירת מחדל (כשנתון חסר)
+
+| פיצ'ר | Default | משמעות |
+|---|---|---|
+| `sleep_hours` | 7.0 | שינה "ממוצעת" |
+| `stress_level` | 5.0 | סטרס ניטרלי |
+| `muscle_soreness` | 5.0 | כאב ניטרלי |
+| `acwr_ratio` | 1.0 | עומס מאוזן |
+| `hrv_drop` | 0.0 | אין שינוי ב-HRV |
+| `sleep_debt_3d` | 1.0 | חוב שינה מינימלי |
+| `injured_yesterday` | 0.0 | לא נפצע |
+
+ערכי ברירת המחדל נבחרו כ-"ניטרליים" — הם לא מושכים את החיזוי לכיוון סיכון גבוה או נמוך.

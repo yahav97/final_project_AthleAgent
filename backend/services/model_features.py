@@ -4,9 +4,7 @@
 # recomputes them from per-athlete history so labels align with the synthetic pipeline.
 TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = (
     "acwr_ratio_ma7",
-    "acwr_ratio_std21",
     "sleep_hours_ma7",
-    "sleep_hours_std21",
 )
 
 MODEL_FEATURE_COLUMNS: list[str] = [
@@ -47,10 +45,8 @@ MODEL_FEATURE_COLUMNS: list[str] = [
     "chronic_load_21d",
     "acwr_ratio",
     "acwr_ratio_ma7",
-    "acwr_ratio_std21",
     "calorie_balance",
     "sleep_hours_ma7",
-    "sleep_hours_std21",
     "sleep_debt_3d",
     "hrv_drop",
     "load_recovery_imbalance",
@@ -95,10 +91,8 @@ DEFAULT_FEATURE_VALUES: dict[str, float] = {
     "chronic_load_21d": 5.1,
     "acwr_ratio": 1.0,
     "acwr_ratio_ma7": 1.0,
-    "acwr_ratio_std21": 0.18,
     "calorie_balance": 0.0,
     "sleep_hours_ma7": 7.0,
-    "sleep_hours_std21": 0.9,
     "sleep_debt_3d": 1.0,
     "hrv_drop": 0.0,
     "load_recovery_imbalance": 1.0,
