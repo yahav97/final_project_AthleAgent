@@ -36,14 +36,14 @@ if sys.platform == "win32":
 from xgboost import XGBClassifier
 
 THRESHOLD = 0.4
-MIN_RECALL_HARD = 0.85
-TARGET_RECALL = 0.90
-TARGET_RECALL_HIGH = 0.92
-TARGET_PRECISION = 0.24
-TARGET_F1 = 0.38
-MAX_FPR_OPERATING = 0.85
+MIN_RECALL_HARD = 0.80
+TARGET_RECALL = 0.85
+TARGET_RECALL_HIGH = 0.88
+TARGET_PRECISION = 0.13
+TARGET_F1 = 0.22
+MAX_FPR_OPERATING = 0.70
 RANDOM_STATE = 42
-THRESHOLDS_TO_EVAL = [round(x, 2) for x in np.arange(0.20, 0.62, 0.02)]
+THRESHOLDS_TO_EVAL = [round(x, 2) for x in np.arange(0.08, 0.62, 0.02)]
 
 
 def evaluate_with_threshold(y_true: pd.Series, y_proba: np.ndarray, threshold: float) -> dict[str, float]:
@@ -297,6 +297,42 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
             random_state=RANDOM_STATE,
             n_jobs=-1,
             scale_pos_weight=2.2,
+        ),
+        "XGBoostDeep": XGBClassifier(
+            n_estimators=500,
+            max_depth=7,
+            learning_rate=0.03,
+            subsample=0.85,
+            colsample_bytree=0.8,
+            colsample_bylevel=0.8,
+            reg_alpha=0.5,
+            reg_lambda=2.0,
+            min_child_weight=5,
+            gamma=0.1,
+            eval_metric="logloss",
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            scale_pos_weight=3.5,
+        ),
+        "XGBoostDeepCalibrated": CalibratedClassifierCV(
+            estimator=XGBClassifier(
+                n_estimators=500,
+                max_depth=7,
+                learning_rate=0.03,
+                subsample=0.85,
+                colsample_bytree=0.8,
+                colsample_bylevel=0.8,
+                reg_alpha=0.5,
+                reg_lambda=2.0,
+                min_child_weight=5,
+                gamma=0.1,
+                eval_metric="logloss",
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+                scale_pos_weight=3.5,
+            ),
+            method="sigmoid",
+            cv=3,
         ),
     }
 

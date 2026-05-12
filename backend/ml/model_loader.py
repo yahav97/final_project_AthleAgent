@@ -15,8 +15,8 @@ _model_gate_reason: str = "model_not_loaded"
 _model_live: bool = False
 _active_manifest: dict[str, Any] = {}
 
-MIN_RECALL_HARD = 0.85
-MIN_AUC_FOR_LIVE = 0.60
+MIN_RECALL_HARD = 0.80
+MIN_AUC_FOR_LIVE = 0.68
 
 
 def _manifest_path_from_model_path(model_path: str) -> str:

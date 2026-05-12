@@ -23,6 +23,17 @@ TOLERANT_FIELDS: tuple[str, ...] = (
     "heartRateMax",
     "heartRateMin",
     "activeCalories",
+    "bodyFatPct",
+    "vo2Max",
+    "elevationGainedMeters",
+    "floorsClimbed",
+    "avgSpeed",
+    "maxSpeed",
+    "avgPower",
+    "avgCadence",
+    "respiratoryRate",
+    "oxygenSaturation",
+    "heightCm",
 )
 
 SENSITIVE_FIELDS: tuple[str, ...] = (
@@ -32,6 +43,8 @@ SENSITIVE_FIELDS: tuple[str, ...] = (
     "heartRateAvg",
     "stressLevel",
     "muscleSoreness",
+    "hrvRmssd",
+    "restingHeartRate",
 )
 
 HARD_FIELDS: tuple[str, ...] = ("userId", "date")
@@ -271,15 +284,22 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     daily_calories = float(min(7000.0, max(800.0, daily_calories)))
 
     workout_intensity = max(0.0, min(240.0, daily_distance_km * 5.5 + active_cal / 40.0))
-    avg_cadence = float(DEFAULT_FEATURE_VALUES["avg_cadence"])
-    if steps > 0 and daily_distance_km > 0.05:
+    sensor_cadence = _safe_float(d.get("avgCadence"), 0.0)
+    if sensor_cadence > 0:
+        avg_cadence = float(max(120.0, min(200.0, sensor_cadence)))
+    elif steps > 0 and daily_distance_km > 0.05:
         est_minutes = max(10.0, workout_intensity)
         avg_cadence = float(max(120.0, min(200.0, steps / est_minutes)))
+    else:
+        avg_cadence = float(DEFAULT_FEATURE_VALUES["avg_cadence"])
 
     weight_kg = d.get("weightKg")
+    height_cm = d.get("heightCm")
+    height_m = 1.75
+    if height_cm is not None and _safe_float(height_cm, 0.0) > 100:
+        height_m = float(height_cm) / 100.0
     bmi = DEFAULT_FEATURE_VALUES["bmi"]
     if weight_kg is not None and _safe_float(weight_kg, 0.0) > 0:
-        height_m = 1.75
         bmi = float(weight_kg) / (height_m**2)
     bmi = float(max(15.0, min(45.0, bmi)))
 
@@ -301,27 +321,76 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         except (TypeError, ValueError):
             history_injury_count = float(DEFAULT_FEATURE_VALUES["history_injury_count"])
 
-    hr_avg = _safe_float(d.get("heartRateAvg"), DEFAULT_FEATURE_VALUES["resting_hr"])
-    hr_min = _safe_float(d.get("heartRateMin"), hr_avg)
-    resting_proxy = hr_min if hr_min > 0 else hr_avg
-    resting_hr = float(resting_proxy if resting_proxy > 0 else DEFAULT_FEATURE_VALUES["resting_hr"])
+    resting_hr_raw = _safe_float(d.get("restingHeartRate"), 0.0)
+    hr_avg = _safe_float(d.get("heartRateAvg"), 0.0)
+    hr_min = _safe_float(d.get("heartRateMin"), 0.0)
+    if resting_hr_raw > 0:
+        resting_hr = resting_hr_raw
+    elif hr_min > 0:
+        resting_hr = hr_min
+    elif hr_avg > 0:
+        resting_hr = hr_avg
+    else:
+        resting_hr = float(DEFAULT_FEATURE_VALUES["resting_hr"])
     resting_hr = float(max(38.0, min(95.0, resting_hr)))
 
-    hrv_score = float(DEFAULT_FEATURE_VALUES["hrv_score"])
-    if hr_avg > 0:
+    hrv_rmssd = _safe_float(d.get("hrvRmssd"), 0.0)
+    if hrv_rmssd > 0:
+        hrv_score = float(max(30.0, min(105.0, hrv_rmssd)))
+    elif hr_avg > 0:
         hrv_score = float(max(30.0, min(100.0, 110.0 - resting_hr * 0.65)))
+    else:
+        hrv_score = float(DEFAULT_FEATURE_VALUES["hrv_score"])
+
+    body_fat_pct = _safe_float(d.get("bodyFatPct"), DEFAULT_FEATURE_VALUES["body_fat_pct"])
+    body_fat_pct = float(max(3.0, min(50.0, body_fat_pct)))
+    vo2_max = _safe_float(d.get("vo2Max"), DEFAULT_FEATURE_VALUES["vo2_max"])
+    vo2_max = float(max(15.0, min(90.0, vo2_max)))
+
+    elevation_gained = _safe_float(d.get("elevationGainedMeters"), DEFAULT_FEATURE_VALUES["elevation_gained_m"])
+    elevation_gained = float(max(0.0, min(5000.0, elevation_gained)))
+    floors_climbed = _safe_float(d.get("floorsClimbed"), DEFAULT_FEATURE_VALUES["floors_climbed"])
+    floors_climbed = float(max(0.0, min(200.0, floors_climbed)))
+
+    sensor_avg_speed = _safe_float(d.get("avgSpeed"), 0.0)
+    sensor_max_speed = _safe_float(d.get("maxSpeed"), 0.0)
+    if sensor_avg_speed > 0:
+        avg_speed = float(max(0.0, min(30.0, sensor_avg_speed)))
+    elif daily_distance_km > 0.05 and workout_intensity > 5:
+        avg_speed = float(max(0.0, min(30.0, daily_distance_km / (workout_intensity / 60.0))))
+    else:
+        avg_speed = float(DEFAULT_FEATURE_VALUES["avg_speed"])
+    max_speed = float(max(0.0, min(40.0, sensor_max_speed))) if sensor_max_speed > 0 else avg_speed * 1.3
+
+    avg_power = _safe_float(d.get("avgPower"), DEFAULT_FEATURE_VALUES["avg_power"])
+    avg_power = float(max(0.0, min(800.0, avg_power)))
+
+    respiratory_rate = _safe_float(d.get("respiratoryRate"), DEFAULT_FEATURE_VALUES["respiratory_rate"])
+    respiratory_rate = float(max(6.0, min(40.0, respiratory_rate)))
+    spo2 = _safe_float(d.get("oxygenSaturation"), DEFAULT_FEATURE_VALUES["spo2"])
+    spo2 = float(max(80.0, min(100.0, spo2)))
 
     partial: dict = {
         "bmi": float(bmi),
         "age": age_val,
+        "body_fat_pct": body_fat_pct,
+        "vo2_max": vo2_max,
         "history_injury_count": history_injury_count,
         "injured_yesterday": injured_yesterday,
         "daily_distance_km": float(daily_distance_km),
         "workout_intensity_minutes": float(workout_intensity),
         "avg_cadence": float(avg_cadence),
+        "elevation_gained_m": elevation_gained,
+        "floors_climbed": floors_climbed,
+        "avg_speed": avg_speed,
+        "max_speed": max_speed,
+        "avg_power": avg_power,
+        "active_calories_burned": active_cal,
         "sleep_hours": float(sleep_hours),
         "hrv_score": float(hrv_score),
         "resting_hr": float(resting_hr),
+        "respiratory_rate": respiratory_rate,
+        "spo2": spo2,
         "nutrition_intake_calories": float(nutrition_intake_calories),
         "daily_calories": float(daily_calories),
         "total_calories_burned": float(total_burned),
@@ -329,11 +398,13 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         "muscle_soreness": _soreness_to_model_scale(d.get("muscleSoreness")),
         "energy_level": _energy_to_model_scale(d.get("energyLevel")),
         "_active_calories": active_cal,
+        "_bmr_calories": bmr,
     }
 
     derived = compute_derived_features(partial)
     partial.update(derived)
     partial.pop("_active_calories", None)
+    partial.pop("_bmr_calories", None)
 
     partial["calorie_balance"] = float(partial["daily_calories"] - partial["total_calories_burned"])
     # Proxy sequential features for serving when only snapshot data is available.
@@ -349,6 +420,11 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     )
     partial["sleep_hours_ma7"] = float(partial["sleep_hours"])
     partial["sleep_hours_std21"] = float(max(0.05, min(2.0, abs(8.0 - partial["sleep_hours"]) * 0.45)))
+
+    partial["load_recovery_imbalance"] = float(partial["acwr_ratio"] * partial["sleep_debt_3d"])
+    partial["speed_intensity_ratio"] = float(
+        min(5.0, partial["max_speed"] / (partial["avg_speed"] + 0.1))
+    )
 
     out: dict[str, float] = {}
     for col in MODEL_FEATURE_COLUMNS:

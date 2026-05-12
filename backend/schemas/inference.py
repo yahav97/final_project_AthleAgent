@@ -75,7 +75,63 @@ class InjuryPredictionRequest(BaseModel):
     heartRateMax: int | None = None
     heartRateMin: int | None = None
     weightKg: float | None = None
+    heightCm: float | None = None
     bmrCalories: int | None = None
+
+    # New Health Connect fields
+    hrvRmssd: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("hrvRmssd", "hrv_rmssd"),
+        description="HRV RMSSD in ms from HeartRateVariabilityRmssd",
+    )
+    restingHeartRate: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("restingHeartRate", "resting_heart_rate"),
+        description="Resting HR bpm from RestingHeartRate record",
+    )
+    bodyFatPct: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("bodyFatPct", "body_fat_pct"),
+    )
+    vo2Max: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("vo2Max", "vo2_max"),
+        description="VO2max ml/kg/min from Vo2Max record",
+    )
+    elevationGainedMeters: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("elevationGainedMeters", "elevation_gained_meters"),
+    )
+    floorsClimbed: int | None = None
+    avgSpeed: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("avgSpeed", "avg_speed"),
+        description="Average speed km/h from SpeedSeries",
+    )
+    maxSpeed: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("maxSpeed", "max_speed"),
+    )
+    avgPower: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("avgPower", "avg_power"),
+        description="Average power watts from PowerSeries (0 if no power meter)",
+    )
+    avgCadence: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("avgCadence", "avg_cadence"),
+        description="Average step cadence spm from StepsCadenceSeries",
+    )
+    respiratoryRate: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("respiratoryRate", "respiratory_rate"),
+        description="Breaths per minute from RespiratoryRate",
+    )
+    oxygenSaturation: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("oxygenSaturation", "oxygen_saturation"),
+        description="SpO2 % from OxygenSaturation",
+    )
 
     # users/{uid}/daily_checkins
     energyLevel: int | None = None
