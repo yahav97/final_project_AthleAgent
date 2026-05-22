@@ -60,12 +60,7 @@ class InjuryPredictionRequest(BaseModel):
         description="Lifetime injury count from profile when available",
     )
 
-    # users/{uid}/daily_health (Health Connect sync + survey flags on same doc)
-    injuredYesterday: int | None = Field(
-        default=None,
-        validation_alias=AliasChoices("injuredYesterday", "injured_yesterday"),
-        description="0/1 — injury on previous calendar day (stored on today's daily_health doc)",
-    )
+    # users/{uid}/daily_health (Health Connect sync)
     sleepMinutes: int | None = None
     steps: int | None = None
     distanceMeters: int | None = None
@@ -133,7 +128,12 @@ class InjuryPredictionRequest(BaseModel):
         description="SpO2 % from OxygenSaturation",
     )
 
-    # users/{uid}/daily_checkins
+    # users/{uid}/daily_checkins (daily survey)
+    injuredYesterday: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("injuredYesterday", "injured_yesterday"),
+        description="0/1 — injured on previous calendar day (daily_checkins/{date})",
+    )
     energyLevel: int | None = None
     muscleSoreness: int | None = None
     stressLevel: int | None = None
@@ -157,13 +157,26 @@ class DailyPredictionTriggerRequest(BaseModel):
 
 
 class InjuryPredictionResponse(BaseModel):
-    """Production JSON response for POST /predict/daily."""
+    """
+    Production JSON response for POST /predict/daily — these three fields only.
 
-    risk_level: str
-    risk_score: float = Field(..., description="Injury positive-class probability, 0.0–1.0")
+    Also merged onto ``users/{uid}/daily_health/{date}`` (see ``save_daily_prediction_result``):
+    - ``risk_level`` → ``riskLevel``
+    - ``risk_score`` (0–1) → ``finalRiskScore`` = round(score × 100, 2)
+    - ``prediction_confidence`` → ``predictionConfidence``
+    - ``predictionUpdatedAt`` (ISO UTC) is written to Firestore only, not returned here.
+    """
+
+    risk_level: str = Field(..., description="Low | Medium | High — persisted as riskLevel")
+    risk_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Injury probability 0–1; persisted as finalRiskScore (0–100)",
+    )
     prediction_confidence: float = Field(
         ...,
         ge=0.0,
         le=100.0,
-        description="Confidence score 0–100 (history coverage + input completeness)",
+        description="0–100; persisted as predictionConfidence on daily_health",
     )

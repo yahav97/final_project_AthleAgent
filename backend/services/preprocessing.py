@@ -81,7 +81,7 @@ def _energy_to_model_scale(value: int | None) -> float:
 
 
 def _injured_yesterday_float(raw: object) -> float:
-    """Firestore ``injuredYesterday`` on today's doc → 0/1 feature."""
+    """Firestore ``injuredYesterday`` from daily_checkins (legacy: daily_health) → 0/1 feature."""
     if raw is None:
         return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
     if raw is True:

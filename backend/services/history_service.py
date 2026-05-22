@@ -33,13 +33,24 @@ def _sleep_hours(doc: dict[str, Any]) -> float:
 
 
 def _resting_hr(doc: dict[str, Any]) -> float:
+    """Same priority as preprocessing: RestingHeartRate → Min → Avg from HeartRateSeries."""
+    resting = float(doc.get("restingHeartRate") or 0.0)
     hr_min = float(doc.get("heartRateMin") or 0.0)
     hr_avg = float(doc.get("heartRateAvg") or 0.0)
+    if resting > 0:
+        return max(38.0, min(95.0, resting))
     if hr_min > 0:
         return max(38.0, min(95.0, hr_min))
     if hr_avg > 0:
         return max(38.0, min(95.0, hr_avg))
     return 54.0
+
+
+def _hrv_score(doc: dict[str, Any], resting_hr: float) -> float:
+    hrv_rmssd = float(doc.get("hrvRmssd") or 0.0)
+    if hrv_rmssd > 0:
+        return float(max(30.0, min(105.0, hrv_rmssd)))
+    return _hrv_proxy_from_resting_hr(resting_hr)
 
 
 def _hrv_proxy_from_resting_hr(resting_hr: float) -> float:
@@ -57,7 +68,7 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
         if not date_key:
             continue
         rest_hr = _resting_hr(row)
-        hrv_score = _hrv_proxy_from_resting_hr(rest_hr)
+        hrv_score = _hrv_score(row, rest_hr)
         rows.append(
             {
                 "date_key": date_key,
@@ -126,40 +137,13 @@ def stable_athlete_numeric_id(user_id: str) -> int:
     return n if n > 0 else 1
 
 
-def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
-    """
-    Label for training row ``(user_id, date_key)``:
-
-    On ``users/{uid}/daily_health/{D+1}``, the field ``injuredYesterday`` / ``injured_yesterday``
-    indicates whether an injury was reported for calendar day ``D``.
-
-    Returns:
-        ``0`` or ``1`` when the next-day document exists (missing injury field → ``0``).
-        ``None`` when the next-day ``daily_health`` document is absent (caller should skip).
-    """
-    db = _get_firestore_client()
-    if db is None:
-        return None
-    try:
-        next_key = (_to_date_key(date_key) + timedelta(days=1)).strftime("%Y-%m-%d")
-        doc = (
-            db.collection("users")
-            .document(user_id)
-            .collection("daily_health")
-            .document(next_key)
-            .get()
-        )
-    except Exception:
-        logger.exception("fetch_injury_tomorrow_label failed user_id=%s date=%s", user_id, date_key)
-        return None
-    if not doc.exists:
-        return None
-    data = doc.to_dict() or {}
+def _injured_yesterday_from_doc(data: dict[str, Any]) -> int | None:
+    """Parse injuredYesterday / injured_yesterday from a Firestore doc dict."""
     raw = data.get("injuredYesterday")
     if raw is None:
         raw = data.get("injured_yesterday")
     if raw is None:
-        return 0
+        return None
     if raw is True:
         return 1
     if raw is False:
@@ -168,6 +152,39 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
         return 1 if int(raw) else 0
     except (TypeError, ValueError):
         return 0
+
+
+def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
+    """
+    Label for training row ``(user_id, date_key)``:
+
+    On ``users/{uid}/daily_checkins/{D+1}``, ``injuredYesterday`` indicates injury on calendar day ``D``.
+    Falls back to the same field on ``daily_health/{D+1}`` for legacy data.
+
+    Returns:
+        ``0`` or ``1`` when the next-day check-in (or legacy health doc) exists.
+        ``None`` when neither next-day document exists (caller should skip).
+    """
+    db = _get_firestore_client()
+    if db is None:
+        return None
+    try:
+        next_key = (_to_date_key(date_key) + timedelta(days=1)).strftime("%Y-%m-%d")
+        user_ref = db.collection("users").document(user_id)
+        checkin_doc = user_ref.collection("daily_checkins").document(next_key).get()
+        if checkin_doc.exists:
+            parsed = _injured_yesterday_from_doc(checkin_doc.to_dict() or {})
+            return 0 if parsed is None else parsed
+        health_doc = user_ref.collection("daily_health").document(next_key).get()
+    except Exception:
+        logger.exception("fetch_injury_tomorrow_label failed user_id=%s date=%s", user_id, date_key)
+        return None
+    if not health_doc.exists:
+        return None
+    parsed = _injured_yesterday_from_doc(health_doc.to_dict() or {})
+    if parsed is not None:
+        return parsed
+    return 0
 
 
 def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any]:

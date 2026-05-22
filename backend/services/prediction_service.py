@@ -177,7 +177,11 @@ def injury_prediction_request_from_firestore_snapshot(
     if hist_profile is None:
         hist_profile = profile.get("history_injury_count")
 
-    ij_raw = health_today.get("injuredYesterday")
+    ij_raw = checkins.get("injuredYesterday")
+    if ij_raw is None:
+        ij_raw = checkins.get("injured_yesterday")
+    if ij_raw is None:
+        ij_raw = health_today.get("injuredYesterday")
     if ij_raw is None:
         ij_raw = health_today.get("injured_yesterday")
 

@@ -78,7 +78,6 @@ def main() -> int:
 
     health_today: dict[str, Any] = {
         "sleepMinutes": 450,
-        "injuredYesterday": 0,
         "lastSync": datetime.now(ZoneInfo("Asia/Jerusalem")).isoformat(),
     }
     if not args.no_fake_prediction:
@@ -105,6 +104,7 @@ def main() -> int:
     }
 
     checkins: dict[str, Any] = {
+        "injuredYesterday": 0,
         "energyLevel": 7,
         "muscleSoreness": 3,
         "stressLevel": 4,

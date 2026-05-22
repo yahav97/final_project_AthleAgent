@@ -4,9 +4,9 @@ Export a training CSV from Firestore with **serve parity**:
 Same merge policy as ``predict_injury_risk_from_firestore`` (sleep/injury today;
 load from yesterday; check-in today; nutrition today + server-side backfill).
 
-Labels ``injury_tomorrow`` come from ``injuredYesterday`` / ``injured_yesterday`` on
-``daily_health/{date+1}`` (injury on calendar ``date``). Rows without a next-day
-``daily_health`` document are skipped.
+Labels ``injury_tomorrow`` come from ``injuredYesterday`` on ``daily_checkins/{date+1}``
+(legacy fallback: ``daily_health/{date+1}``). Rows without a next-day check-in or
+legacy health doc are skipped.
 
 Output columns match ``ML_model/train_model`` expectations: base feature columns
 (see ``TRAINING_BASE_FEATURE_COLUMNS``) plus ``athlete_id``, ``date``, ``injury_tomorrow``.

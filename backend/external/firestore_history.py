@@ -28,13 +28,23 @@ def _sleep_hours(doc: dict[str, Any]) -> float:
 
 
 def _resting_hr(doc: dict[str, Any]) -> float:
+    resting = float(doc.get("restingHeartRate") or 0.0)
     hr_min = float(doc.get("heartRateMin") or 0.0)
     hr_avg = float(doc.get("heartRateAvg") or 0.0)
+    if resting > 0:
+        return max(38.0, min(95.0, resting))
     if hr_min > 0:
         return max(38.0, min(95.0, hr_min))
     if hr_avg > 0:
         return max(38.0, min(95.0, hr_avg))
     return 54.0
+
+
+def _hrv_score(doc: dict[str, Any], resting_hr: float) -> float:
+    hrv_rmssd = float(doc.get("hrvRmssd") or 0.0)
+    if hrv_rmssd > 0:
+        return float(max(30.0, min(105.0, hrv_rmssd)))
+    return _hrv_proxy_from_resting_hr(resting_hr)
 
 
 def _hrv_proxy_from_resting_hr(resting_hr: float) -> float:
@@ -49,7 +59,8 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
     - date_key (yyyy-MM-dd)
     - distanceMeters / steps
     - sleepMinutes
-    - heartRateMin / heartRateAvg
+    - restingHeartRate / heartRateMin / heartRateAvg (from HeartRateSeries aggregates)
+    - hrvRmssd (HeartRateVariabilityRmssd) when present
     """
     if not history_rows:
         return None
@@ -60,7 +71,7 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
         if not date_key:
             continue
         rest_hr = _resting_hr(row)
-        hrv_score = _hrv_proxy_from_resting_hr(rest_hr)
+        hrv_score = _hrv_score(row, rest_hr)
         rows.append(
             {
                 "date_key": date_key,

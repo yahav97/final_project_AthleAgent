@@ -15,67 +15,149 @@
 
 ## 1. מקורות הנתונים (Firestore)
 
-| Collection | Document | מה נמשך | טווח זמן |
+| Collection | Document | תפקיד | טווח זמן |
 |---|---|---|---|
-| `users/{uid}` | פרופיל | age, historyInjuryCount | קבוע (פעם אחת) |
-| `users/{uid}/daily_health/{date}` | בריאות היום | שינה, צעדים, מרחק, דופק, HRV, קלוריות, משקל, גובה, SpO2, נשימה, מהירות, הספק וכו' | **יום נוכחי** |
-| `users/{uid}/daily_health/{date-1}` | בריאות אתמול | אותם שדות — fallback אם היום חסר | **אתמול** |
-| `users/{uid}/daily_health/{date-6}...{date-1}` | היסטוריה | מרחק, שינה, דופק | **7 ימים אחורה** |
-| `users/{uid}/daily_checkins/{date}` | דיווח עצמי | stressLevel, muscleSoreness, energyLevel | **יום נוכחי** |
-| `users/{uid}/daily_nutrition/{date}` | תזונה | totalProtein, totalCarbs, mealsLoggedCount, totalCalories | **יום נוכחי** (fallback עד 14 ימים) |
+| `users/{uid}` | פרופיל | רישום: `age`, `historyInjuryCount` | קבוע |
+| `users/{uid}/daily_health/{date}` | בריאות + פלט חיזוי | שעון; אחרי `/predict/daily`: `finalRiskScore`… | **יום נוכחי** (+ אתמול fallback) |
+| `users/{uid}/daily_health/{date-6}…{date}` | היסטוריה | rolling features (מרחק, שינה, HRV) | **7 ימים** |
+| `users/{uid}/daily_checkins/{date}` | דיווח עצמי | stress, soreness, energy | **יום נוכחי** |
+| `users/{uid}/daily_nutrition/{date}` | תזונה | protein, carbs, meals, calories | **יום נוכחי** (fallback 14 ימים) |
 
-### שדות מ-`daily_health` (Health Connect / שעון חכם)
+### חוזה שדות — לפי מקור
 
-| שדה בפיירבייס | סוג נתון | מקור |
+כל הקלטים למודל מגיעים מ-**ארבעה מקורות** (בנוסף לפלט החיזוי):
+
+| # | מקור | Collection | שדות עיקריים | פיצ'רי מודל (דוגמה) |
+|---|---|---|---|---|
+| 1 | **שעון** | `daily_health` | שינה, צעדים, דופק, HRV… | `sleep_hours`, `hrv_score`, `daily_distance_km` |
+| 2 | **רישום** | `users/{uid}` | `age`, `historyInjuryCount` | `age`, `history_injury_count` |
+| 3 | **סקר יומי** | `daily_checkins/{date}` | `stressLevel`, `muscleSoreness`, `energyLevel`, **`injuredYesterday`** | `stress_level`, `muscle_soreness`, `energy_level`, `injured_yesterday` |
+| 4 | **תזונה** | `daily_nutrition/{date}` | `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `totalCalories` | `nutrition_intake_calories`, `daily_calories`, `calorie_balance` |
+| — | **פלט חיזוי** | `daily_health` (אחרי API) | `finalRiskScore`, `riskLevel`, … | לא קלט — תוצאה |
+
+#### 1. מהשעון (Health Connect → `daily_health`)
+
+21 רשומות זמינות בשעון; האפליקציה ממפה לשדות Firestore (טבלה מפורטת למטה).
+
+#### 2. מרישום (`users/{uid}`)
+
+| שדה | מקור |
+|---|---|
+| `age` | טופס הרשמה / פרופיל |
+| `historyInjuryCount` | טופס הרשמה / פרופיל |
+
+#### 3. סקר יומי (`users/{uid}/daily_checkins/{date}`)
+
+| שדה | סוג | פיצ'ר במודל |
 |---|---|---|
-| `sleepMinutes` | דקות שינה | Health Connect → Sleep |
-| `steps` | צעדים | Health Connect → Steps |
-| `distanceMeters` | מרחק במטרים | Health Connect → Distance |
-| `activeCalories` | קלוריות פעילות | Health Connect → ActiveCalories |
-| `totalCalories` | סה"כ שריפה | Health Connect → TotalCalories |
-| `heartRateAvg` | דופק ממוצע | Health Connect → HeartRate |
-| `heartRateMax` | דופק מקסימלי | Health Connect → HeartRate |
-| `heartRateMin` | דופק מינימלי | Health Connect → HeartRate |
-| `hrvRmssd` | HRV (ms) | Health Connect → HeartRateVariabilityRmssd |
-| `restingHeartRate` | דופק מנוחה | Health Connect → RestingHeartRate |
-| `weightKg` | משקל | Health Connect → Weight |
-| `heightCm` | גובה | Health Connect → Height |
-| `bmrCalories` | BMR | Health Connect → BasalMetabolicRate |
-| `bodyFatPct` | אחוז שומן | Health Connect → BodyFat |
-| `vo2Max` | VO₂max | Health Connect → Vo2Max |
-| `elevationGainedMeters` | עלייה במטרים | Health Connect → ElevationGained |
-| `floorsClimbed` | קומות | Health Connect → FloorsClimbed |
-| `avgSpeed` | מהירות ממוצעת | Health Connect → Speed |
-| `maxSpeed` | מהירות מקסימלית | Health Connect → Speed |
-| `avgPower` | הספק ממוצע (וואט) | Health Connect → Power |
-| `avgCadence` | קצב צעדים | Health Connect → StepsCadence |
-| `respiratoryRate` | קצב נשימה | Health Connect → RespiratoryRate |
-| `oxygenSaturation` | SpO₂ % | Health Connect → OxygenSaturation |
-| `injuredYesterday` | פציעה אתמול (0/1) | דיווח עצמי שנשמר ב-daily_health |
+| `stressLevel` | סטרס (1–10 או 0–100 באפליקציה) | `stress_level` |
+| `muscleSoreness` | כאב שרירים (1–5) | `muscle_soreness` |
+| `energyLevel` | אנרגיה (1–10 או 0–100) | `energy_level` |
+| `injuredYesterday` | פציעה אתמול (0/1) | `injured_yesterday` |
 
-### שדות מ-`daily_checkins` (דיווח עצמי)
+נמשך ביום החיזוי בלבד (אין fallback לאתמול ב-backend).
 
-| שדה בפיירבייס | סוג נתון |
+**תיוג לאימון:** `injury_tomorrow` ליום `D` נלקח מ-`injuredYesterday` ב-`daily_checkins/{D+1}` (fallback: `daily_health/{D+1}` לנתונים ישנים).
+
+#### 4. תזונה (`users/{uid}/daily_nutrition/{date}`)
+
+| שדה | סוג | פיצ'ר במודל |
+|---|---|---|
+| `totalProtein` | גרם חלבון | `daily_calories` (derive), `nutrition_intake_calories` |
+| `totalCarbs` | גרם פחמימות | כמו למעלה |
+| `mealsLoggedCount` | מספר ארוחות | fallback לאומדן קלוריות |
+| `totalCalories` | קלוריות **צריכה** (לא שריפה!) | `nutrition_intake_calories` |
+
+**Fallback:** אם היום חסר — חיפוש עד **14 ימים** אחורה באותה collection (`merge_nutrition_with_history`).
+
+**הבחנה:** `daily_health.totalCalories` = **שריפה** (מקלוריות שעון). `daily_nutrition.totalCalories` = **צריכה** (ממזון).
+
+#### 5. ב-`daily_health` — אחרי חיזוי (`POST /predict/daily`)
+
+| שדה Firestore | תוכן | ב-`InjuryPredictionResponse`? |
+|---|---|---|
+| `finalRiskScore` | הסתברות × 100 (0–100) | כן — כ-`risk_score` (0–1) בתגובת API |
+| `riskLevel` | `Low` / `Medium` / `High` | כן — כ-`risk_level` |
+| `predictionConfidence` | 0–100 | כן — כ-`prediction_confidence` |
+| `predictionUpdatedAt` | ISO UTC | **לא** — רק ב-Firestore |
+
+מיפוי API ↔ Firestore:
+
+| `InjuryPredictionResponse` (JSON) | Firestore `daily_health` |
 |---|---|
-| `stressLevel` | רמת סטרס (1–10 או 0–100) |
-| `muscleSoreness` | כאב שרירים (1–5) |
-| `energyLevel` | רמת אנרגיה (1–10 או 0–100) |
+| `risk_level` | `riskLevel` |
+| `risk_score` (0.0–1.0) | `finalRiskScore` = `round(risk_score × 100, 2)` |
+| `prediction_confidence` | `predictionConfidence` |
 
-### שדות מ-`daily_nutrition` (תזונה)
+### רשומות Health Connect מהשעון (21)
 
-| שדה בפיירבייס | סוג נתון |
+| רשומת HC | שדה ב-`daily_health` | סינכרון Android (`WearableSyncActivity`) | מודל |
+|---|---|---|---|
+| **SleepSession** | `sleepMinutes` | כן | כן |
+| **ActiveCaloriesBurned** | `activeCalories` | כן | כן |
+| **BasalMetabolicRate** | `bmrCalories` | כן | כן |
+| **Steps** | `steps` | כן | כן |
+| **Distance** | `distanceMeters` | כן | כן |
+| **HeartRateSeries** | `heartRateAvg` / `Max` / `Min` | כן (אגרגציה יומית) | כן |
+| **Weight** | `weightKg` | כן | כן |
+| **Height** | `heightCm` | לא | כן |
+| **HeartRateVariabilityRmssd** | `hrvRmssd` | לא | כן |
+| **RestingHeartRate** | `restingHeartRate` | לא | כן |
+| **BodyFat** | `bodyFatPct` | לא | כן |
+| **Vo2Max** | `vo2Max` | לא | כן |
+| **ElevationGained** | `elevationGainedMeters` | לא | כן |
+| **FloorsClimbed** | `floorsClimbed` | לא | כן |
+| **SpeedSeries** | `avgSpeed` / `maxSpeed` | לא | כן |
+| **PowerSeries** | `avgPower` | לא | כן |
+| **StepsCadenceSeries** | `avgCadence` | לא | כן |
+| **RespiratoryRate** | `respiratoryRate` | לא | כן |
+| **OxygenSaturation** | `oxygenSaturation` | לא | כן |
+| **ExerciseSession** | — (מומלץ: משך/סוג אימון) | הרשאה בלבד, לא נשמר | מוערך (`workout_intensity`) |
+| **LeanBodyMass** | — | לא | לא |
+
+**שדה נגזר (אין רשומת HC נפרדת בשעון):**
+
+| שדה ב-`daily_health` | חישוב |
 |---|---|
-| `totalProtein` | גרם חלבון |
-| `totalCarbs` | גרם פחמימות |
-| `mealsLoggedCount` | מספר ארוחות שנרשמו |
-| `totalCalories` | סה"כ קלוריות שנצרכו |
+| `totalCalories` | `activeCalories + bmrCalories` (או אגרגט HC אם האפליקציה קוראת `TotalCaloriesBurned`) |
 
-### שדות מ-`users/{uid}` (פרופיל)
+**הערות:**
+- אין בשעון: TotalCaloriesBurned, BloodGlucose, BloodPressure, טמפרטורה, מסה מים/עצם, CyclingPedalingCadence, WheelchairPushes.
+- דופק: אגרגציה מ-**HeartRateSeries** (בקוד Android: `HeartRateRecord`).
+- `injuredYesterday` — בסקר יומי (`daily_checkins`), לא מ-HC.
 
-| שדה בפיירבייס | סוג נתון |
+### שדות ב-`daily_health` (מיפוי לפי שם Firestore)
+
+| שדה בפיירבייס | מקור Health Connect |
 |---|---|
-| `age` | גיל |
-| `historyInjuryCount` | מספר פציעות קודמות |
+| `sleepMinutes` | SleepSession |
+| `steps` | Steps |
+| `distanceMeters` | Distance |
+| `activeCalories` | ActiveCaloriesBurned |
+| `totalCalories` | נגזר: ActiveCaloriesBurned + BasalMetabolicRate |
+| `heartRateAvg` / `heartRateMax` / `heartRateMin` | HeartRateSeries (אגרגציה) |
+| `hrvRmssd` | HeartRateVariabilityRmssd |
+| `restingHeartRate` | RestingHeartRate |
+| `weightKg` | Weight |
+| `heightCm` | Height |
+| `bmrCalories` | BasalMetabolicRate |
+| `bodyFatPct` | BodyFat |
+| `vo2Max` | Vo2Max |
+| `elevationGainedMeters` | ElevationGained |
+| `floorsClimbed` | FloorsClimbed |
+| `avgSpeed` / `maxSpeed` | SpeedSeries |
+| `avgPower` | PowerSeries |
+| `avgCadence` | StepsCadenceSeries |
+| `respiratoryRate` | RespiratoryRate |
+| `oxygenSaturation` | OxygenSaturation |
+| `finalRiskScore` | פלט מודל (לא קלט) |
+| `riskLevel` | פלט מודל |
+| `predictionConfidence` | פלט מודל |
+| `predictionUpdatedAt` | פלט מודל (לא ב-API response) |
+
+---
+
+> פירוט מלא לשדות שעון, סקר ותזונה — בטבלאות למעלה (סעיפים 1–5).
 
 ---
 
@@ -188,7 +270,7 @@
 | 1 | `hrv_drop` | **14.9%** | היסטוריה 7 ימים של `hrvRmssd` | HRV_today − mean(HRV_7d) |
 | 2 | `stress_level` | **8.1%** | `daily_checkins.stressLevel` | המרת סקאלה |
 | 3 | `load_recovery_imbalance` | **8.0%** | חישוב | acwr_ratio × sleep_debt_3d |
-| 4 | `injured_yesterday` | **7.1%** | `daily_health.injuredYesterday` | bool → 0/1 |
+| 4 | `injured_yesterday` | **7.1%** | `daily_checkins.injuredYesterday` | bool → 0/1 |
 | 5 | `acwr_ratio` | **7.0%** | היסטוריה 7 ימים של `distanceMeters` | acute_7d / chronic_estimate |
 | 6 | `history_injury_count` | **5.0%** | `users/{uid}.historyInjuryCount` | ישיר |
 | 7 | `sleep_debt_3d` | **4.4%** | היסטוריה 3 ימים של `sleepMinutes` | sum(max(0, 8 − sleep)) |
@@ -217,9 +299,9 @@
 | `daily_health` | `sleepMinutes` | `sleep_hours` |
 | `daily_health` | `steps` | `daily_distance_km` fallback, `avg_cadence` |
 | `daily_health` | `distanceMeters` | `daily_distance_km` primary |
-| `daily_health` | `activeCalories` | `workout_intensity_minutes`, load proxies |
-| `daily_health` | `totalCalories` | `total_calories_burned` (שריפה, לא צריכה!) |
-| `daily_health` | `heartRateAvg` | `resting_hr`, `hrv_score` proxy |
+| `daily_health` | `activeCalories` | `active_calories_burned`, `workout_intensity_minutes`, load proxies |
+| `daily_health` | `totalCalories` (active+BMR) / `bmrCalories` + `activeCalories` | `total_calories_burned` |
+| `daily_health` | `restingHeartRate` / `heartRateMin` / `heartRateAvg` | `resting_hr` (סדר עדיפות); `hrvRmssd` → `hrv_score` / `hrv_drop` |
 | `daily_health` | `weightKg` | `bmi` |
 | `daily_checkins` | `stressLevel` | `stress_level` |
 | `daily_checkins` | `muscleSoreness` | `muscle_soreness` |
