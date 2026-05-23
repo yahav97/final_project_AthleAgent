@@ -1,14 +1,18 @@
-# זרימת נתונים ופיצ'רים — מודל חיזוי פציעות AthleAgent
+# זרימת נתונים ופיצ'רים — חוזה Production
 
-## סקירה כללית
+> **נספח ML מלא** (יצירת דאטה, השוואת פיצ'רים, בחירת מודל, גרפים וציונים):  
+> [`ML_model/notebooks/model_improvement_journey.ipynb`](../../ML_model/notebooks/model_improvement_journey.ipynb)  
+>
+> **מסמך זה = חוזה שירות בלבד** (Firestore → מודל). ללא ניתוח ML כפול — ראו את המחברת.
+
+## סקירה כללית (תפעול)
 
 | פרט | ערך |
 |---|---|
 | **מודל** | XGBoostDeep |
-| **מספר פיצ'רים סופי** | 36 |
-| **סף החלטה (High Risk)** | 0.18 |
-| **Recall** | 86.6% |
-| **ROC-AUC** | 0.723 |
+| **מספר פיצ'רים** | 36 (`model_features.py`) |
+| **סף High Risk** | ≥ 0.18 |
+| **סף Medium** | 0.11 – 0.18 |
 | **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
 
 ### זרימת חיזוי יומית (בוקר) — סיכון **להיום**, לא למחר
@@ -285,36 +289,11 @@
 
 **כל ה-defaults נבחרו להיות "ניטרליים"** — לא מושכים את החיזוי לסיכון גבוה או נמוך.
 
----
-
-## 5. הפיצ'רים הסופיים (36) לפי סדר חשיבות
-
-| # | פיצ'ר | חשיבות | מקור הנתון | חישוב |
-|---|---|---|---|---|
-| 1 | `hrv_drop` | **14.9%** | היסטוריה 7 ימים של `hrvRmssd` | HRV_today − mean(HRV_7d) |
-| 2 | `stress_level` | **8.1%** | `daily_checkins.stressLevel` | המרת סקאלה |
-| 3 | `load_recovery_imbalance` | **8.0%** | חישוב | acwr_ratio × sleep_debt_3d |
-| 4 | `injured_yesterday` | **7.1%** | `daily_checkins.injuredYesterday` | bool → 0/1 |
-| 5 | `acwr_ratio` | **7.0%** | היסטוריה 7 ימים של `distanceMeters` | acute_7d / chronic_estimate |
-| 6 | `history_injury_count` | **5.0%** | `users/{uid}.historyInjuryCount` | ישיר |
-| 7 | `sleep_debt_3d` | **4.4%** | היסטוריה 3 ימים של `sleepMinutes` | sum(max(0, 8 − sleep)) |
-| 8 | `daily_distance_km` | **2.4%** | `daily_health.distanceMeters` | מטרים / 1000 |
-| 9 | `sleep_hours` | **2.3%** | `daily_health.sleepMinutes` | דקות / 60 |
-| 10 | `active_calories_burned` | **2.0%** | `daily_health.activeCalories` | ישיר |
-| 11 | `workout_intensity_minutes` | **2.0%** | חישוב | distance × 5.5 + calories / 40 |
-| 12 | `muscle_soreness` | **1.9%** | `daily_checkins.muscleSoreness` | המרת סקאלה |
-| 13 | `chronic_load_21d` | **1.7%** | היסטוריה 7 ימים | אומדן כרוני |
-| 14 | `acwr_ratio_ma7` | **1.6%** | היסטוריה 7 ימים | mean(acwr_7d) |
-| 15 | `acute_load_7d` | **1.5%** | היסטוריה 7 ימים של `distanceMeters` | mean(distance_7d) |
-| 16 | `energy_level` | **1.5%** | `daily_checkins.energyLevel` | המרת סקאלה |
-| 17–36 | שאר הפיצ'רים | ~1.4% כ"א | מגוון מקורות | ישיר / fallback / חישוב |
-
-**Top 7** (חוסמים ~54.9% מהחשיבות):
-`hrv_drop`, `stress_level`, `load_recovery_imbalance`, `injured_yesterday`, `acwr_ratio`, `history_injury_count`, `sleep_debt_3d`
+רשימת 36 הפיצ'רים, חשיבות, והשוואת גרסאות — **רק במחברת הנספח** (לינק למעלה).
 
 ---
 
-## 6. מיפוי Firestore → Model (Contract)
+## 5. מיפוי Firestore → Model (Contract)
 
 | Firestore source | Field | Model feature |
 |---|---|---|
@@ -338,7 +317,7 @@
 
 ---
 
-## 7. Data Quality & Blocking
+## 6. Data Quality & Blocking
 
 ### שדות קריטיים (חוסר בהם עשוי לחסום חיזוי)
 
@@ -358,49 +337,3 @@
 
 `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `energyLevel`, `heartRateMax`, `heartRateMin`, `activeCalories`
 
----
-
-## 8. תרשים זרימה מסכם
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FIREBASE                                  │
-├──────────────┬──────────────┬───────────────┬────────────────────┤
-│ users/{uid}  │ daily_health │ daily_checkins│ daily_nutrition    │
-│              │ (7 ימים)     │ (היום)        │ (היום + fallback)  │
-│ • age        │ • sleep      │ • stress      │ • calories         │
-│ • injuries   │ • distance   │ • soreness    │ • protein          │
-│              │ • HR/HRV     │ • energy      │ • carbs            │
-│              │ • calories   │               │                    │
-│              │ • speed/power│               │ default: 2500 kcal │
-│              │ • SpO2/resp  │               │                    │
-│              │ • elevation  │               │                    │
-└──────┬───────┴──────┬───────┴───────┬───────┴────────┬───────────┘
-       │              │               │                │
-       ▼              ▼               ▼                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    PREPROCESSING                                  │
-│  • המרות יחידות (דקות→שעות, מטרים→קמ)                           │
-│  • המרות סקאלה (0-100→1-10)                                      │
-│  • Fallbacks (אם חסר → שימוש באתמול / ברירת מחדל)               │
-│  • חישוב BMI, workout_intensity, load_recovery_imbalance        │
-└─────────────────────────────────┬───────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              FEATURE ENGINEERING (היסטוריה 7 ימים)               │
-│  confidence = high (7 ימים) / medium (4-6) / low (0-3)          │
-│  • acute_load_7d, chronic_load_21d, acwr_ratio                  │
-│  • sleep_debt_3d, sleep_hours_ma7, hrv_drop                     │
-│  confidence=low? → ערכי ברירת מחדל ניטרליים                      │
-└─────────────────────────────────┬───────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  XGBoostDeep MODEL                                │
-│          36 פיצ'רים → predict_proba → סיכון 0.0–1.0             │
-│          ≥ 0.18 → High Risk                                      │
-│          ≥ 0.11 → Medium Risk                                    │
-│          < 0.11 → Low Risk                                       │
-└─────────────────────────────────────────────────────────────────┘
-```

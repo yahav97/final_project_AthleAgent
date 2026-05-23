@@ -1,214 +1,34 @@
-# שיקולי מודל למידת מכונה — AthleAgent
+# ML model — production reference
 
-## 1. מדדי הערכה
+> **Full ML appendix** (synthetic data, feature comparison tables/charts, model selection, metrics evolution):  
+> [`ML_model/notebooks/model_improvement_journey.ipynb`](../../ML_model/notebooks/model_improvement_journey.ipynb)  
+>
+> Do not duplicate that narrative here — this file is **ops/config only**.
 
-### Recall (רגישות) — "כמה פציעות תפסנו?"
+## Production config (promoted artifact)
 
-```
-Recall = פציעות שזוהו נכון / סך כל הפציעות האמיתיות
-```
+| Item | Value |
+|------|-------|
+| Model | `XGBoostDeep` |
+| Feature count | 36 (`backend/services/model_features.py`) |
+| Operating threshold | `0.18` → **High** risk if score ≥ 0.18 |
+| UI bands | Low &lt; 0.11 · Medium 0.11–0.18 · High ≥ 0.18 |
+| Prediction target | Injury risk **today** (calendar day D), morning inference |
 
-**למה זה הכי חשוב?**
-פציעה שלא זוהתה (False Negative) מסוכנת — הספורטאי ממשיך להתאמן ומסתכן בפציעה חמורה.
-התראת שווא (False Positive) פחות מסוכנת — הספורטאי מקבל המלצה לנוח.
+## Live gate (`backend/ml/model_loader.py`)
 
-**→ מעדיפים לטעות בכיוון של "יותר מדי אזהרות" מאשר לפספס פציעה.**
+Model is **Blocked** (no `/predict/daily`) unless manifest passes:
 
-### Precision — "כמה מההתראות באמת פציעה?"
+- `Recall@Threshold` ≥ **0.85**
+- `ROC-AUC` ≥ **0.60**
 
-נמוך אצלנו (~14%) כי שיעור הפציעות הוא ~8–12% מהימים. כדי לתפוס 87% מהפציעות, המודל חייב "לחשוד" ביותר ימים. **זה Trade-off מכוון.**
+Pointer: `ML_model/artifacts/promoted.json` → `run_manifest.json`, `injury_model.pkl`.
 
-### ROC-AUC — "כמה טוב המודל מפריד?"
+## Training pipeline (scripts only)
 
-| ערך | משמעות |
-|---|---|
-| 0.50 | ניחוש אקראי |
-| 0.60–0.70 | בינוני |
-| 0.70–0.80 | טוב |
-| 0.80+ | מצוין |
-
-**אצלנו: 0.723** — טוב.
-
-### Brier Score — "כמה מכוילות ההסתברויות?"
-
-**אצלנו: 0.115** — מצוין (0 = מושלם, 0.25 = בינוני).
-
-### LogLoss
-
-**אצלנו: 0.388** — טוב (שיפור גדול מ-0.587 בגרסה הקודמת).
-
----
-
-## 2. מדיניות סף (Thresholds)
-
-### סף מינימלי לכל מדד
-
-| מדד | סף מינימלי | סיבה |
-|---|---|---|
-| **Recall** | ≥ 80% (hard min) | אסור לפספס יותר מ-1 מתוך 5 פציעות |
-| **Recall** | ≥ 85% (target) | יעד רגיל — מקסימום 1 מ-7 |
-| **Precision** | ≥ 13% | מעל הבסיס האקראי |
-| **F1** | ≥ 0.22 | איזון מינימלי |
-| **FPR** | ≤ 70% | לא להציף בהתראות |
-
-### שלושה סוגי Threshold (לא לבלבל!)
-
-| סוג | ערך לדוגמה | תפקיד |
-|---|---|---|
-| **סף השוואת מודלים** | `0.4` | כל המודלים נבחנים באותו סף ליצירת טבלת השוואה אחידה |
-| **סף ריצה (sweep)** | `0.20 … 0.60` | ניתוח כיצד מדדים משתנים לפי סף |
-| **סף תפעול המנצח** | נשמר ב-`injury_model.pkl` | הסף הסופי לשירות — תוצאה של הריצה |
-
----
-
-## 3. בחירת מודל — למה XGBoostDeep?
-
-### המודלים שהושוו (11 מודלים)
-
-| משפחה | מודלים | סוג |
-|---|---|---|
-| Logistic Regression | 1 | ליניארי, בסיס |
-| Random Forest | 2 | Ensemble עצי החלטה |
-| Extra Trees | 2 | כמו RF + פיצולים אקראיים |
-| Gradient Boosting | 1 | Boosting קלאסי |
-| XGBoost | 5 גרסאות | Boosting מתקדם |
-
-### תוצאות מרכזיות
-
-| מודל | Recall | Precision | FPR | ROC-AUC | Brier |
-|---|---|---|---|---|---|
-| ExtraTrees | 81.3% | 15.0% | 56.9% | 0.711 | 0.200 |
-| LogisticRegression | 79.6% | 14.9% | 56.1% | 0.704 | 0.214 |
-| RandomForest | 71.2% | 17.6% | 41.1% | 0.720 | 0.182 |
-| **XGBoostDeep** | **86.6%** | **14.1%** | **65.1%** | **0.723** | **0.115** |
-| XGBoostRaw | 88.9% | 13.7% | 69.1% | 0.725 | 0.097 |
-| ExtraTreesTuned | 91.1% | 13.1% | **74.7%*** | 0.716 | 0.102 |
-
-*\* FPR > 70% = חורג ממגבלה → נפסל*
-
-### תהליך הבחירה (`pick_best_model`)
-
-**Tier 0 (עדיף):** Recall ≥ 85%, FPR ≤ 70%, Precision ≥ 13%, F1 ≥ 0.22
-
-**Tier 1:** Recall ≥ 80%, FPR ≤ 70%
-
-**Tier 2:** Fallback
-
-**בתוך כל Tier, סדר העדיפות:**
-1. FPR נמוך ביותר (פחות התראות שווא)
-2. Recall → Precision → F1 → ROC-AUC
-
-**XGBoostDeep נבחר כי:**
-- ב-**Tier 0** — עומד בכל הדרישות (Recall=86.6%, FPR=65.1%)
-- FPR נמוך יותר מ-XGBoostRaw (65.1% vs 69.1%)
-- ExtraTreesTuned חורג מ-FPR ≤ 70% ונפסל
-
-### למה XGBoost עדיף על Random Forest?
-
-| יתרון | הסבר |
-|---|---|
-| Boosting vs Bagging | כל עץ מתקן טעויות של הקודם |
-| רגולריזציה מובנית | מונע overfitting |
-| `scale_pos_weight` | מטפל בחוסר איזון (8% פציעות) |
-| מהירות inference | חשוב לשרת production |
-
-### פרמטרי המודל (XGBoostDeep)
-
-| פרמטר | ערך | תפקיד |
-|---|---|---|
-| `n_estimators` | 500 | מספר עצים |
-| `max_depth` | 7 | עומק מקסימלי |
-| `learning_rate` | 0.03 | קצב למידה |
-| `subsample` | 0.85 | % דוגמאות לעץ |
-| `colsample_bytree` | 0.8 | % פיצ'רים לעץ |
-| `reg_alpha` | 0.5 | L1 רגולריזציה |
-| `reg_lambda` | 2.0 | L2 רגולריזציה |
-| `min_child_weight` | 5 | מינימום דוגמאות בעלה |
-| `gamma` | 0.1 | מינימום Gain לפיצול |
-| `scale_pos_weight` | 3.5 | משקל יתר לפציעה |
-
----
-
-## 4. ה-Trade-off: Recall vs Precision
-
-בבעיה עם **8% שיעור פציעה**, יש מגבלה מתמטית:
-- ב-100 ימים, ~8 ימי פציעה ו-~92 ימים בריאים
-- כדי לתפוס 7 מתוך 8 פציעות, צריך להרחיב את "רשת" ההתראות
-- הרשת הרחבה תופסת גם ~60 ימים בריאים בטעות
-
-**→ 3 רמות סיכון פותרות את הבעיה:**
-
-| רמת סיכון | ציון | שיעור פציעה אמיתי | % מהימים | מה הספורטאי רואה |
-|---|---|---|---|---|
-| **Low** (ירוק) | < 11% | 5.0% | 42% | "הכל בסדר, המשך כרגיל" |
-| **Medium** (צהוב) | 11%–18% | 11.4% | 49% | "שים לב — שקול להפחית עומס" |
-| **High** (אדום) | ≥ 18% | 37.2% | 9% | "סיכון גבוה — מומלץ לנוח" |
-
-**בזון האדום, 37% מהימים באמת מסתיימים בפציעה** — פי 4 מהממוצע.
-
----
-
-## 5. חלוקת נתונים (Train/Test)
-
-| פרט | ערך |
-|---|---|
-| סך שורות | 345,000 |
-| שיטת חלוקה | GroupShuffleSplit לפי `athlete_id` |
-| יחס | 80% אימון, 20% טסט |
-| Benchmark holdout | קבוצת אתלטים קבועה שנפרדה מראש |
-
-**למה GroupShuffleSplit?** כדי שספורטאי לא יופיע גם באימון וגם בטסט (מניעת data leakage).
-
----
-
-## 6. השוואה בין גרסאות
-
-| מדד | v1 (XGBoostRaw) | v2 (XGBoostDeep) | שינוי |
-|---|---|---|---|
-| Recall | 90.3% | 86.6% | ↓ 3.7% |
-| ROC-AUC | 0.654 | **0.723** | ↑ 10.6% |
-| Brier Score | 0.200 | **0.115** | ↑↑ שיפור גדול |
-| LogLoss | 0.587 | **0.388** | ↑↑ שיפור גדול |
-| FPR | 79.0% | **65.1%** | ↑↑ פחות שווא |
-| Threshold | 0.30 | 0.18 | — |
-
----
-
-## 7. צינור ML (Pipeline)
-
-### קבצים עיקריים
-
-| קובץ | תפקיד |
-|---|---|
-| `ML_model/data_generator.py` | יצירת דאטה סינתטי |
-| `ML_model/train_model.py` | אימון + בחירת winner |
-| `ML_model/validate_metrics.py` | בדיקת gates |
-| `ML_model/run_pipeline.py` | ריצה מלאה + promotion |
-
-### Artifacts
-
-- נשמרים תחת `ML_model/artifacts/<run_id>/`
-- המודל החי מצביע דרך `ML_model/artifacts/promoted.json`
-- הקובץ מכיל: `model_path`, `manifest_path`, `threshold`
-
-### שער איכות (Live Gate)
-
-מודל לא נטען כ-Live אם:
-- חסר `winner` במניפסט
-- `Recall@Threshold` < 0.85
-- `ROC-AUC` < 0.60
-- קובץ חסר
-
----
-
-## 8. סיכום החלטות
-
-| החלטה | בחירה | סיבה |
-|---|---|---|
-| מדד מוביל | Recall ≥ 85% | פציעה שלא נתפסה מסוכנת יותר מהתראת שווא |
-| מודל | XGBoostDeep | Tier 0 + FPR הנמוך ביותר |
-| threshold | 0.18 | נקודת עבודה אוטומטית שמאזנת Recall עם FPR |
-| הסרת פיצ'רים | acwr_ratio_std21, sleep_hours_std21 | דרשו 21 ימי היסטוריה שלא זמינים |
-| ערכי ברירת מחדל | ניטרליים | לא מוטים לסיכון גבוה או נמוך |
-| חלוקת נתונים | לפי ספורטאי | מניעת data leakage |
-| 3 רמות סיכון | Low/Medium/High | מידע מדורג לספורטאי |
+| Script | Role |
+|--------|------|
+| `ML_model/data_generator.py` | Build synthetic `athlete_injury_data.csv` |
+| `ML_model/train_model.py` | Train candidates, write `artifacts/<run_id>/` |
+| `ML_model/validate_metrics.py` | Policy gates |
+| `ML_model/run_pipeline.py` | End-to-end + promote |

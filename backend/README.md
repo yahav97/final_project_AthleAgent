@@ -1,5 +1,7 @@
 # AthleAgent Backend (RC1)
 
+**Documentation:** [`docs/README.md`](docs/README.md) — what lives where (notebook appendix vs production contracts).
+
 FastAPI backend for injury-risk inference. This service is treated as mission-critical:
 
 - If model gate checks pass, `POST /predict/daily` returns a model-based response.
