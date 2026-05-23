@@ -5,11 +5,35 @@
 | פרט | ערך |
 |---|---|
 | **מודל** | XGBoostDeep |
-| **מספר פיצ'רים סופי** | 34 |
+| **מספר פיצ'רים סופי** | 36 |
 | **סף החלטה (High Risk)** | 0.18 |
 | **Recall** | 86.6% |
 | **ROC-AUC** | 0.723 |
 | **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
+
+### זרימת חיזוי יומית (בוקר) — סיכון **להיום**, לא למחר
+
+כשהמשתמש פותח את האפליקציה **בבוקר של יום D**, החיזוי מתייחס ל**סיכון הפציעה היום** (מיידי), לא לתחזית למחר.
+
+**מה נכנס לקלט (תאריך API = `D` — היום):**
+
+| מקור | תאריך במסמך | מה נכלל |
+|---|---|---|
+| שעון / בריאות | `daily_health/{D}` | שינה מהלילה האחרון, סנכרון בוקר (חלקי) |
+| שעון / בריאות | `daily_health/{D-1}` | **fallback** — עומס אתמול (צעדים, מרחק, קלוריות…) אם היום עדיין חסר |
+| סקר | `daily_checkins/{D}` | סטרס, כאב, אנרגיה, **`injuredYesterday`** (= פציעה ב-**D−1**) |
+| תזונה | `daily_nutrition/{D}` | צריכה (אתמול/היום לפי מה שנרשם) |
+| היסטוריה | 7 ימים עד **D−1** | ACWR, חוב שינה, `hrv_drop` (rolling) |
+
+**מה יוצא:**
+
+| איפה | משמעות |
+|---|---|
+| `daily_health/{D}` → `finalRiskScore`, `riskLevel`, … | **סיכון להיום D** — מוצג מיד באפליקציה |
+| `InjuryPredictionResponse` | אותו דבר בשלושת השדות (`risk_level`, `risk_score`, `prediction_confidence`) |
+
+> **הפרדה חשובה:** ב-**production** (בוקר) הכל תחת תאריך **D**.  
+> **`daily_checkins/{D+1}`** משמש רק ב-**בניית דאטהסט לאימון** (למטה) — כי רק למחרת בוקר אפשר לדעת בוודאות אם הייתה פציעה ביום D.
 
 ---
 
@@ -55,9 +79,9 @@
 | `energyLevel` | אנרגיה (1–10 או 0–100) | `energy_level` |
 | `injuredYesterday` | פציעה אתמול (0/1) | `injured_yesterday` |
 
-נמשך ביום החיזוי בלבד (אין fallback לאתמול ב-backend).
+נמשך מ-`daily_checkins/{D}` ביום החיזוי (אין fallback לאתמול ב-backend).
 
-**תיוג לאימון:** `injury_tomorrow` ליום `D` נלקח מ-`injuredYesterday` ב-`daily_checkins/{D+1}` (fallback: `daily_health/{D+1}` לנתונים ישנים).
+**רק לאימון מחדש (לא בחיזוי בוקר):** כדי לבנות תיוג היסטורי "האם הייתה פציעה ביום D", הסקריפט `build_training_dataset_from_firestore` קורא `injuredYesterday` מ-`daily_checkins/{D+1}` — כי בבוקר של D+1 המשתמש מדווח על אתמול (יום D). ב-production לא משתמשים ב-D+1.
 
 #### 4. תזונה (`users/{uid}/daily_nutrition/{date}`)
 
@@ -76,8 +100,8 @@
 
 | שדה Firestore | תוכן | ב-`InjuryPredictionResponse`? |
 |---|---|---|
-| `finalRiskScore` | הסתברות × 100 (0–100) | כן — כ-`risk_score` (0–1) בתגובת API |
-| `riskLevel` | `Low` / `Medium` / `High` | כן — כ-`risk_level` |
+| `finalRiskScore` | הסתברות × 100 — **סיכון להיום** | כן — כ-`risk_score` (0–1) בתגובת API |
+| `riskLevel` | `Low` / `Medium` / `High` — **להיום** | כן — כ-`risk_level` |
 | `predictionConfidence` | 0–100 | כן — כ-`prediction_confidence` |
 | `predictionUpdatedAt` | ISO UTC | **לא** — רק ב-Firestore |
 
@@ -263,7 +287,7 @@
 
 ---
 
-## 5. הפיצ'רים הסופיים (34) לפי סדר חשיבות
+## 5. הפיצ'רים הסופיים (36) לפי סדר חשיבות
 
 | # | פיצ'ר | חשיבות | מקור הנתון | חישוב |
 |---|---|---|---|---|
@@ -283,7 +307,7 @@
 | 14 | `acwr_ratio_ma7` | **1.6%** | היסטוריה 7 ימים | mean(acwr_7d) |
 | 15 | `acute_load_7d` | **1.5%** | היסטוריה 7 ימים של `distanceMeters` | mean(distance_7d) |
 | 16 | `energy_level` | **1.5%** | `daily_checkins.energyLevel` | המרת סקאלה |
-| 17–34 | שאר הפיצ'רים | 1.4%–1.5% כ"א | מגוון מקורות | ישיר / fallback / חישוב |
+| 17–36 | שאר הפיצ'רים | ~1.4% כ"א | מגוון מקורות | ישיר / fallback / חישוב |
 
 **Top 7** (חוסמים ~54.9% מהחשיבות):
 `hrv_drop`, `stress_level`, `load_recovery_imbalance`, `injured_yesterday`, `acwr_ratio`, `history_injury_count`, `sleep_debt_3d`
@@ -374,7 +398,7 @@
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  XGBoostDeep MODEL                                │
-│          34 פיצ'רים → predict_proba → סיכון 0.0–1.0             │
+│          36 פיצ'רים → predict_proba → סיכון 0.0–1.0             │
 │          ≥ 0.18 → High Risk                                      │
 │          ≥ 0.11 → Medium Risk                                    │
 │          < 0.11 → Low Risk                                       │
