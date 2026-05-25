@@ -1,391 +1,593 @@
-"""
-AthleAgent - Injury Prediction Model Training Script
+"""Train injury model with recall-first policy and calibrated probabilities."""
 
-This script compares multiple ML models to find the best one for injury prediction.
-It includes comprehensive model evaluation, feature importance analysis, and feature selection.
+from __future__ import annotations
 
-Models tested:
-- Random Forest
-- XGBoost (if available)
-- Logistic Regression
-- Support Vector Machine (SVM)
-
-"""
-
-import pandas as pd
-import numpy as np
-import sys
 import io
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report, roc_auc_score, roc_curve
-)
-import joblib
+import json
 import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
-# Fix encoding for Windows console
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-
-# Try to import XGBoost (optional - better performance if available)
-try:
-    from xgboost import XGBClassifier
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    print("Note: XGBoost not available. Install with: pip install xgboost")
-
-# ============================================================================
-# DATA LOADING
-# ============================================================================
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(script_dir, 'athlete_injury_data.csv')
-
-if os.path.exists(data_path):
-    df = pd.read_csv(data_path)
-    print("=" * 60)
-    print("Data loaded successfully.")
-    print(f"Dataset shape: {df.shape}")
-    print("=" * 60)
-else:
-    print(f"Error: {data_path} not found. Run data_generator.py first!")
-    exit()
-
-# ============================================================================
-# DATA PREPARATION
-# ============================================================================
-
-X = df.drop('injury_tomorrow', axis=1)
-y = df['injury_tomorrow']
-
-# Analyze class distribution
-print("\n" + "=" * 60)
-print("CLASS DISTRIBUTION ANALYSIS")
-print("=" * 60)
-class_counts = y.value_counts()
-class_percentages = y.value_counts(normalize=True) * 100
-print(f"No Injury (0): {class_counts[0]} samples ({class_percentages[0]:.2f}%)")
-print(f"Injury (1): {class_counts[1]} samples ({class_percentages[1]:.2f}%)")
-print(f"Class Imbalance Ratio: {class_counts[0] / class_counts[1]:.2f}:1")
-
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    brier_score_loss,
+    f1_score,
+    log_loss,
+    precision_recall_curve,
+    auc,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
-print(f"\nTrain set: {X_train.shape[0]} samples")
-print(f"Test set: {X_test.shape[0]} samples")
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
-# ============================================================================
-# DATA SCALING (for models that need it)
-# ============================================================================
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-# Scale data for Logistic Regression and SVM (they are sensitive to feature scale)
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns, index=X_train.index)
-X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns, index=X_test.index)
+from xgboost import XGBClassifier
 
-# ============================================================================
-# FEATURE SELECTION - Identify weak features
-# ============================================================================
+THRESHOLD = 0.4
+MIN_RECALL_HARD = 0.80
+TARGET_RECALL = 0.85
+TARGET_RECALL_HIGH = 0.88
+TARGET_PRECISION = 0.13
+TARGET_F1 = 0.22
+MAX_FPR_OPERATING = 0.70
+RANDOM_STATE = 42
+THRESHOLDS_TO_EVAL = [round(x, 2) for x in np.arange(0.08, 0.62, 0.02)]
 
-print("\n" + "=" * 60)
-print("FEATURE SELECTION ANALYSIS")
-print("=" * 60)
 
-# Quick Random Forest to check feature importance
-temp_rf = RandomForestClassifier(n_estimators=50, random_state=42, class_weight='balanced')
-temp_rf.fit(X_train, y_train)
-
-feature_importance_prelim = pd.DataFrame({
-    'feature': X.columns,
-    'importance': temp_rf.feature_importances_
-}).sort_values('importance', ascending=False)
-
-print("\nAll Features by Importance:")
-print("-" * 60)
-for idx, row in feature_importance_prelim.iterrows():
-    print(f"{row['feature']:30s} {row['importance']:.4f} ({row['importance']*100:.2f}%)")
-
-# Identify weak features (importance < 0.01 or bottom 20%)
-threshold = 0.01
-bottom_percentile = 0.20
-weak_features = feature_importance_prelim[
-    (feature_importance_prelim['importance'] < threshold) |
-    (feature_importance_prelim['importance'] < feature_importance_prelim['importance'].quantile(bottom_percentile))
-]
-
-if len(weak_features) > 0:
-    print(f"\n[WARNING] WEAK FEATURES DETECTED ({len(weak_features)} features):")
-    print("-" * 60)
-    for idx, row in weak_features.iterrows():
-        print(f"  - {row['feature']:30s} (importance: {row['importance']:.4f})")
-    print("\n[TIP] Consider removing these features to reduce overfitting and improve model performance.")
-else:
-    print("\n[OK] No obviously weak features detected.")
-
-# ============================================================================
-# MODEL COMPARISON - Test Multiple Models
-# ============================================================================
-
-print("\n" + "=" * 60)
-print("MODEL COMPARISON - Training Multiple Models")
-print("=" * 60)
-
-models = {
-    'Random Forest': {
-        'model': RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
-            random_state=42,
-            class_weight='balanced'
-        ),
-        'use_scaled': False  # Tree-based models don't need scaling
-    },
-    'Logistic Regression': {
-        'model': LogisticRegression(
-            max_iter=2000,  # Increased iterations
-            random_state=42,
-            class_weight='balanced',
-            solver='lbfgs'  # Good default solver
-        ),
-        'use_scaled': True  # Needs scaling
-    },
-    'SVM': {
-        'model': SVC(
-            probability=True,
-            random_state=42,
-            class_weight='balanced',
-            kernel='rbf'
-        ),
-        'use_scaled': True  # Needs scaling
-    }
-}
-
-# Add XGBoost if available
-if XGBOOST_AVAILABLE:
-    models['XGBoost'] = {
-        'model': XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            random_state=42,
-            eval_metric='logloss',
-            use_label_encoder=False
-        ),
-        'use_scaled': False  # Tree-based models don't need scaling
+def evaluate_with_threshold(y_true: pd.Series, y_proba: np.ndarray, threshold: float) -> dict[str, float]:
+    y_pred = (y_proba >= threshold).astype(int)
+    negatives = int((y_true == 0).sum())
+    false_positives = int(((y_pred == 1) & (y_true == 0)).sum())
+    false_positive_rate = (false_positives / negatives) if negatives > 0 else 0.0
+    return {
+        "Recall@Threshold": recall_score(y_true, y_pred, zero_division=0),
+        "Precision@Threshold": precision_score(y_true, y_pred, zero_division=0),
+        "F1@Threshold": f1_score(y_true, y_pred, zero_division=0),
+        "FPR@Threshold": false_positive_rate,
     }
 
-# Train and evaluate all models
-results = []
 
-for name, model_config in models.items():
-    model = model_config['model']
-    use_scaled = model_config['use_scaled']
-    
-    # Choose scaled or unscaled data
-    X_train_model = X_train_scaled if use_scaled else X_train
-    X_test_model = X_test_scaled if use_scaled else X_test
-    
-    print(f"\nTraining {name}...")
-    model.fit(X_train_model, y_train)
-    
-    # Predictions
-    y_pred = model.predict(X_test_model)
-    y_pred_proba = model.predict_proba(X_test_model)[:, 1]
-    
-    # Calculate metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, zero_division=0)
-    recall = recall_score(y_test, y_pred, zero_division=0)
-    f1 = f1_score(y_test, y_pred, zero_division=0)
-    roc_auc = roc_auc_score(y_test, y_pred_proba)
-    
-    # Cross-validation (use appropriate data scaling)
-    cv_scores = cross_val_score(model, X_train_model, y_train, cv=5, scoring='f1')
-    cv_mean = cv_scores.mean()
-    cv_std = cv_scores.std()
-    
-    results.append({
-        'Model': name,
-        'Accuracy': accuracy,
-        'Precision': precision,
-        'Recall': recall,
-        'F1-Score': f1,
-        'ROC-AUC': roc_auc,
-        'CV F1-Mean': cv_mean,
-        'CV F1-Std': cv_std
-    })
-    
-    print(f"  ✓ F1-Score: {f1:.4f}, ROC-AUC: {roc_auc:.4f}")
+def print_split_diagnostics(y: pd.Series, y_train: pd.Series, y_test: pd.Series) -> None:
+    overall_rate = float(y.mean())
+    train_rate = float(y_train.mean())
+    test_rate = float(y_test.mean())
+    print("\nData split diagnostics:")
+    print(f"- total_rows: {len(y)}")
+    print(f"- train_rows: {len(y_train)}")
+    print(f"- test_rows: {len(y_test)}")
+    print(f"- injury_rate_overall: {overall_rate:.4f}")
+    print(f"- injury_rate_train:   {train_rate:.4f}")
+    print(f"- injury_rate_test:    {test_rate:.4f}")
 
-# Create comparison DataFrame
-results_df = pd.DataFrame(results)
 
-print("\n" + "=" * 60)
-print("MODEL COMPARISON RESULTS")
-print("=" * 60)
-print("\n" + results_df.to_string(index=False))
+def threshold_sweep(y_true: pd.Series, y_proba: np.ndarray, model_name: str) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = []
+    for threshold in THRESHOLDS_TO_EVAL:
+        metrics = evaluate_with_threshold(y_true, y_proba, threshold)
+        rows.append(
+            {
+                "Model": model_name,
+                "Threshold": float(threshold),
+                "Recall": float(metrics["Recall@Threshold"]),
+                "Precision": float(metrics["Precision@Threshold"]),
+                "F1": float(metrics["F1@Threshold"]),
+                "FPR": float(metrics["FPR@Threshold"]),
+            }
+        )
+    return rows
 
-# Find best model
-best_model_idx = results_df['F1-Score'].idxmax()
-best_model_name = results_df.loc[best_model_idx, 'Model']
-best_model_config = list(models.values())[best_model_idx]
-best_model = best_model_config['model']
-best_use_scaled = best_model_config['use_scaled']
 
-print(f"\n[BEST MODEL] {best_model_name}")
-print(f"   F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
-print(f"   ROC-AUC: {results_df.loc[best_model_idx, 'ROC-AUC']:.4f}")
+def select_best_operating_points(
+    threshold_rows: list[dict[str, float | str]],
+    min_recall: float = TARGET_RECALL,
+    min_precision: float = TARGET_PRECISION,
+) -> pd.DataFrame:
+    df = pd.DataFrame(threshold_rows)
+    feasible = df[(df["Recall"] >= min_recall) & (df["Precision"] >= min_precision)]
+    if feasible.empty:
+        return (
+            df.sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+            .groupby("Model")
+            .head(1)
+        )
+    return (
+        feasible.sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+        .groupby("Model")
+        .head(1)
+        .sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+    )
 
-# ============================================================================
-# DETAILED EVALUATION OF BEST MODEL
-# ============================================================================
 
-print("\n" + "=" * 60)
-print(f"DETAILED EVALUATION - {best_model_name}")
-print("=" * 60)
+def select_operating_threshold_for_model(
+    threshold_rows: list[dict[str, float | str]],
+    model_name: str,
+) -> float:
+    df = pd.DataFrame(threshold_rows)
+    model_df = df[df["Model"] == model_name].copy()
+    if model_df.empty:
+        return THRESHOLD
 
-model = best_model  # Use best model for detailed evaluation
+    high_recall = model_df[
+        (model_df["Recall"] >= TARGET_RECALL_HIGH) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
+    if not high_recall.empty:
+        ranked = high_recall.sort_values(
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
+        )
+        return float(ranked.iloc[0]["Threshold"])
 
-# Use appropriate data for best model
-X_train_best = X_train_scaled if best_use_scaled else X_train
-X_test_best = X_test_scaled if best_use_scaled else X_test
+    min_recall = model_df[
+        (model_df["Recall"] >= TARGET_RECALL) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
+    if not min_recall.empty:
+        ranked = min_recall.sort_values(
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
+        )
+        return float(ranked.iloc[0]["Threshold"])
 
-# ============================================================================
-# MODEL EVALUATION - Basic Metrics
-# ============================================================================
+    fallback = model_df.sort_values(
+        by=["Recall", "F1", "Precision", "FPR", "Threshold"],
+        ascending=[False, False, False, True, True],
+    ).iloc[0]
+    return float(fallback["Threshold"])
 
-print("\n" + "=" * 60)
-print("MODEL EVALUATION - TEST SET PERFORMANCE")
-print("=" * 60)
 
-# Predictions (using appropriate scaled/unscaled data)
-y_pred = model.predict(X_test_best)
-y_pred_proba = model.predict_proba(X_test_best)[:, 1]
+def _best_operating_row_for_model(
+    threshold_rows: list[dict[str, float | str]],
+    model_name: str,
+) -> tuple[pd.Series, int] | None:
+    df = pd.DataFrame(threshold_rows)
+    model_df = df[df["Model"] == model_name].copy()
+    if model_df.empty:
+        return None
+    target = model_df[
+        (model_df["Recall"] >= TARGET_RECALL)
+        & (model_df["FPR"] <= MAX_FPR_OPERATING)
+        & (model_df["Precision"] >= TARGET_PRECISION)
+        & (model_df["F1"] >= TARGET_F1)
+    ]
+    if not target.empty:
+        return (
+            target.sort_values(
+                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+                ascending=[True, False, False, False, True],
+            ).iloc[0],
+            0,
+        )
+    relaxed = model_df[
+        (model_df["Recall"] >= MIN_RECALL_HARD)
+        & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    ]
+    if not relaxed.empty:
+        return (
+            relaxed.sort_values(
+                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+                ascending=[True, False, False, False, True],
+            ).iloc[0],
+            1,
+        )
+    return (
+        model_df.sort_values(
+            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
+            ascending=[True, False, False, False, True],
+        ).iloc[0],
+        2,
+    )
 
-# Calculate metrics
-accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred, zero_division=0)
-recall = recall_score(y_test, y_pred, zero_division=0)
-f1 = f1_score(y_test, y_pred, zero_division=0)
-roc_auc = roc_auc_score(y_test, y_pred_proba)
 
-print(f"\nAccuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
-print(f"Precision: {precision:.4f} ({precision*100:.2f}%)")
-print(f"Recall:    {recall:.4f} ({recall*100:.2f}%)")
-print(f"F1-Score:  {f1:.4f} ({f1*100:.2f}%)")
-print(f"ROC-AUC:   {roc_auc:.4f} ({roc_auc*100:.2f}%)")
+def _build_risk_bin_table(y_true: pd.Series, y_proba: np.ndarray) -> pd.DataFrame:
+    bins = pd.cut(
+        y_proba,
+        bins=[0.0, 0.2, 0.5, 1.0],
+        labels=["green_0_20", "yellow_20_50", "red_50_100"],
+        include_lowest=True,
+        right=True,
+    )
+    frame = pd.DataFrame({"bin": bins, "injury": y_true.astype(int)})
+    grouped = frame.groupby("bin", observed=False)["injury"].agg(["count", "mean"]).reset_index()
+    grouped = grouped.rename(columns={"count": "samples", "mean": "injury_rate"})
+    grouped["injury_rate"] = grouped["injury_rate"].fillna(0.0)
+    return grouped
 
-# Confusion Matrix
-print("\n" + "-" * 60)
-print("CONFUSION MATRIX")
-print("-" * 60)
-cm = confusion_matrix(y_test, y_pred)
-print("\n                Predicted")
-print("              No Injury  Injury")
-print(f"Actual No Injury   {cm[0,0]:5d}    {cm[0,1]:5d}")
-print(f"Actual Injury      {cm[1,0]:5d}    {cm[1,1]:5d}")
-print(f"\nTrue Negatives:  {cm[0,0]}")
-print(f"False Positives: {cm[0,1]}")
-print(f"False Negatives: {cm[1,0]}")
-print(f"True Positives:  {cm[1,1]}")
 
-# Classification Report
-print("\n" + "-" * 60)
-print("DETAILED CLASSIFICATION REPORT")
-print("-" * 60)
-print(classification_report(y_test, y_pred, target_names=['No Injury', 'Injury']))
+def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedClassifierCV | XGBClassifier]:
+    return {
+        "LogisticRegression": Pipeline(
+            steps=[
+                ("scaler", StandardScaler()),
+                (
+                    "model",
+                    LogisticRegression(
+                        random_state=RANDOM_STATE,
+                        class_weight="balanced",
+                        max_iter=3000,
+                    ),
+                ),
+            ]
+        ),
+        "RandomForest": RandomForestClassifier(
+            n_estimators=250,
+            max_depth=12,
+            random_state=RANDOM_STATE,
+            class_weight="balanced_subsample",
+            n_jobs=-1,
+        ),
+        "RandomForestTuned": RandomForestClassifier(
+            n_estimators=450,
+            max_depth=16,
+            min_samples_leaf=3,
+            min_samples_split=8,
+            random_state=RANDOM_STATE,
+            class_weight={0: 1.0, 1: 2.6},
+            n_jobs=-1,
+        ),
+        "ExtraTrees": ExtraTreesClassifier(
+            n_estimators=320,
+            max_depth=14,
+            random_state=RANDOM_STATE,
+            class_weight="balanced_subsample",
+            n_jobs=-1,
+        ),
+        "ExtraTreesTuned": ExtraTreesClassifier(
+            n_estimators=520,
+            max_depth=18,
+            min_samples_leaf=2,
+            min_samples_split=6,
+            random_state=RANDOM_STATE,
+            class_weight={0: 1.0, 1: 2.9},
+            n_jobs=-1,
+        ),
+        "GradientBoosting": GradientBoostingClassifier(
+            random_state=RANDOM_STATE,
+            n_estimators=180,
+            learning_rate=0.05,
+            max_depth=3,
+        ),
+        "XGBoostCalibrated": CalibratedClassifierCV(
+            estimator=XGBClassifier(
+                n_estimators=220,
+                max_depth=5,
+                learning_rate=0.05,
+                subsample=0.9,
+                colsample_bytree=0.9,
+                eval_metric="logloss",
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+            ),
+            method="sigmoid",
+            cv=3,
+        ),
+        "XGBoostCalibratedTuned": CalibratedClassifierCV(
+            estimator=XGBClassifier(
+                n_estimators=320,
+                max_depth=4,
+                learning_rate=0.045,
+                subsample=0.92,
+                colsample_bytree=0.92,
+                reg_lambda=1.3,
+                scale_pos_weight=3.0,
+                eval_metric="logloss",
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+            ),
+            method="sigmoid",
+            cv=3,
+        ),
+        "XGBoostRaw": XGBClassifier(
+            n_estimators=260,
+            max_depth=5,
+            learning_rate=0.06,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            eval_metric="logloss",
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            scale_pos_weight=2.2,
+        ),
+        "XGBoostDeep": XGBClassifier(
+            n_estimators=500,
+            max_depth=7,
+            learning_rate=0.03,
+            subsample=0.85,
+            colsample_bytree=0.8,
+            colsample_bylevel=0.8,
+            reg_alpha=0.5,
+            reg_lambda=2.0,
+            min_child_weight=5,
+            gamma=0.1,
+            eval_metric="logloss",
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            scale_pos_weight=3.5,
+        ),
+        "XGBoostDeepCalibrated": CalibratedClassifierCV(
+            estimator=XGBClassifier(
+                n_estimators=500,
+                max_depth=7,
+                learning_rate=0.03,
+                subsample=0.85,
+                colsample_bytree=0.8,
+                colsample_bylevel=0.8,
+                reg_alpha=0.5,
+                reg_lambda=2.0,
+                min_child_weight=5,
+                gamma=0.1,
+                eval_metric="logloss",
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+                scale_pos_weight=3.5,
+            ),
+            method="sigmoid",
+            cv=3,
+        ),
+    }
 
-# ============================================================================
-# CROSS-VALIDATION
-# ============================================================================
 
-print("\n" + "=" * 60)
-print("CROSS-VALIDATION (5-fold)")
-print("=" * 60)
+def pick_best_model(results_df: pd.DataFrame, threshold_rows: list[dict[str, float | str]]) -> pd.Series:
+    """
+    Select winner by operating-point feasibility, not only by fixed THRESHOLD=0.4.
+    """
+    operating_candidates: list[dict[str, float | str]] = []
+    for model_name in results_df["Model"].tolist():
+        row = _best_operating_row_for_model(threshold_rows, str(model_name))
+        if row is None:
+            continue
+        selected_row, tier = row
+        operating_candidates.append(
+            {
+                "Model": str(model_name),
+                "OperatingTier": int(tier),
+                "OperatingThreshold": float(selected_row["Threshold"]),
+                "OperatingRecall": float(selected_row["Recall"]),
+                "OperatingPrecision": float(selected_row["Precision"]),
+                "OperatingF1": float(selected_row["F1"]),
+                "OperatingFPR": float(selected_row["FPR"]),
+            }
+        )
+    if operating_candidates:
+        op_df = pd.DataFrame(operating_candidates)
+        merged = op_df.merge(
+            results_df[["Model", "ROC-AUC", "PR-AUC", "BrierScore", "LogLoss"]],
+            on="Model",
+            how="left",
+        )
+        return merged.sort_values(
+            by=[
+                "OperatingTier",
+                "OperatingFPR",
+                "OperatingRecall",
+                "OperatingPrecision",
+                "OperatingF1",
+                "ROC-AUC",
+                "PR-AUC",
+                "BrierScore",
+            ],
+            ascending=[True, True, False, False, False, False, True, True],
+        ).iloc[0]
+    return results_df.sort_values(
+        by=["Recall@Threshold", "FPR@Threshold", "ROC-AUC"],
+        ascending=[False, True, False],
+    ).iloc[0]
 
-cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='f1')
-print(f"F1-Score: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
-print(f"Individual fold scores: {cv_scores}")
 
-# ============================================================================
-# FEATURE IMPORTANCE ANALYSIS (Best Model)
-# ============================================================================
+def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.sort_values(["athlete_id", "date"]).copy()
+    grouped = out.groupby("athlete_id", group_keys=False)
+    out["acwr_ratio_ma7"] = grouped["acwr_ratio"].transform(
+        lambda x: x.rolling(7, min_periods=1).mean()
+    )
+    out["sleep_hours_ma7"] = grouped["sleep_hours"].transform(
+        lambda x: x.rolling(7, min_periods=1).mean()
+    )
+    return out
 
-print("\n" + "=" * 60)
-print("FEATURE IMPORTANCE ANALYSIS")
-print("=" * 60)
 
-# Feature importance (works for tree-based models and can be approximated for others)
-if hasattr(model, 'feature_importances_'):
-    feature_importance = pd.DataFrame({
-        'feature': X_train_best.columns,
-        'importance': model.feature_importances_
-    }).sort_values('importance', ascending=False)
-    
-    print("\nTop 10 Most Important Features:")
-    print("-" * 60)
-    for idx, row in feature_importance.head(10).iterrows():
-        print(f"{row['feature']:25s} {row['importance']:.4f} ({row['importance']*100:.2f}%)")
-    
-    # Save feature importance
-    importance_path = os.path.join(script_dir, 'feature_importance.csv')
-    feature_importance.to_csv(importance_path, index=False)
-    print(f"\n[OK] Feature importance saved to {importance_path}")
-    
-elif hasattr(model, 'coef_'):
-    # For linear models (Logistic Regression)
-    feature_importance = pd.DataFrame({
-        'feature': X_train_best.columns,
-        'coefficient': np.abs(model.coef_[0])
-    }).sort_values('coefficient', ascending=False)
-    
-    print("\nTop 10 Features by Absolute Coefficient:")
-    print("-" * 60)
-    for idx, row in feature_importance.head(10).iterrows():
-        print(f"{row['feature']:25s} {row['coefficient']:.4f}")
-else:
-    print("\n[WARNING] Feature importance not available for this model type.")
-    feature_importance = None
+def extract_feature_importance(model, feature_names: list[str]) -> pd.DataFrame | None:
+    base_model = model
+    if isinstance(model, Pipeline):
+        base_model = model.named_steps["model"]
+    elif isinstance(model, CalibratedClassifierCV):
+        calibrated = model.calibrated_classifiers_
+        if calibrated and hasattr(calibrated[0], "estimator"):
+            base_model = calibrated[0].estimator
+    if hasattr(base_model, "feature_importances_"):
+        return pd.DataFrame(
+            {"feature": feature_names, "importance": base_model.feature_importances_}
+        ).sort_values("importance", ascending=False)
+    if hasattr(base_model, "coef_"):
+        return pd.DataFrame(
+            {"feature": feature_names, "importance": np.abs(base_model.coef_[0])}
+        ).sort_values("importance", ascending=False)
+    return None
 
-# ============================================================================
-# SAVE MODEL
-# ============================================================================
 
-print("\n" + "=" * 60)
-print("SAVING MODEL")
-print("=" * 60)
+def main() -> None:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    dataset_path = os.path.join(script_dir, "athlete_injury_data.csv")
+    benchmark_path = os.path.join(script_dir, "benchmark_holdout.csv")
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
-output_dir = os.path.join(project_root, 'backend')
+    df = pd.read_csv(dataset_path, parse_dates=["date"])
+    df = add_sequential_features(df)
+    X = df.drop(columns=["injury_tomorrow"])
+    y = df["injury_tomorrow"].astype(int)
+    model_df = X.drop(columns=["athlete_id", "date"])
+    feature_columns = list(model_df.columns)
+    if os.path.exists(benchmark_path):
+        benchmark_df = pd.read_csv(benchmark_path, parse_dates=["date"])
+        benchmark_df = add_sequential_features(benchmark_df)
+        benchmark_ids = set(benchmark_df["athlete_id"].astype(int).unique().tolist())
+        train_mask = ~df["athlete_id"].astype(int).isin(benchmark_ids)
+        test_mask = df["athlete_id"].astype(int).isin(benchmark_ids)
+        if train_mask.sum() == 0 or test_mask.sum() == 0:
+            raise ValueError("Benchmark split invalid: empty train/test after athlete split.")
+        X_train = model_df.loc[train_mask]
+        X_test = model_df.loc[test_mask]
+        y_train = y.loc[train_mask]
+        y_test = y.loc[test_mask]
+    else:
+        groups = df["athlete_id"]
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=RANDOM_STATE)
+        train_idx, test_idx = next(gss.split(model_df, y, groups=groups))
+        X_train = model_df.iloc[train_idx]
+        X_test = model_df.iloc[test_idx]
+        y_train = y.iloc[train_idx]
+        y_test = y.iloc[test_idx]
+    print_split_diagnostics(y, y_train, y_test)
 
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+    results: list[dict[str, float | str]] = []
+    trained_models: dict[str, object] = {}
+    calibration_bins: dict[str, pd.DataFrame] = {}
+    threshold_rows: list[dict[str, float | str]] = []
 
-output_path = os.path.join(output_dir, 'injury_model.pkl')
-joblib.dump(model, output_path)
-print(f"[OK] Model saved to {output_path}")
+    for model_name, model in model_catalog().items():
+        print(f"Training {model_name}...")
+        model.fit(X_train, y_train)
+        y_proba = model.predict_proba(X_test)[:, 1]
+        metrics = evaluate_with_threshold(y_test, y_proba, THRESHOLD)
+        pr_precision, pr_recall, _ = precision_recall_curve(y_test, y_proba)
+        pr_auc = auc(pr_recall, pr_precision)
+        metrics.update(
+            {
+                "Model": model_name,
+                "ROC-AUC": roc_auc_score(y_test, y_proba),
+                "PR-AUC": pr_auc,
+                "LogLoss": log_loss(y_test, y_proba, labels=[0, 1]),
+                "BrierScore": brier_score_loss(y_test, y_proba),
+                "BalancedAccuracy@Threshold": balanced_accuracy_score(
+                    y_test, (y_proba >= THRESHOLD).astype(int)
+                ),
+            }
+        )
+        results.append(metrics)
+        trained_models[model_name] = model
+        threshold_rows.extend(threshold_sweep(y_test, y_proba, model_name))
 
-# Save model comparison results
-comparison_path = os.path.join(script_dir, 'model_comparison.csv')
-results_df.to_csv(comparison_path, index=False)
-print(f"[OK] Model comparison saved to {comparison_path}")
+        frac_pos, mean_pred = calibration_curve(y_test, y_proba, n_bins=10, strategy="uniform")
+        calibration_bins[model_name] = pd.DataFrame(
+            {"mean_predicted_risk": mean_pred, "fraction_positive": frac_pos}
+        )
 
-print("\n" + "=" * 60)
-print("TRAINING COMPLETE!")
-print("=" * 60)
-print(f"\n[SUMMARY]")
-print(f"   Best Model: {best_model_name}")
-print(f"   F1-Score: {results_df.loc[best_model_idx, 'F1-Score']:.4f}")
-print(f"   ROC-AUC: {results_df.loc[best_model_idx, 'ROC-AUC']:.4f}")
-if len(weak_features) > 0:
-    print(f"   [WARNING] {len(weak_features)} weak features identified - consider removal")
-print("=" * 60)
+    results_df = pd.DataFrame(results).sort_values(
+        by=["Recall@Threshold", "F1@Threshold", "Precision@Threshold", "FPR@Threshold"],
+        ascending=[False, False, False, True],
+    )
+    best_row = pick_best_model(results_df, threshold_rows)
+    best_model_name = str(best_row["Model"])
+    best_model = trained_models[best_model_name]
+    best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
+    winner_proba = best_model.predict_proba(X_test)[:, 1]
+    winner_operating_metrics = evaluate_with_threshold(y_test, winner_proba, best_operating_threshold)
+    risk_bins_df = _build_risk_bin_table(y_test, winner_proba)
+
+    print("\nModel comparison:")
+    print(results_df.to_string(index=False))
+    print("\nThreshold sweep summary:")
+    print(pd.DataFrame(threshold_rows).sort_values(by=["Model", "Threshold"]).to_string(index=False))
+    best_points = select_best_operating_points(threshold_rows)
+    print("\nBest operating points per model:")
+    print(best_points.to_string(index=False))
+    print(f"\nSelected winner: {best_model_name}")
+
+    importance_df = extract_feature_importance(best_model, feature_columns)
+
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    artifacts_dir = os.path.join(script_dir, "artifacts", run_id)
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
+    output_model_path = os.path.join(artifacts_dir, "injury_model.pkl")
+    model_bundle = {
+        "estimator": best_model,
+        "feature_columns": feature_columns,
+        "threshold": best_operating_threshold,
+        "medium_threshold": max(0.15, best_operating_threshold * 0.6),
+        "policy": {
+            "recall_hard_min": MIN_RECALL_HARD,
+            "recall_min": TARGET_RECALL,
+            "recall_high_target": TARGET_RECALL_HIGH,
+            "fpr_max_operating": MAX_FPR_OPERATING,
+            "precision_min": TARGET_PRECISION,
+            "f1_min": TARGET_F1,
+        },
+        "winner": best_model_name,
+    }
+    joblib.dump(model_bundle, output_model_path)
+
+    comparison_path = os.path.join(artifacts_dir, "model_comparison.csv")
+    results_df.to_csv(comparison_path, index=False)
+
+    calibration_path = os.path.join(artifacts_dir, "calibration_curve_data.csv")
+    (
+        pd.concat(
+            [df.assign(model=name) for name, df in calibration_bins.items()],
+            ignore_index=True,
+        ).to_csv(calibration_path, index=False)
+    )
+    threshold_path = os.path.join(artifacts_dir, "threshold_sweep.csv")
+    pd.DataFrame(threshold_rows).to_csv(threshold_path, index=False)
+    best_points_path = os.path.join(artifacts_dir, "best_operating_points.csv")
+    best_points.to_csv(best_points_path, index=False)
+    risk_bins_path = os.path.join(artifacts_dir, "risk_bins_summary.csv")
+    risk_bins_df.to_csv(risk_bins_path, index=False)
+
+    manifest = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "run_id": run_id,
+        "artifacts_dir": artifacts_dir,
+        "dataset_path": dataset_path,
+        "dataset_rows": int(len(df)),
+        "benchmark_path": benchmark_path if os.path.exists(benchmark_path) else None,
+        "threshold": best_operating_threshold,
+        "policy": model_bundle["policy"],
+        "winner": best_model_name,
+        "winner_metrics": {
+            "Recall@Threshold": float(winner_operating_metrics["Recall@Threshold"]),
+            "Precision@Threshold": float(winner_operating_metrics["Precision@Threshold"]),
+            "F1@Threshold": float(winner_operating_metrics["F1@Threshold"]),
+            "FPR@Threshold": float(winner_operating_metrics["FPR@Threshold"]),
+            "BrierScore": float(best_row["BrierScore"]),
+            "ROC-AUC": float(best_row["ROC-AUC"]),
+            "LogLoss": float(best_row["LogLoss"]),
+        },
+        "risk_bins": [
+            {
+                "bin": str(row["bin"]),
+                "samples": int(row["samples"]),
+                "injury_rate": float(row["injury_rate"]),
+            }
+            for _, row in risk_bins_df.iterrows()
+        ],
+    }
+    manifest_path = os.path.join(artifacts_dir, "run_manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+    if importance_df is not None:
+        importance_df.to_csv(os.path.join(artifacts_dir, "feature_importance.csv"), index=False)
+
+    print(f"\nSaved model bundle: {output_model_path}")
+    print(f"Saved comparison: {comparison_path}")
+    print(f"Saved calibration data: {calibration_path}")
+    print(f"Saved threshold sweep: {threshold_path}")
+    print(f"Saved best operating points: {best_points_path}")
+    print(f"Saved risk bins summary: {risk_bins_path}")
+    print(f"Saved run manifest: {manifest_path}")
+
+
+if __name__ == "__main__":
+    main()

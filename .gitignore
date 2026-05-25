@@ -9,6 +9,10 @@ backend/*.pkl
 .env
 backend/.env
 *.env
+serviceAccountKey.json
+*serviceAccount*.json
+firebase-adminsdk*.json
+firebase-key.json
 
 # Logs
 logs/
@@ -32,3 +36,8 @@ backend/uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# ML synthetic outputs (regenerate: ML_model/run_pipeline.py or data_generator.py + create_benchmark_set.py)
+ML_model/athlete_injury_data.csv
+ML_model/benchmark_holdout.csv
+ML_model/dataset_quality_report.json

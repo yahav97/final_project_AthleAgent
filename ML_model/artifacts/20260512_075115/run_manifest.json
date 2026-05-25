@@ -1,0 +1,44 @@
+{
+  "created_at_utc": "2026-05-12T07:51:16.010061+00:00",
+  "run_id": "20260512_075115",
+  "artifacts_dir": "C:\\dev\\final_project_AthleAgent\\ML_model\\artifacts\\20260512_075115",
+  "dataset_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\athlete_injury_data.csv",
+  "dataset_rows": 345000,
+  "benchmark_path": "C:\\dev\\final_project_AthleAgent\\ML_model\\benchmark_holdout.csv",
+  "threshold": 0.18,
+  "policy": {
+    "recall_hard_min": 0.8,
+    "recall_min": 0.85,
+    "recall_high_target": 0.88,
+    "fpr_max_operating": 0.7,
+    "precision_min": 0.13,
+    "f1_min": 0.22
+  },
+  "winner": "XGBoostDeep",
+  "winner_metrics": {
+    "Recall@Threshold": 0.8657229792300569,
+    "Precision@Threshold": 0.1406313798809447,
+    "F1@Threshold": 0.24195814538194188,
+    "FPR@Threshold": 0.6508520369134617,
+    "BrierScore": 0.11498494446277618,
+    "ROC-AUC": 0.7233440828461886,
+    "LogLoss": 0.3878041677445451
+  },
+  "risk_bins": [
+    {
+      "bin": "green_0_20",
+      "samples": 29116,
+      "injury_rate": 0.050212941338095896
+    },
+    {
+      "bin": "yellow_20_50",
+      "samples": 33902,
+      "injury_rate": 0.11424104772579789
+    },
+    {
+      "bin": "red_50_100",
+      "samples": 5982,
+      "injury_rate": 0.371782012704781
+    }
+  ]
+}

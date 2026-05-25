@@ -24,7 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger("athleagent")
 
 # Set specific loggers to appropriate levels
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)  # Reduce SQLAlchemy verbosity
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Reduce Uvicorn access logs
 
 

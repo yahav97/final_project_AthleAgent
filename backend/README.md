@@ -1,112 +1,102 @@
-# Backend - AthleAgent API
+# AthleAgent Backend (RC1)
 
-FastAPI backend for AthleAgent injury prediction system.
+**Documentation:** [`docs/README.md`](docs/README.md) — what lives where (notebook appendix vs production contracts).
 
-## 🚀 Quick Start
+FastAPI backend for injury-risk inference. This service is treated as mission-critical:
 
-### 1. Install Dependencies
+- If model gate checks pass, `POST /predict/daily` returns a model-based response.
+- If gate checks fail or input is invalid, `POST /predict/daily` returns HTTP 500 with a clear error.
 
-```bash
-pip install -r ../requirements.txt
-```
+## API Structure
 
-### 2. Setup Database
+### `POST /predict/daily`
 
-1. Create PostgreSQL database `athleagent` in pgAdmin
-2. Update `config.py` with your database credentials
-3. Run:
+Production inference endpoint (minimal trigger). The backend loads `userId`/`date` docs from Firestore and builds the internal feature payload server-side.
 
-```bash
-python create_tables.py
-```
+**Request:**
+- `userId`, `date` (yyyy-MM-dd)
 
-### 3. Run Server
+**Response JSON:**
+- `risk_score` (`0..1`, injury positive-class probability)
+- `risk_level` (`Low|Medium|High`)
+- `prediction_confidence` (`0..100`)
 
-```bash
-uvicorn main:app --reload
-```
+### `GET /status/ml`
 
-Server runs on: `http://localhost:8000`
-API Docs: `http://localhost:8000/docs`
+Internal operational endpoint:
+- `status` (`Live|Blocked`)
+- `gate_reason`
+- `winner`
+- `threshold`
+- `policy`
+- `degraded_rc`
 
-## 📁 Project Structure
+## ML Integration and Manifest Gate
 
-```
-backend/
-├── main.py              # FastAPI app entry point
-├── config.py            # Configuration (env variables)
-├── create_tables.py     # Database initialization script
-│
-├── models/              # SQLAlchemy ORM models
-│   ├── user.py
-│   ├── daily_record.py
-│   ├── prediction.py
-│   └── ...
-│
-├── schemas/             # Pydantic validation schemas
-│   ├── user.py
-│   ├── daily_data.py
-│   └── ...
-│
-├── repositories/        # Data access layer
-│   ├── user_repository.py
-│   └── ...
-│
-├── services/            # Business logic
-│   ├── auth_service.py
-│   ├── prediction_service.py
-│   └── ...
-│
-├── api/                 # API routes
-│   └── routes/
-│       ├── auth.py
-│       ├── predictions.py
-│       └── ...
-│
-├── database/            # Database connection
-│   └── connection.py
-│
-├── utils/               # Utilities
-│   ├── logging.py
-│   └── exceptions.py
-│
-└── ml/                  # ML model integration
-    └── model_loader.py
-```
+Model loading is handled in `backend/ml/model_loader.py`.
 
-## 🔧 Configuration
+At startup, the backend loads the promoted artifact set from:
+- `ML_model/artifacts/promoted.json`
 
-Create `.env` file:
+Then it validates `run_manifest.json` before marking model as live:
+- Recall hard gate: `Recall@Threshold >= 0.85`
+- AUC live sanity gate (RC1): `ROC-AUC >= 0.60`
 
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/athleagent
-SECRET_KEY=your-secret-key-min-32-chars
-GEMINI_API_KEY=your-gemini-api-key
-```
+If gate validation fails:
+- model status becomes `Blocked`
+- `POST /predict/daily` returns HTTP 500 (no fallback predictions)
 
-## 📊 Database Models
+## Run Locally
 
-- **User** - Users (athletes/coaches)
-- **DailyRecord** - Daily training/health data
-- **Prediction** - Injury risk predictions
-- **NutritionRecord** - Meal data from Gemini AI
-- **StressSurvey** - Daily stress surveys
-- **Team** - Team management
-- **HealthConnectPermission** - Health Connect integration
-
-## 🧪 Testing
+### 1) Create virtual environment
 
 ```bash
-# Test database connection
-python create_tables.py
+python -m venv .venv
+```
 
-# Run with auto-reload
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### 2) Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3) Start backend
+
+```bash
+cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## 📝 API Documentation
+Docs: `http://localhost:8000/docs`
 
-Once server is running, visit:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+## Tests
 
+Run backend tests:
+
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+## Data storage
+
+- Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.
+- After `POST /predict/daily`, merged fields on `daily_health/{date}` include **`finalRiskScore`**, **`riskLevel`**, **`predictionConfidence`**, **`predictionUpdatedAt`** (see `save_daily_prediction_result`).
+
+## Notes for Evaluation
+
+- RC1 is promoted through `ML_model/run_pipeline.py`.
+- Artifact history is versioned under `ML_model/artifacts/<timestamp>/`.
+- Production pointer is `ML_model/artifacts/promoted.json`.

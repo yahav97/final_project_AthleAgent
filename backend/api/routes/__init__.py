@@ -1,6 +1,3 @@
 """API route modules."""
 
-from . import auth
-
-__all__ = ["auth"]
-
+__all__ = ["health", "predict"]

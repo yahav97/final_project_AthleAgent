@@ -1,0 +1,129 @@
+"""Injury risk prediction HTTP routes."""
+
+from fastapi import APIRouter, HTTPException
+import pandas as pd
+
+from config import settings
+from ml.model_loader import get_model, get_model_status
+from services.model_features import DEFAULT_FEATURE_VALUES
+from schemas.inference import (
+    AthleteData,
+    DailyPredictionTriggerRequest,
+    InjuryPredictionResponse,
+    SimpleData,
+)
+from services.prediction_service import (
+    _resolve_model_bundle,
+    persist_prediction_result_or_raise,
+    predict_injury_risk_from_firestore,
+)
+from utils.logging import logger
+
+router = APIRouter(tags=["Prediction"])
+
+
+@router.post("/test_predict")
+def test_predict_injury(data: SimpleData):
+    """Return a fixed mock payload for UI/API smoke usage.
+
+    Args:
+        data: Minimal request containing a user identifier.
+
+    Returns:
+        dict: Stable mock inference payload.
+    """
+    return {
+        "user_id": data.user_id,
+        "risk_percentage": 72.5,
+        "risk_level": "High",
+        "message": "This is a mock response for Android UI testing",
+    }
+
+
+@router.post("/demo_predict")
+def demo_predict_injury(data: AthleteData):
+    """Run a lightweight heuristic score for legacy demo clients.
+
+    Args:
+        data: Legacy athlete feature payload.
+
+    Returns:
+        dict: Risk percentage and categorical risk level.
+    """
+    score = 10.0
+
+    if data.sleep_hours < 5.0:
+        score += 30.0
+    elif data.sleep_hours < 7.0:
+        score += 15.0
+
+    score += data.muscle_soreness * 7.0
+    score += data.stress_level * 0.25
+
+    if data.daily_distance_km > 12.0:
+        score += 15.0
+
+    final_score = min(score, 100.0)
+
+    return {
+        "risk_percentage": round(final_score, 1),
+        "risk_level": "High" if final_score > 60 else "Medium" if final_score > 40 else "Low",
+    }
+
+
+@router.post("/predict/daily", response_model=InjuryPredictionResponse)
+def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredictionResponse:
+    """
+    Minimal trigger endpoint: frontend sends only userId/date; backend loads all
+    relevant daily data directly from Firestore and runs production inference.
+    """
+    try:
+        result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
+        persist_prediction_result_or_raise(
+            trigger.userId,
+            trigger.date,
+            result,
+        )
+    except Exception as exc:
+        logger.exception("predict_daily_route_error userId=%s err=%s", trigger.userId, exc)
+        raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
+    return InjuryPredictionResponse(**result)
+
+
+@router.post("/predict/sklearn")
+def predict_injury_sklearn(data: AthleteData):
+    """Run legacy sklearn endpoint guarded behind explicit feature flag.
+
+    Args:
+        data: Legacy engineered feature row.
+
+    Returns:
+        dict: Legacy risk percentage response.
+    """
+    if not settings.ENABLE_LEGACY_SKLEARN_ENDPOINT:
+        raise HTTPException(
+            status_code=410,
+            detail="Legacy endpoint disabled. Use POST /predict/daily.",
+        )
+    loaded = get_model()
+    estimator, bundle_cols, *_rest = _resolve_model_bundle(loaded)
+    if estimator is None or not bundle_cols:
+        return {"error": "Model not loaded"}
+
+    merged = dict(DEFAULT_FEATURE_VALUES)
+    for key, val in data.model_dump().items():
+        if val is not None:
+            merged[key] = float(val)
+    input_df = pd.DataFrame([[merged[c] for c in bundle_cols]], columns=bundle_cols)
+    risk_probability = estimator.predict_proba(input_df)[0][1]
+
+    return {
+        "risk_percentage": round(risk_probability * 100, 1),
+        "risk_level": "High" if risk_probability > 0.6 else "Medium" if risk_probability > 0.3 else "Low",
+    }
+
+
+@router.get("/status/ml")
+def ml_status():
+    """Expose model liveness and gate metadata for operational debugging."""
+    return get_model_status()

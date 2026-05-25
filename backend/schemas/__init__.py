@@ -1,20 +1,17 @@
 """Pydantic schemas for API requests and responses."""
 
-from .user import (
-    UserCreate,
-    UserResponse,
-    LoginRequest,
-    GoogleAuthRequest,
-    LoginResponse,
-    TokenResponse,
+from .inference import (
+    AthleteData,
+    DailyPredictionTriggerRequest,
+    InjuryPredictionRequest,
+    InjuryPredictionResponse,
+    SimpleData,
 )
 
 __all__ = [
-    "UserCreate",
-    "UserResponse",
-    "LoginRequest",
-    "GoogleAuthRequest",
-    "LoginResponse",
-    "TokenResponse",
+    "AthleteData",
+    "DailyPredictionTriggerRequest",
+    "InjuryPredictionRequest",
+    "InjuryPredictionResponse",
+    "SimpleData",
 ]
-
