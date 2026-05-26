@@ -2,6 +2,7 @@ package com.yahav.athleagent.ui.athlete
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -14,10 +15,15 @@ import java.util.Date
 import java.util.Locale
 import androidx.core.net.toUri
 
+import com.yahav.athleagent.network.ApiClient
+import com.yahav.athleagent.network.ApiService
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+
 class MealAnalysisActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMealAnalysisBinding
 
-    // Daily nutritional targets
     private val targetCalories = 2500
     private val targetProtein = 150
     private val targetCarbs = 300
@@ -28,23 +34,19 @@ class MealAnalysisActivity : AppCompatActivity() {
         binding = ActivityMealAnalysisBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Extract the nutritional data passed from the Gemini API analysis
         val calories = intent.getIntExtra("CALORIES", 0)
         val protein = intent.getIntExtra("PROTEIN", 0)
         val carbs = intent.getIntExtra("CARBS", 0)
         val imageUriString = intent.getStringExtra("IMAGE_URI")
 
-        // Display the captured or selected image
         if (imageUriString != null) {
             binding.mealIMGPhoto.setImageURI(imageUriString.toUri())
         }
 
-        // Display the extracted nutritional values
         binding.mealLBLCalories.text = "$calories kcal"
         binding.mealLBLProtein.text = "${protein}g"
         binding.mealLBLCarbs.text = "${carbs}g"
 
-        // Calculate progress percentages based on daily targets
         val calProgress = ((calories.toFloat() / targetCalories) * 100).toInt()
         val proProgress = ((protein.toFloat() / targetProtein) * 100).toInt()
         val carbProgress = ((carbs.toFloat() / targetCarbs) * 100).toInt()
@@ -53,9 +55,7 @@ class MealAnalysisActivity : AppCompatActivity() {
         binding.mealPRGProtein.progress = proProgress.coerceAtMost(100)
         binding.mealPRGCarbs.progress = carbProgress.coerceAtMost(100)
 
-        // Handle the save button click to persist the meal data
         binding.mealBTNSave.setOnClickListener {
-            // Disable the button to prevent multiple submissions
             binding.mealBTNSave.isEnabled = false
             saveMealToDatabase(calories, protein, carbs)
         }
@@ -66,7 +66,6 @@ class MealAnalysisActivity : AppCompatActivity() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-        //  Save the specific meal entry as a new document
         val mealData = hashMapOf(
             "calories" to calories,
             "protein" to protein,
@@ -79,7 +78,6 @@ class MealAnalysisActivity : AppCompatActivity() {
             .collection("meals").add(mealData)
             .addOnSuccessListener {
 
-                //  Upon successful save, update the daily aggregated totals
                 val dailyNutritionUpdates = hashMapOf(
                     "totalCalories" to FieldValue.increment(calories.toDouble()),
                     "totalProtein" to FieldValue.increment(protein.toDouble()),
@@ -93,7 +91,10 @@ class MealAnalysisActivity : AppCompatActivity() {
                     .set(dailyNutritionUpdates, SetOptions.merge())
                     .addOnSuccessListener {
                         Toast.makeText(this, "Meal saved successfully!", Toast.LENGTH_SHORT).show()
-                        finish() // Close the screen and return to the dashboard
+
+                        checkAndTriggerPredictionInBackground()
+
+                        finish()
                     }
                     .addOnFailureListener {
                         Toast.makeText(this, "Error updating daily total", Toast.LENGTH_SHORT).show()
@@ -104,5 +105,40 @@ class MealAnalysisActivity : AppCompatActivity() {
                 Toast.makeText(this, "Error saving meal: ${e.message}", Toast.LENGTH_SHORT).show()
                 binding.mealBTNSave.isEnabled = true
             }
+    }
+
+    private fun checkAndTriggerPredictionInBackground() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val db = FirebaseFirestore.getInstance()
+
+        val healthRef = db.collection("users").document(userId).collection("daily_health").document(today)
+        val checkinRef = db.collection("users").document(userId).collection("daily_checkins").document(today)
+
+        // התזונה נשמרה, נבדוק ששני תנאי החובה (שעון + סקר) קיימים לפני שנריץ חיזוי מעודכן
+        healthRef.get().addOnSuccessListener { healthDoc ->
+            checkinRef.get().addOnSuccessListener { checkinDoc ->
+
+                val hasWatch = healthDoc.exists() && healthDoc.contains("steps")
+                val hasSurvey = checkinDoc.exists() && checkinDoc.contains("energyLevel")
+
+                if (hasWatch && hasSurvey) {
+                    Log.d("ML_Trigger", "Nutrition added, and both Watch and Survey are present. Triggering full prediction.")
+
+                    val requestData = ApiService.PredictionTriggerRequest(userId, today)
+                    ApiClient.apiService.getDailyPrediction(requestData)
+                        .enqueue(object : Callback<ApiService.PredictionResponse> {
+                            override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
+                                if (response.isSuccessful) Log.d("ML_Trigger", "Full dynamic prediction updated successfully!")
+                            }
+                            override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
+                                Log.e("ML_Trigger", "Failed to trigger dynamic prediction", t)
+                            }
+                        })
+                } else {
+                    Log.d("ML_Trigger", "Nutrition saved, but core metrics (Watch/Survey) are missing. Skipping trigger.")
+                }
+            }
+        }
     }
 }

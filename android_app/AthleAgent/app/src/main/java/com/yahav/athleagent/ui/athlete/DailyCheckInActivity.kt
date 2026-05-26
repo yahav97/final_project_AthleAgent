@@ -18,6 +18,12 @@ import java.util.Date
 import java.util.Locale
 import androidx.core.graphics.toColorInt
 
+import com.yahav.athleagent.network.ApiClient
+import com.yahav.athleagent.network.ApiService
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+
 class DailyCheckInActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDailyCheckInBinding
 
@@ -25,6 +31,9 @@ class DailyCheckInActivity : AppCompatActivity() {
     private var selectedSoreness: Int = 3
     private var energyLevel: Float = 60f
     private var stressLevel: Float = 30f
+
+    // ML Target Field (0 = Not Injured, 1 = Injured)
+    private var injuredYesterday: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,14 +44,16 @@ class DailyCheckInActivity : AppCompatActivity() {
     }
 
     private fun initListeners() {
-        //  Set click listeners for each soreness button separately
         binding.checkinBTN1.setOnClickListener { updateSorenessSelection(1) }
         binding.checkinBTN2.setOnClickListener { updateSorenessSelection(2) }
         binding.checkinBTN3.setOnClickListener { updateSorenessSelection(3) }
         binding.checkinBTN4.setOnClickListener { updateSorenessSelection(4) }
         binding.checkinBTN5.setOnClickListener { updateSorenessSelection(5) }
 
-        //  Save data to Firebase when clicking Submit
+        binding.checkinSWITCHInjured.setOnCheckedChangeListener { _, isChecked ->
+            injuredYesterday = if (isChecked) 1 else 0
+        }
+
         binding.dailyCheckInBTNSubmit.setOnClickListener {
             energyLevel = binding.checkinSLDEnergy.value
             stressLevel = binding.checkinSLDStress.value
@@ -51,7 +62,6 @@ class DailyCheckInActivity : AppCompatActivity() {
         }
     }
 
-    // Updates the selected value and properly redraws the button backgrounds
     private fun updateSorenessSelection(score: Int) {
         selectedSoreness = score
 
@@ -63,26 +73,23 @@ class DailyCheckInActivity : AppCompatActivity() {
             binding.checkinBTN5
         )
 
-        // Create an outlined design (transparent with a colored stroke) for unselected buttons
-        val strokeWidthPx = (2 * resources.displayMetrics.density).toInt() // Stroke width
-        val cornerRadiusPx = 8f * resources.displayMetrics.density // 8dp as in XML
+        val strokeWidthPx = (2 * resources.displayMetrics.density).toInt()
+        val cornerRadiusPx = 8f * resources.displayMetrics.density
         val strokeColor = ContextCompat.getColor(this, R.color.brand_button_dark_muted)
 
         val unselectedBackground = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = cornerRadiusPx
             setStroke(strokeWidthPx, strokeColor)
-            setColor(Color.TRANSPARENT) // Transparent background
+            setColor(Color.TRANSPARENT)
         }
 
         buttons.forEachIndexed { index, button ->
             if (index + 1 == score) {
-                // Selected button: apply gradient background and white text
                 button.backgroundTintList = null
                 button.setBackgroundResource(R.drawable.btn_gradient)
                 button.setTextColor(ContextCompat.getColor(this, R.color.white))
             } else {
-                // Unselected button: apply the outlined design created above
                 button.backgroundTintList = null
                 button.background = unselectedBackground
                 button.setTextColor(ContextCompat.getColor(this, R.color.brand_button_dark_muted))
@@ -93,7 +100,6 @@ class DailyCheckInActivity : AppCompatActivity() {
     private fun saveCheckInToFirebase() {
         Snackbar.make(binding.root, "Saving your check-in...", Snackbar.LENGTH_SHORT).show()
 
-        // Prepare the data map
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
@@ -101,20 +107,21 @@ class DailyCheckInActivity : AppCompatActivity() {
             "energyLevel" to energyLevel.toInt(),
             "muscleSoreness" to selectedSoreness,
             "stressLevel" to stressLevel.toInt(),
+            "injuredYesterday" to injuredYesterday,
             "lastCheckInTime" to FieldValue.serverTimestamp()
         )
 
-        // Save to Firestore
         val db = FirebaseFirestore.getInstance()
         db.collection("users").document(userId)
-            .collection("daily_checkins").document(today) // <-- Separate collection here
+            .collection("daily_checkins").document(today)
             .set(checkInData, SetOptions.merge())
             .addOnSuccessListener {
                 Snackbar.make(binding.root, "Check-in Saved Successfully!", Snackbar.LENGTH_LONG)
                     .setBackgroundTint("#3A6578".toColorInt())
                     .show()
 
-                // Close the screen shortly after showing the message
+                checkAndTriggerPredictionInBackground()
+
                 binding.root.postDelayed({ finish() }, 1500)
             }
             .addOnFailureListener { e ->
@@ -123,5 +130,35 @@ class DailyCheckInActivity : AppCompatActivity() {
                     .setBackgroundTint(Color.RED)
                     .show()
             }
+    }
+
+    private fun checkAndTriggerPredictionInBackground() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val db = FirebaseFirestore.getInstance()
+
+        val healthRef = db.collection("users").document(userId).collection("daily_health").document(today)
+
+        // הסקר כבר נשמר בהצלחה, נבדוק רק אם גם השעון כבר סונכרן היום
+        healthRef.get().addOnSuccessListener { healthDoc ->
+            val hasWatch = healthDoc.exists() && healthDoc.contains("steps")
+
+            if (hasWatch) {
+                Log.d("ML_Trigger", "Survey completed and Watch Sync is already present. Triggering core prediction.")
+
+                val requestData = ApiService.PredictionTriggerRequest(userId, today)
+                ApiClient.apiService.getDailyPrediction(requestData)
+                    .enqueue(object : Callback<ApiService.PredictionResponse> {
+                        override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
+                            if (response.isSuccessful) Log.d("ML_Trigger", "Core prediction triggered successfully!")
+                        }
+                        override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
+                            Log.e("ML_Trigger", "Failed to trigger prediction", t)
+                        }
+                    })
+            } else {
+                Log.d("ML_Trigger", "Survey saved, but waiting for Watch Sync before running the model.")
+            }
+        }
     }
 }

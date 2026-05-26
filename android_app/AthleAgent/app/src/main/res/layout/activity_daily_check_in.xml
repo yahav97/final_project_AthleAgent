@@ -18,7 +18,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginTop="@dimen/spacing_24"
-            android:layout_marginBottom="@dimen/spacing_64">
+            android:layout_marginBottom="@dimen/spacing_60">
 
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="match_parent"
@@ -236,7 +236,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="@dimen/spacing_4"
-            android:layout_marginBottom="@dimen/spacing_48">
+            android:layout_marginBottom="@dimen/spacing_32">
 
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
@@ -259,6 +259,36 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1.5dp"
+            android:background="@color/text_color_secondary"
+            android:layout_marginBottom="@dimen/spacing_24"/>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="@dimen/spacing_36">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/injured_yesterday"
+                android:textSize="@dimen/login_text_size"
+                android:textColor="@color/text"
+                android:fontFamily="@font/roboto_bold" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/checkin_SWITCH_injured"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:thumbTint="@color/white"
+                app:trackTint="@color/brand_button_light_muted" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
         <com.google.android.material.button.MaterialButton
             android:id="@+id/dailyCheckIn_BTN_submit"
             android:layout_width="@dimen/button_width"
