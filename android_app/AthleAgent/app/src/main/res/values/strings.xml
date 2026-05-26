@@ -93,5 +93,10 @@
     <string name="sync_button_text">Sync Today\'s Data</string>
     <string name="Team_name">No team</string>
     <string name="AI_meal_analysis">Analyzing Meal...</string>
+    <string name="injured_yesterday">Did you get injured yesterday?</string>
+    <string name="age">Age (e.g., 25)</string>
+    <string name="previous_injuries_count">Previous Injuries (Count)</string>
+    <string name="save_amp_continue"><![CDATA[Save & Continue]]></string>
+    <string name="complete_profile">Complete Profile</string>
 
 </resources>

@@ -14,6 +14,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseUser
+import com.yahav.athleagent.R
 import com.yahav.athleagent.ui.athlete.HomeAthleteActivity
 import com.yahav.athleagent.ui.coach.HomeCoachActivity
 import com.yahav.athleagent.databinding.ActivityLoginBinding
@@ -153,39 +154,87 @@ class LoginActivity : AppCompatActivity() {
             // Google sign-in failed  - restore the normal view
             binding.loginLayoutLoading.visibility = View.GONE
             binding.loginLayoutContent.visibility = View.VISIBLE
-            // Intentionally not showing a snackbar if the user simply closed the Google window voluntarily
         }
     }
 
     private fun showRoleSelectionDialog(user: FirebaseUser) {
-        val roles = arrayOf("Athlete", "Coach")
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Select Your Role")
-            .setMessage("Are you a Coach or an Athlete?")
-            .setCancelable(false)
-            .setItems(roles) { _, which ->
-                val selectedRole = roles[which]
-                // User made a selection, show loading UI while data is being saved
-                binding.loginLayoutContent.visibility = View.GONE
-                binding.loginLayoutLoading.visibility = View.VISIBLE
-                saveUserToFirestore(user, selectedRole)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_google_profile, null)
+
+        val toggleGroup = dialogView.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.google_TOGGLE_role)
+        val tilAge = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.google_TIL_age)
+        val etAge = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.google_ET_age)
+        val tilInjury = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.google_TIL_injury_history)
+        val etInjury = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.google_ET_injury_history)
+        val btnSave = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.google_BTN_save)
+
+        toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                if (checkedId == R.id.google_BTN_coach_role) {
+                    tilAge.visibility = View.GONE
+                    tilInjury.visibility = View.GONE
+                } else {
+                    tilAge.visibility = View.VISIBLE
+                    tilInjury.visibility = View.VISIBLE
+                }
             }
-            .show()
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        btnSave.setOnClickListener {
+            val isAthlete = toggleGroup.checkedButtonId == R.id.google_BTN_athlete_role
+            val selectedRole = if (isAthlete) "Athlete" else "Coach"
+
+            val ageStr = etAge.text.toString().trim()
+            val injuryStr = etInjury.text.toString().trim()
+            val age = if (ageStr.isNotEmpty()) ageStr.toInt() else 25
+            val injuries = if (injuryStr.isNotEmpty()) injuryStr.toInt() else 0
+
+            dialog.dismiss()
+            binding.loginLayoutContent.visibility = View.GONE
+            binding.loginLayoutLoading.visibility = View.VISIBLE
+
+            saveUserToFirestore(user, selectedRole, age, injuries)
+        }
+
+        // Show the dialog first
+        dialog.show()
+
+        // TRICK: Force the dialog window to stretch to full screen AFTER it's shown
+        dialog.window?.setLayout(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 
-    private fun saveUserToFirestore(user: FirebaseUser, role: String) {
-        val userData = hashMapOf(
+    private fun saveUserToFirestore(user: FirebaseUser, role: String, age: Int = 25, injuries: Int = 0) {
+        val userData = hashMapOf<String, Any>(
             "fullName" to (user.displayName ?: "User"),
             "email" to (user.email ?: ""),
             "role" to role,
             "teamId" to ""
         )
 
+        // Only attach ML specifics if they are an Athlete
+        if (role == "Athlete") {
+            userData["age"] = age
+            userData["historyInjuryCount"] = injuries
+        }
+
         FirebaseFirestore.getInstance().collection("users").document(user.uid)
             .set(userData)
             .addOnSuccessListener {
                 SignalManager.getInstance().snackbar(binding.root, "Welcome ${user.displayName}!")
                 navigateToDashboard(role)
+            }
+            .addOnFailureListener {
+                binding.loginLayoutLoading.visibility = View.GONE
+                binding.loginLayoutContent.visibility = View.VISIBLE
+                SignalManager.getInstance().snackbar(binding.root, "Error saving profile")
             }
     }
 
