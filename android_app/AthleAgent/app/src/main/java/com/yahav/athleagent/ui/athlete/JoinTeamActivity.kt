@@ -37,7 +37,7 @@ class JoinTeamActivity : AppCompatActivity() {
 
         // Query the "teams" collection to find a match for the entered team code
         db.collection("teams")
-            .whereEqualTo("TeamCode", teamCode)
+            .whereEqualTo("teamCode", teamCode)
             .get()
             .addOnSuccessListener { documents ->
                 if (documents.isEmpty) {

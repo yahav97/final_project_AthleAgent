@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     ENABLE_LEGACY_SKLEARN_ENDPOINT: bool = False
 
     # sklearn model artifact (default: backend/injury_model.pkl)
-    MODEL_PATH: str = str(Path(__file__).resolve().parent / "injury_model.pkl")
+    MODEL_PATH: str = str(
+    Path(__file__).resolve().parent.parent / "ML_model" / "artifacts" / "20260512_075115" / "injury_model.pkl"
+)
 
     # Google OAuth (optional; used by external/google_auth helpers)
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")

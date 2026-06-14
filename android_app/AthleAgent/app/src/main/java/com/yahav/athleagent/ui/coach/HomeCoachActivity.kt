@@ -35,24 +35,28 @@ class HomeCoachActivity : AppCompatActivity() {
         }
 
         setupClickListeners()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // מרעננים נתונים כשחוזרים ממסך יצירת הקבוצה
         loadCoachData()
         listenForPendingRequests()
     }
 
     private fun setupClickListeners() {
-        // Navigate to the requests screen when clicking the notification
         binding.coachHomeCARDNotifications.setOnClickListener {
-            val intent = Intent(this, CoachRequestsActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, CoachRequestsActivity::class.java))
         }
         binding.coachHomeBTNManageTeam.setOnClickListener {
-            val intent = Intent(this, CoachRequestsActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, CoachRequestsActivity::class.java))
         }
-        // Navigate to the dashboard screen
         binding.coachHomeBTNDashboard.setOnClickListener {
-            val intent = Intent(this, CoachDashboardActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, CoachDashboardActivity::class.java))
+        }
+        // המעבר למסך יצירת הקבוצה החדש!
+        binding.coachHomeCARDCreateTeamAction.setOnClickListener {
+            startActivity(Intent(this, CreateTeamActivity::class.java))
         }
         binding.btnLogout.setOnClickListener {
             performLogout()
@@ -62,7 +66,7 @@ class HomeCoachActivity : AppCompatActivity() {
     private fun loadCoachData() {
         val uid = auth.currentUser?.uid ?: return
 
-        // coach name
+        // טעינת שם המאמן
         db.collection("users").document(uid).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
@@ -70,20 +74,24 @@ class HomeCoachActivity : AppCompatActivity() {
                     binding.coachHomeLBLName.text = coachName
                 }
             }
-            .addOnFailureListener {
-                Log.e("HomeCoach", "Failed to load coach data")
-            }
 
-        // Team Name
+        // בדיקה האם יש קבוצה ועדכון התצוגה של הכרטיסיות
         db.collection("teams").whereEqualTo("coachId", uid).get()
             .addOnSuccessListener { teams ->
                 if (!teams.isEmpty) {
                     val teamName = teams.documents[0].getString("TeamName") ?: "Unknown Team"
                     binding.coachHomeLBLTeamName.text = teamName
+                    binding.coachHomeLBLTeamName.visibility = View.VISIBLE
+
+                    // יש קבוצה: מציגים דאשבורד וניהול, מסתירים את יצירת הקבוצה
+                    binding.coachHomeLAYOUTExistingTeamActions.visibility = View.VISIBLE
+                    binding.coachHomeCARDCreateTeamAction.visibility = View.GONE
+                } else {
+                    // אין קבוצה: מסתירים את שם הקבוצה, דאשבורד וניהול, מציגים את כרטיסיית היצירה
+                    binding.coachHomeLBLTeamName.visibility = View.GONE
+                    binding.coachHomeLAYOUTExistingTeamActions.visibility = View.GONE
+                    binding.coachHomeCARDCreateTeamAction.visibility = View.VISIBLE
                 }
-            }
-            .addOnFailureListener {
-                Log.e("HomeCoach", "Failed to load team data")
             }
     }
 
@@ -91,21 +99,16 @@ class HomeCoachActivity : AppCompatActivity() {
     private fun listenForPendingRequests() {
         val uid = auth.currentUser?.uid ?: return
 
-        // First, locate the coach's team
         db.collection("teams").whereEqualTo("coachId", uid).get()
             .addOnSuccessListener { teams ->
                 if (!teams.isEmpty) {
                     val teamId = teams.documents[0].id
 
-                    // Listen in real-time (SnapshotListener) for pending join requests
                     db.collection("teams").document(teamId)
                         .collection("requests")
                         .whereEqualTo("status", "pending")
                         .addSnapshotListener { snapshot, error ->
-                            if (error != null) {
-                                Log.e("HomeCoach", "Listen failed.", error)
-                                return@addSnapshotListener
-                            }
+                            if (error != null) return@addSnapshotListener
 
                             if (snapshot != null) {
                                 val pendingCount = snapshot.size()
@@ -113,23 +116,20 @@ class HomeCoachActivity : AppCompatActivity() {
                                     binding.coachHomeCARDNotifications.visibility = View.VISIBLE
                                     binding.coachHomeLBLNotifText.text = "You have $pendingCount new athlete join requests!"
                                 } else {
-                                    // If there are no requests, update the text (or optionally hide the notification)
-                                    binding.coachHomeLBLNotifText.text = "No new requests at the moment."
-                                    // Optional: Hide the card entirely when there are no requests
-                                    // binding.coachHomeCARDNotifications.visibility = View.GONE
+                                    binding.coachHomeCARDNotifications.visibility = View.VISIBLE
+                                    binding.coachHomeLBLNotifText.text = "No pending requests at the moment."
                                 }
                             }
                         }
+                } else {
+                    binding.coachHomeCARDNotifications.visibility = View.GONE
                 }
             }
     }
-    private fun performLogout() {
-        // 1. Sign out from Firebase Auth (email/password)
-        FirebaseAuth.getInstance().signOut()
 
-        // 2. Sign out from Google Auth to allow account selection on next login
+    private fun performLogout() {
+        FirebaseAuth.getInstance().signOut()
         AuthUI.getInstance().signOut(this).addOnCompleteListener {
-            // 3. Navigate back to the login screen and clear the activity back stack
             val intent = Intent(this, LoginActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)

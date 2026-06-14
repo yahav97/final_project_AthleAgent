@@ -161,10 +161,8 @@ def injury_prediction_request_from_firestore_snapshot(
 ) -> InjuryPredictionRequest:
     """
     Build the same ``InjuryPredictionRequest`` as the production Firestore path.
-
     Merge policy matches ``predict_injury_risk_from_firestore``:
-    prefer same-day documents for all health signals, fallback to date-1 snapshot when needed,
-    plus same-day check-ins and nutrition (with optional history backfill).
+    prefer same-day documents for all health signals, fallback to date-1 snapshot when needed.
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
@@ -185,9 +183,18 @@ def injury_prediction_request_from_firestore_snapshot(
     if ij_raw is None:
         ij_raw = health_today.get("injured_yesterday")
 
-    def _today_then_yesterday(field: str) -> Any:
-        v = health_today.get(field)
-        return health_yesterday.get(field) if v is None else v
+    def _today_then_yesterday(field_options: list[str]) -> Any:
+        """Helper to search for multiple possible field names, first today, then yesterday."""
+        for field in field_options:
+            val = health_today.get(field)
+            if val is not None and val != 0: # Avoid grabbing 0 if another name has the real value
+                return val
+        for field in field_options:
+            val = health_yesterday.get(field)
+            if val is not None:
+                return val
+        return 0
+
     hr_avg_today = _firestore_doc_heartrate_avg(health_today)
 
     return InjuryPredictionRequest(
@@ -196,32 +203,45 @@ def injury_prediction_request_from_firestore_snapshot(
         age=profile.get("age"),
         historyInjuryCount=hist_profile,
         injuredYesterday=_coerce_injured_yesterday(ij_raw),
-        sleepMinutes=_today_then_yesterday("sleepMinutes"),
-        steps=_today_then_yesterday("steps"),
-        distanceMeters=_today_then_yesterday("distanceMeters"),
-        activeCalories=_today_then_yesterday("activeCalories"),
-        totalCalories=_today_then_yesterday("totalCalories"),
+        
+        # --- HEALTH CONNECT ALIGNMENT --- 
+        # By passing a list, the server checks both what the ML model wants 
+        # and what the Android app actually sent.
+        sleepMinutes=_today_then_yesterday(["sleepMinutes", "sleep_minutes"]),
+        steps=_today_then_yesterday(["steps", "daily_steps"]),
+        distanceMeters=_today_then_yesterday(["distanceMeters", "distance_meters", "daily_distance_meters"]),
+        activeCalories=_today_then_yesterday(["activeCalories", "active_calories", "active_calories_burned"]),
+        totalCalories=_today_then_yesterday(["totalCalories", "total_calories", "daily_calories"]),
+        
         heartRateAvg=hr_avg_today if hr_avg_today is not None else _firestore_doc_heartrate_avg(health_yesterday),
-        heartRateMax=_today_then_yesterday("heartRateMax"),
-        heartRateMin=_today_then_yesterday("heartRateMin"),
-        weightKg=_today_then_yesterday("weightKg"),
-        heightCm=_today_then_yesterday("heightCm"),
-        bmrCalories=_today_then_yesterday("bmrCalories"),
-        hrvRmssd=_today_then_yesterday("hrvRmssd"),
-        restingHeartRate=_today_then_yesterday("restingHeartRate"),
-        bodyFatPct=_today_then_yesterday("bodyFatPct"),
-        vo2Max=_today_then_yesterday("vo2Max"),
-        elevationGainedMeters=_today_then_yesterday("elevationGainedMeters"),
-        floorsClimbed=_today_then_yesterday("floorsClimbed"),
-        avgSpeed=_today_then_yesterday("avgSpeed"),
-        maxSpeed=_today_then_yesterday("maxSpeed"),
-        avgPower=_today_then_yesterday("avgPower"),
-        avgCadence=_today_then_yesterday("avgCadence"),
-        respiratoryRate=_today_then_yesterday("respiratoryRate"),
-        oxygenSaturation=_today_then_yesterday("oxygenSaturation"),
+        heartRateMax=_today_then_yesterday(["heartRateMax", "heart_rate_max"]),
+        heartRateMin=_today_then_yesterday(["heartRateMin", "heart_rate_min"]),
+        
+        weightKg=_today_then_yesterday(["weightKg", "weight_kg"]),
+        heightCm=_today_then_yesterday(["heightCm", "height_cm"]),
+        bmrCalories=_today_then_yesterday(["bmrCalories", "bmr_calories"]),
+        
+        hrvRmssd=_today_then_yesterday(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
+        restingHeartRate=_today_then_yesterday(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
+        bodyFatPct=_today_then_yesterday(["bodyFatPct", "body_fat_pct"]),
+        vo2Max=_today_then_yesterday(["vo2Max", "vo2_max"]),
+        
+        elevationGainedMeters=_today_then_yesterday(["elevationGainedMeters", "elevation_gained_meters"]),
+        floorsClimbed=_today_then_yesterday(["floorsClimbed", "floors_climbed"]),
+        
+        avgSpeed=_today_then_yesterday(["avgSpeed", "avg_speed"]),
+        maxSpeed=_today_then_yesterday(["maxSpeed", "max_speed"]),
+        avgPower=_today_then_yesterday(["avgPower", "avg_power"]),
+        avgCadence=_today_then_yesterday(["avgCadence", "avg_cadence"]),
+        
+        respiratoryRate=_today_then_yesterday(["respiratoryRate", "respiratory_rate"]),
+        oxygenSaturation=_today_then_yesterday(["oxygenSaturation", "oxygen_saturation", "spo2"]),
+        # ---------------------------------
+        
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),
+        
         totalProtein=nutrition.get("totalProtein"),
         totalCarbs=nutrition.get("totalCarbs"),
         mealsLoggedCount=nutrition.get("mealsLoggedCount"),
@@ -310,8 +330,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     X = validate_feature_vector_for_model(df, model_contract)
 
     proba = float(model.predict_proba(X)[0, 1])
-    high_cutoff = float(model_threshold)
-    medium_cutoff = min(float(medium_threshold), high_cutoff)
+    high_cutoff = 0.70    
+    medium_cutoff = 0.40  
     risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
     return {
         "risk_level": risk_level,

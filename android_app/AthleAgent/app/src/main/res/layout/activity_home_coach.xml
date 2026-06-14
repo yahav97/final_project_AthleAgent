@@ -68,9 +68,10 @@
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/coachHome_CARD_notifications"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_72"
+                android:layout_marginBottom="@dimen/spacing_32"
                 app:cardBackgroundColor="@color/background_white_floral"
                 app:cardCornerRadius="@dimen/spacing_12"
                 app:cardElevation="0dp"
@@ -105,13 +106,16 @@
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_32"
+                android:layout_marginBottom="@dimen/spacing_16"
                 android:fontFamily="@font/roboto_bold"
                 android:text="@string/daily_actions"
                 android:textColor="@color/brand_button_dark_muted"
                 android:textSize="@dimen/login_text_size" />
 
+            <!-- אזור הפעולות כשיש קבוצה (דאשבורד וניהול) -->
             <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/coachHome_LAYOUT_existingTeamActions"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:baselineAligned="false"
@@ -191,6 +195,44 @@
                     </androidx.appcompat.widget.LinearLayoutCompat>
                 </com.google.android.material.card.MaterialCardView>
             </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <!-- הכרטיסייה החדשה של יצירת קבוצה כשהמאמן ללא קבוצה -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/coachHome_CARD_createTeamAction"
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="@dimen/spacing_20"
+                app:cardElevation="3dp">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_24">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="@dimen/spacing_44"
+                        android:layout_height="@dimen/spacing_44"
+                        android:layout_marginBottom="@dimen/spacing_16"
+                        android:src="@android:drawable/ic_menu_add"
+                        app:tint="@color/text" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/roboto_bold"
+                        android:text="Create\nNew Team"
+                        android:textAlignment="center"
+                        android:textColor="@color/text"
+                        android:textSize="@dimen/text_size_input_bigger" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </com.google.android.material.card.MaterialCardView>
+
         </androidx.appcompat.widget.LinearLayoutCompat>
     </ScrollView>
 

@@ -2,8 +2,8 @@
 backend/venv/
 __pycache__/
 *.pyc
-*.pkl
-backend/*.pkl
+#*.pkl
+#backend/*.pkl
 
 # Environment variables (contains secrets!)
 .env
