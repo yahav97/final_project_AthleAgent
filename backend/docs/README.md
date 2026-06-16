@@ -6,6 +6,7 @@ Avoid duplicating content across files. Use this map:
 |----------|---------|
 | [**ML notebook appendix**](../../ML_model/notebooks/model_improvement_journey.ipynb) | **Single source** for ML story: data generation, EDA, feature comparison, model scores, charts |
 | [`FEATURES.md`](FEATURES.md) | **Production contract only** — Firestore fields, preprocessing, defaults, blocking rules |
+| [`RISK_SCORE.md`](RISK_SCORE.md) | **Risk score end-to-end** — ML inference, features, days window, API/Firestore output, thresholds |
 | [`MODEL.md`](MODEL.md) | **Production ML config only** — threshold, UI bands, live gate, script paths |
 | [`BACKEND.md`](BACKEND.md) | API, architecture, code layout |
 
