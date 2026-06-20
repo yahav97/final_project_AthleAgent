@@ -13,11 +13,11 @@ from schemas.inference import (
     SimpleData,
 )
 from services.prediction_service import (
-    _resolve_model_bundle,
     persist_prediction_result_or_raise,
     predict_injury_risk_from_firestore,
+    resolve_model_bundle,
 )
-from utils.logging import logger
+from services.risk_levels import LEGACY_SKLEARN_HIGH, LEGACY_SKLEARN_MEDIUM, classify_risk_level
 
 router = APIRouter(tags=["Prediction"])
 
@@ -77,16 +77,12 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
     Minimal trigger endpoint: frontend sends only userId/date; backend loads all
     relevant daily data directly from Firestore and runs production inference.
     """
-    try:
-        result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
-        persist_prediction_result_or_raise(
-            trigger.userId,
-            trigger.date,
-            result,
-        )
-    except Exception as exc:
-        logger.exception("predict_daily_route_error userId=%s err=%s", trigger.userId, exc)
-        raise HTTPException(status_code=500, detail=f"Prediction unavailable: {exc}") from exc
+    result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
+    persist_prediction_result_or_raise(
+        trigger.userId,
+        trigger.date,
+        result,
+    )
     return InjuryPredictionResponse(**result)
 
 
@@ -106,7 +102,7 @@ def predict_injury_sklearn(data: AthleteData):
             detail="Legacy endpoint disabled. Use POST /predict/daily.",
         )
     loaded = get_model()
-    estimator, bundle_cols, *_rest = _resolve_model_bundle(loaded)
+    estimator, bundle_cols, *_rest = resolve_model_bundle(loaded)
     if estimator is None or not bundle_cols:
         return {"error": "Model not loaded"}
 
@@ -119,7 +115,11 @@ def predict_injury_sklearn(data: AthleteData):
 
     return {
         "risk_percentage": round(risk_probability * 100, 1),
-        "risk_level": "High" if risk_probability > 0.6 else "Medium" if risk_probability > 0.3 else "Low",
+        "risk_level": classify_risk_level(
+            risk_probability,
+            high=LEGACY_SKLEARN_HIGH,
+            medium=LEGACY_SKLEARN_MEDIUM,
+        ),
     }
 
 

@@ -7,8 +7,10 @@ import pytest
 
 from schemas.inference import InjuryPredictionRequest
 from services import prediction_service as ps
+from services.field_transforms import injured_yesterday_for_request
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.preprocessing import injury_request_to_model_dataframe
+from utils.exceptions import DatabaseError, MLModelError
 
 
 pytestmark = pytest.mark.unit
@@ -16,44 +18,44 @@ pytestmark = pytest.mark.unit
 
 class TestResolveModelBundle:
     def test_returns_none_when_model_not_loaded(self):
-        est, cols, thr, med, winner, status = ps._resolve_model_bundle(None)
+        est, cols, thr, med, winner, status = ps.resolve_model_bundle(None)
         assert est is None
         assert status == "model_not_loaded"
         assert winner == "fallback_demo"
 
     def test_rejects_non_dict_bundle(self):
-        est, *_rest, status = ps._resolve_model_bundle("not-a-dict")
+        est, *_rest, status = ps.resolve_model_bundle("not-a-dict")
         assert est is None
         assert status == "unsupported_model_format"
 
     def test_rejects_missing_estimator(self):
         bundle = {"feature_columns": ["age"], "threshold": 0.35}
-        est, *_rest, status = ps._resolve_model_bundle(bundle)
+        est, *_rest, status = ps.resolve_model_bundle(bundle)
         assert est is None
         assert status == "missing_estimator"
 
     def test_rejects_empty_feature_columns(self):
         bundle = {"estimator": object(), "feature_columns": [], "threshold": 0.35}
-        est, *_rest, status = ps._resolve_model_bundle(bundle)
+        est, *_rest, status = ps.resolve_model_bundle(bundle)
         assert est is None
         assert status == "missing_feature_columns"
 
     def test_rejects_invalid_threshold(self):
         bundle = {"estimator": object(), "feature_columns": ["age"], "threshold": "bad"}
-        est, *_rest, status = ps._resolve_model_bundle(bundle)
+        est, *_rest, status = ps.resolve_model_bundle(bundle)
         assert est is None
         assert status == "invalid_threshold"
 
     def test_derives_medium_threshold_when_absent(self, mock_model_bundle):
         del mock_model_bundle["medium_threshold"]
         mock_model_bundle["threshold"] = 0.40
-        _est, _cols, thr, med, winner, status = ps._resolve_model_bundle(mock_model_bundle)
+        _est, _cols, thr, med, winner, status = ps.resolve_model_bundle(mock_model_bundle)
         assert status == "none"
         assert thr == pytest.approx(0.40)
         assert med == pytest.approx(max(0.15, 0.40 * 0.6))
 
     def test_valid_bundle_returns_all_fields(self, mock_model_bundle):
-        est, cols, thr, med, winner, status = ps._resolve_model_bundle(mock_model_bundle)
+        est, cols, thr, med, winner, status = ps.resolve_model_bundle(mock_model_bundle)
         assert est is mock_model_bundle["estimator"]
         assert cols == MODEL_FEATURE_COLUMNS
         assert thr == pytest.approx(0.35)
@@ -98,12 +100,12 @@ class TestDefaultedCriticalFeatures:
 
 
 class TestFirestoreFieldHelpers:
-    def test_coerce_injured_yesterday_bool_and_int(self):
-        assert ps._coerce_injured_yesterday(True) == 1
-        assert ps._coerce_injured_yesterday(False) == 0
-        assert ps._coerce_injured_yesterday(1) == 1
-        assert ps._coerce_injured_yesterday(None) is None
-        assert ps._coerce_injured_yesterday("bad") is None
+    def test_injured_yesterday_for_request_bool_and_int(self):
+        assert injured_yesterday_for_request(True) == 1
+        assert injured_yesterday_for_request(False) == 0
+        assert injured_yesterday_for_request(1) == 1
+        assert injured_yesterday_for_request(None) is None
+        assert injured_yesterday_for_request("bad") is None
 
     def test_firestore_doc_heartrate_avg_prefers_heart_rate_avg(self):
         assert ps._firestore_doc_heartrate_avg({"heartRateAvg": 58, "avgHeartRate": 62}) == 58
@@ -151,7 +153,7 @@ class TestPredictInjuryRisk:
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):
         monkeypatch.setattr(ps, "get_model", lambda: None)
         monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-        with pytest.raises(RuntimeError, match="model_not_live:manifest_corrupted"):
+        with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
             ps.predict_injury_risk(sample_prediction_request)
 
     @pytest.mark.parametrize(
@@ -192,10 +194,10 @@ class TestPredictInjuryRisk:
 
     def test_from_firestore_raises_when_snapshot_empty(self, monkeypatch):
         monkeypatch.setattr(ps, "fetch_daily_firestore_snapshot", lambda uid, d: {})
-        with pytest.raises(ValueError, match="firestore_snapshot_unavailable"):
+        with pytest.raises(DatabaseError, match="Firestore snapshot unavailable"):
             ps.predict_injury_risk_from_firestore("u1", "2026-05-09")
 
     def test_persist_raises_on_write_failure(self, monkeypatch):
         monkeypatch.setattr(ps, "save_daily_prediction_result", lambda *a, **k: False)
-        with pytest.raises(RuntimeError, match="prediction_persist_failed"):
+        with pytest.raises(DatabaseError, match="Prediction persist failed"):
             ps.persist_prediction_result_or_raise("u1", "2026-05-09", {"risk_score": 0.3})

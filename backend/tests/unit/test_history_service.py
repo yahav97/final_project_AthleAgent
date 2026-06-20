@@ -24,17 +24,6 @@ class TestStableAthleteId:
         assert hs.stable_athlete_numeric_id("") > 0
 
 
-class TestDailyDistanceKm:
-    def test_prefers_distance_meters(self):
-        assert hs._daily_distance_km({"distanceMeters": 5000, "steps": 10000}) == pytest.approx(5.0)
-
-    def test_steps_fallback_when_no_distance(self):
-        assert hs._daily_distance_km({"steps": 10000}) == pytest.approx(8.0)
-
-    def test_zero_when_no_signals(self):
-        assert hs._daily_distance_km({}) == pytest.approx(0.0)
-
-
 class TestSleepHours:
     def test_default_when_missing(self):
         assert hs._sleep_hours({}) == pytest.approx(7.0)
@@ -43,18 +32,6 @@ class TestSleepHours:
         assert hs._sleep_hours({"sleepMinutes": 540}) == pytest.approx(9.0)
         assert hs._sleep_hours({"sleepMinutes": 120}) == pytest.approx(3.0)
         assert hs._sleep_hours({"sleepMinutes": 900}) == pytest.approx(12.0)
-
-
-class TestRestingHr:
-    def test_priority_chain(self):
-        assert hs._resting_hr({"restingHeartRate": 48}) == pytest.approx(48.0)
-        assert hs._resting_hr({"heartRateMin": 50}) == pytest.approx(50.0)
-        assert hs._resting_hr({"heartRateAvg": 60}) == pytest.approx(60.0)
-        assert hs._resting_hr({}) == pytest.approx(54.0)
-
-    def test_clamps_extreme_values(self):
-        assert hs._resting_hr({"restingHeartRate": 20}) == pytest.approx(38.0)
-        assert hs._resting_hr({"restingHeartRate": 120}) == pytest.approx(95.0)
 
 
 class TestHistoricalDerivedFeatures:
@@ -96,13 +73,3 @@ class TestHistoricalDerivedFeatures:
         monkeypatch.setattr(hs, "fetch_user_history", lambda *a, **k: rows)
         ctx = hs.get_history_window_context("u1", "2026-05-09")
         assert ctx["confidence"] == expected_confidence
-
-
-class TestInjuredYesterdayParsing:
-    @pytest.mark.parametrize(
-        ("raw", "expected"),
-        [(True, 1), (False, 0), (1, 1), (0, 0), (None, None)],
-    )
-    def test_injured_yesterday_from_doc(self, raw, expected):
-        doc = {} if raw is None else {"injuredYesterday": raw}
-        assert hs._injured_yesterday_from_doc(doc) == expected

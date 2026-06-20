@@ -10,19 +10,17 @@ from typing import Any
 import pandas as pd
 
 from config import settings
+from services.field_transforms import (
+    daily_distance_km_from_doc,
+    hrv_proxy_from_resting_hr,
+    injured_yesterday_from_doc,
+    resting_hr_from_doc,
+)
 from utils.logging import logger
 
 
 def _to_date_key(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d")
-
-
-def _daily_distance_km(doc: dict[str, Any]) -> float:
-    distance_m = float(doc.get("distanceMeters") or 0.0)
-    if distance_m > 0:
-        return distance_m / 1000.0
-    steps = float(doc.get("steps") or 0.0)
-    return max(0.0, steps * 0.0008)
 
 
 def _sleep_hours(doc: dict[str, Any]) -> float:
@@ -32,29 +30,11 @@ def _sleep_hours(doc: dict[str, Any]) -> float:
     return max(3.0, min(12.0, sleep_minutes / 60.0))
 
 
-def _resting_hr(doc: dict[str, Any]) -> float:
-    """Same priority as preprocessing: RestingHeartRate → Min → Avg from HeartRateSeries."""
-    resting = float(doc.get("restingHeartRate") or 0.0)
-    hr_min = float(doc.get("heartRateMin") or 0.0)
-    hr_avg = float(doc.get("heartRateAvg") or 0.0)
-    if resting > 0:
-        return max(38.0, min(95.0, resting))
-    if hr_min > 0:
-        return max(38.0, min(95.0, hr_min))
-    if hr_avg > 0:
-        return max(38.0, min(95.0, hr_avg))
-    return 54.0
-
-
 def _hrv_score(doc: dict[str, Any], resting_hr: float) -> float:
     hrv_rmssd = float(doc.get("hrvRmssd") or 0.0)
     if hrv_rmssd > 0:
         return float(max(30.0, min(105.0, hrv_rmssd)))
-    return _hrv_proxy_from_resting_hr(resting_hr)
-
-
-def _hrv_proxy_from_resting_hr(resting_hr: float) -> float:
-    return float(max(30.0, min(100.0, 110.0 - resting_hr * 0.65)))
+    return hrv_proxy_from_resting_hr(resting_hr)
 
 
 def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> dict[str, float] | None:
@@ -67,12 +47,12 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
         date_key = str(row.get("date_key") or "")
         if not date_key:
             continue
-        rest_hr = _resting_hr(row)
+        rest_hr = resting_hr_from_doc(row)
         hrv_score = _hrv_score(row, rest_hr)
         rows.append(
             {
                 "date_key": date_key,
-                "daily_distance_km": _daily_distance_km(row),
+                "daily_distance_km": daily_distance_km_from_doc(row),
                 "sleep_hours": _sleep_hours(row),
                 "hrv_score": hrv_score,
             }
@@ -137,23 +117,6 @@ def stable_athlete_numeric_id(user_id: str) -> int:
     return n if n > 0 else 1
 
 
-def _injured_yesterday_from_doc(data: dict[str, Any]) -> int | None:
-    """Parse injuredYesterday / injured_yesterday from a Firestore doc dict."""
-    raw = data.get("injuredYesterday")
-    if raw is None:
-        raw = data.get("injured_yesterday")
-    if raw is None:
-        return None
-    if raw is True:
-        return 1
-    if raw is False:
-        return 0
-    try:
-        return 1 if int(raw) else 0
-    except (TypeError, ValueError):
-        return 0
-
-
 def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
     """
     Label for training row ``(user_id, date_key)``:
@@ -173,7 +136,7 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
         user_ref = db.collection("users").document(user_id)
         checkin_doc = user_ref.collection("daily_checkins").document(next_key).get()
         if checkin_doc.exists:
-            parsed = _injured_yesterday_from_doc(checkin_doc.to_dict() or {})
+            parsed = injured_yesterday_from_doc(checkin_doc.to_dict() or {})
             return 0 if parsed is None else parsed
         health_doc = user_ref.collection("daily_health").document(next_key).get()
     except Exception:
@@ -181,7 +144,7 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
         return None
     if not health_doc.exists:
         return None
-    parsed = _injured_yesterday_from_doc(health_doc.to_dict() or {})
+    parsed = injured_yesterday_from_doc(health_doc.to_dict() or {})
     if parsed is not None:
         return parsed
     return 0

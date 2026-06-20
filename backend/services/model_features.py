@@ -8,15 +8,12 @@ TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = (
 )
 
 MODEL_FEATURE_COLUMNS: list[str] = [
-    # --- Static / Profile ---
     "bmi",
     "age",
     "body_fat_pct",
     "vo2_max",
-    # --- History / State ---
     "history_injury_count",
     "injured_yesterday",
-    # --- Training Load ---
     "daily_distance_km",
     "workout_intensity_minutes",
     "avg_cadence",
@@ -26,21 +23,17 @@ MODEL_FEATURE_COLUMNS: list[str] = [
     "max_speed",
     "avg_power",
     "active_calories_burned",
-    # --- Recovery / Physiology ---
     "sleep_hours",
     "hrv_score",
     "resting_hr",
     "respiratory_rate",
     "spo2",
-    # --- Nutrition / Energy ---
     "nutrition_intake_calories",
     "daily_calories",
     "total_calories_burned",
-    # --- Subjective (manual input) ---
     "stress_level",
     "muscle_soreness",
     "energy_level",
-    # --- Engineered / Derived ---
     "acute_load_7d",
     "chronic_load_21d",
     "acwr_ratio",

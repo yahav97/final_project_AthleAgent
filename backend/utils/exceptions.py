@@ -1,45 +1,49 @@
-"""
-Custom exceptions for AthleAgent backend.
-"""
+"""Domain exceptions and FastAPI handlers for AthleAgent backend."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from utils.logging import logger
 
 
 class AthleAgentException(Exception):
-    """Base exception for all AthleAgent errors."""
-    pass
+    """Base domain exception with HTTP status and optional machine-readable code."""
 
+    status_code: int = 500
 
-class AuthenticationError(AthleAgentException):
-    """Authentication failed."""
-    pass
-
-
-class AuthorizationError(AthleAgentException):
-    """User not authorized for this action."""
-    pass
-
-
-class NotFoundError(AthleAgentException):
-    """Resource not found."""
-    pass
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class ValidationError(AthleAgentException):
-    """Data validation failed."""
-    pass
+    """Feature or payload validation failed."""
+
+    status_code = 422
 
 
 class DatabaseError(AthleAgentException):
-    """Database operation failed."""
-    pass
+    """Firestore or persistence operation failed."""
+
+    status_code = 503
 
 
 class MLModelError(AthleAgentException):
-    """ML model operation failed."""
-    pass
+    """Model artifact missing, blocked by quality gate, or inference unavailable."""
+
+    status_code = 503
 
 
-class ExternalAPIError(AthleAgentException):
-    """External API call failed."""
-    pass
-
-
+def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AthleAgentException)
+    async def handle_athleagent_exception(
+        _request: Request,
+        exc: AthleAgentException,
+    ) -> JSONResponse:
+        logger.warning("domain_error status=%s code=%s message=%s", exc.status_code, exc.code, exc)
+        body: dict[str, str] = {"detail": str(exc)}
+        if exc.code:
+            body["code"] = exc.code
+        return JSONResponse(status_code=exc.status_code, content=body)

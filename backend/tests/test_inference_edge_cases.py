@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from main import app
 from schemas.inference import InjuryPredictionRequest
 from services.prediction_service import predict_injury_risk
+from utils.exceptions import AthleAgentException
 
 pytestmark = pytest.mark.integration
 
@@ -23,7 +24,7 @@ def test_predict_extreme_sleep_zero_no_crash():
                 muscleSoreness=5,
             )
         )
-    except (ValueError, RuntimeError):
+    except AthleAgentException:
         return
     assert 0.0 <= float(out["risk_score"]) <= 1.0
 
@@ -41,7 +42,7 @@ def test_predict_extreme_distance_high_no_crash():
                 muscleSoreness=5,
             )
         )
-    except (ValueError, RuntimeError):
+    except AthleAgentException:
         return
 
 
@@ -57,7 +58,7 @@ def test_predict_response_json_schema_when_success():
                 muscleSoreness=2,
             )
         )
-    except (ValueError, RuntimeError):
+    except AthleAgentException:
         return
     assert {"risk_score", "risk_level", "prediction_confidence"} <= set(data.keys())
 
@@ -74,5 +75,5 @@ def test_status_endpoint_multiple_calls_light_load():
 def test_predict_missing_optional_fields_still_deterministic_error_or_success():
     try:
         predict_injury_risk(InjuryPredictionRequest(userId="minimal", date="2026-04-30"))
-    except (ValueError, RuntimeError):
+    except AthleAgentException:
         return

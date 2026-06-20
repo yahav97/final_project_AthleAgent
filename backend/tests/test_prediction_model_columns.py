@@ -8,7 +8,7 @@ import pytest
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import MODEL_FEATURE_COLUMNS
 from services.prediction_service import predict_injury_risk
-from services.preprocessing import validate_feature_vector_for_model
+from utils.exceptions import DatabaseError, MLModelError, ValidationError
 
 
 @pytest.mark.skipif(
@@ -40,8 +40,8 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
             "/predict/daily",
             json={"userId": "u1", "date": "2026-04-30"},
         )
-    if r.status_code == 500:
-        assert "Prediction unavailable" in r.json()["detail"]
+    if r.status_code == 503:
+        assert "Model is not live" in r.json()["detail"]
         return
     assert r.status_code == 200
     data = r.json()
@@ -54,7 +54,7 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
     monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-    with pytest.raises(RuntimeError, match="model_not_live:manifest_corrupted"):
+    with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
         predict_injury_risk(
             InjuryPredictionRequest(
                 userId="u1",
@@ -72,7 +72,7 @@ def test_predict_injury_risk_raises_when_model_missing(monkeypatch):
 
     monkeypatch.setattr(ps, "get_model", lambda: None)
     monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(MLModelError):
         predict_injury_risk(
             InjuryPredictionRequest(
                 userId="u1",
@@ -117,7 +117,7 @@ def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch)
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "save_daily_prediction_result", lambda user_id, date_key, result: False)
-    with pytest.raises(RuntimeError, match="prediction_persist_failed"):
+    with pytest.raises(DatabaseError, match="Prediction persist failed"):
         ps.persist_prediction_result_or_raise(
             "u1",
             "2026-05-09",
@@ -167,7 +167,7 @@ def test_firestore_snapshot_split_date_merge_policy():
 
 def test_validate_feature_vector_raises_when_missing_column():
     df = pd.DataFrame([{c: 1.0 for c in MODEL_FEATURE_COLUMNS if c != "acwr_ratio"}])
-    with pytest.raises(ValueError, match="missing feature columns"):
+    with pytest.raises(ValidationError, match="missing feature columns"):
         validate_feature_vector_for_model(
             df,
             {"feature_columns": MODEL_FEATURE_COLUMNS, "estimator": None},

@@ -11,7 +11,6 @@ from schemas.inference import InjuryPredictionRequest
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.preprocessing import (
     _energy_to_model_scale,
-    _injured_yesterday_float,
     _safe_float,
     _soreness_to_model_scale,
     _stress_to_model_scale,
@@ -19,6 +18,7 @@ from services.preprocessing import (
     injury_request_to_model_dataframe,
     validate_feature_vector_for_model,
 )
+from utils.exceptions import ValidationError
 
 pytestmark = pytest.mark.unit
 
@@ -44,13 +44,6 @@ class TestScaleMapping:
     )
     def test_energy_to_model_scale(self, raw, expected):
         assert _energy_to_model_scale(raw) == pytest.approx(expected)
-
-    @pytest.mark.parametrize(
-        ("raw", "expected"),
-        [(None, DEFAULT_FEATURE_VALUES["injured_yesterday"]), (True, 1.0), (False, 0.0), (0, 0.0), (1, 1.0)],
-    )
-    def test_injured_yesterday_float(self, raw, expected):
-        assert _injured_yesterday_float(raw) == pytest.approx(expected)
 
 
 class TestSafeFloat:
@@ -113,7 +106,7 @@ class TestValidateFeatureVector:
     def test_raises_on_nan(self, model_feature_row):
         bad = model_feature_row.copy()
         bad.at[bad.index[0], "age"] = float("nan")
-        with pytest.raises(ValueError, match="NaN"):
+        with pytest.raises(ValidationError, match="NaN"):
             validate_feature_vector_for_model(
                 bad, {"feature_columns": MODEL_FEATURE_COLUMNS, "estimator": None}
             )
@@ -131,7 +124,7 @@ class TestValidateFeatureVector:
     def test_raises_on_out_of_range_values(self, model_feature_row, column, value, pattern):
         bad = model_feature_row.copy()
         bad.at[bad.index[0], column] = value
-        with pytest.raises(ValueError, match=pattern):
+        with pytest.raises(ValidationError, match=pattern):
             validate_feature_vector_for_model(
                 bad, {"feature_columns": MODEL_FEATURE_COLUMNS, "estimator": None}
             )

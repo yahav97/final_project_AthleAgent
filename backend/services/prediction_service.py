@@ -15,12 +15,15 @@ from services.history_service import (
     merge_nutrition_with_history,
     save_daily_prediction_result,
 )
+from services.field_transforms import injured_yesterday_for_request
 from services.model_features import DEFAULT_FEATURE_VALUES, TRAINING_BASE_FEATURE_COLUMNS
+from services.risk_levels import classify_risk_level
 from services.preprocessing import (
     calculate_data_quality_score,
     injury_request_to_model_dataframe,
     validate_feature_vector_for_model,
 )
+from utils.exceptions import DatabaseError, MLModelError
 from utils.logging import logger
 
 
@@ -102,7 +105,7 @@ def _count_defaulted_critical_features(df) -> int:
     return count
 
 
-def _resolve_model_bundle(
+def resolve_model_bundle(
     loaded_model: Any,
 ) -> tuple[Any | None, list[str] | None, float | None, float | None, str, str]:
     """
@@ -228,42 +231,30 @@ def injury_prediction_request_from_firestore_snapshot(
         date=date_key,
         age=profile.get("age"),
         historyInjuryCount=hist_profile,
-        injuredYesterday=_coerce_injured_yesterday(ij_raw),
-        
-        # --- HEALTH CONNECT ALIGNMENT --- 
-        # By passing a list, the server checks both what the ML model wants 
-        # and what the Android app actually sent.
+        injuredYesterday=injured_yesterday_for_request(ij_raw),
         sleepMinutes=_today_only(["sleepMinutes", "sleep_minutes"]),
         steps=_yesterday_then_today(["steps", "daily_steps"]),
         distanceMeters=_yesterday_then_today(["distanceMeters", "distance_meters", "daily_distance_meters"]),
         activeCalories=_yesterday_then_today(["activeCalories", "active_calories", "active_calories_burned"]),
         totalCalories=_yesterday_then_today(["totalCalories", "total_calories", "daily_calories"]),
-        
         heartRateAvg=hr_avg,
         heartRateMax=_yesterday_then_today(["heartRateMax", "heart_rate_max"]),
         heartRateMin=_yesterday_then_today(["heartRateMin", "heart_rate_min"]),
-        
         weightKg=_yesterday_then_today(["weightKg", "weight_kg"]),
         heightCm=_yesterday_then_today(["heightCm", "height_cm"]),
         bmrCalories=_yesterday_then_today(["bmrCalories", "bmr_calories"]),
-        
         hrvRmssd=_yesterday_then_today(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
         restingHeartRate=_yesterday_then_today(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
         bodyFatPct=_yesterday_then_today(["bodyFatPct", "body_fat_pct"]),
         vo2Max=_yesterday_then_today(["vo2Max", "vo2_max"]),
-        
         elevationGainedMeters=_yesterday_then_today(["elevationGainedMeters", "elevation_gained_meters"]),
         floorsClimbed=_yesterday_then_today(["floorsClimbed", "floors_climbed"]),
-        
         avgSpeed=_yesterday_then_today(["avgSpeed", "avg_speed"]),
         maxSpeed=_yesterday_then_today(["maxSpeed", "max_speed"]),
         avgPower=_yesterday_then_today(["avgPower", "avg_power"]),
         avgCadence=_yesterday_then_today(["avgCadence", "avg_cadence"]),
-        
         respiratoryRate=_yesterday_then_today(["respiratoryRate", "respiratory_rate"]),
         oxygenSaturation=_yesterday_then_today(["oxygenSaturation", "oxygen_saturation", "spo2"]),
-        # ---------------------------------
-        
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),
@@ -286,19 +277,6 @@ def training_base_feature_dict_from_request(payload: InjuryPredictionRequest) ->
     for col in TRAINING_BASE_FEATURE_COLUMNS:
         out[col] = float(df[col].iloc[0])
     return out
-
-
-def _coerce_injured_yesterday(raw: object) -> int | None:
-    if raw is None:
-        return None
-    if raw is True:
-        return 1
-    if raw is False:
-        return 0
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
 
 
 def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
@@ -336,11 +314,11 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     (
         model,
         bundle_feature_columns,
-        model_threshold,
-        medium_threshold,
+        _model_threshold,
+        _medium_threshold,
         _model_version,
         model_status,
-    ) = _resolve_model_bundle(loaded_model)
+    ) = resolve_model_bundle(loaded_model)
     if model is None:
         gate_reason = get_model_gate_reason()
         blocked_reason = model_status if model_status != "model_not_loaded" else gate_reason
@@ -350,17 +328,17 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             blocked_reason,
             prediction_confidence,
         )
-        raise RuntimeError(f"model_not_live:{blocked_reason}")
+        raise MLModelError(
+            f"Model is not live: {blocked_reason}",
+            code=f"model_not_live:{blocked_reason}",
+        )
 
     model_contract = {"estimator": model, "feature_columns": bundle_feature_columns}
     X = validate_feature_vector_for_model(df, model_contract)
 
     proba = float(model.predict_proba(X)[0, 1])
-    high_cutoff = 0.70    
-    medium_cutoff = 0.40  
-    risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
     return {
-        "risk_level": risk_level,
+        "risk_level": classify_risk_level(proba),
         "risk_score": round(proba, 4),
         "prediction_confidence": prediction_confidence,
     }
@@ -378,7 +356,7 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     """
     snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
     if not snapshot:
-        raise ValueError("firestore_snapshot_unavailable")
+        raise DatabaseError("Firestore snapshot unavailable", code="firestore_snapshot_unavailable")
 
     payload = injury_prediction_request_from_firestore_snapshot(user_id, date_key, snapshot)
     return predict_injury_risk(payload)
@@ -391,4 +369,4 @@ def persist_prediction_result_or_raise(
 ) -> None:
     ok = save_daily_prediction_result(user_id, date_key, result)
     if not ok:
-        raise RuntimeError("prediction_persist_failed")
+        raise DatabaseError("Prediction persist failed", code="prediction_persist_failed")

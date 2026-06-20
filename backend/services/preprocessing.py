@@ -12,29 +12,14 @@ import pandas as pd
 
 from schemas.inference import InjuryPredictionRequest
 from services.feature_engineering import compute_derived_features
-from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
-
-TOLERANT_FIELDS: tuple[str, ...] = (
-    "totalProtein",
-    "totalCarbs",
-    "mealsLoggedCount",
-    "nutritionTotalCalories",
-    "energyLevel",
-    "heartRateMax",
-    "heartRateMin",
-    "activeCalories",
-    "bodyFatPct",
-    "vo2Max",
-    "elevationGainedMeters",
-    "floorsClimbed",
-    "avgSpeed",
-    "maxSpeed",
-    "avgPower",
-    "avgCadence",
-    "respiratoryRate",
-    "oxygenSaturation",
-    "heightCm",
+from services.field_transforms import (
+    daily_distance_km,
+    hrv_proxy_from_resting_hr,
+    injured_yesterday_as_feature,
+    resting_hr as resolve_resting_hr,
 )
+from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
+from utils.exceptions import ValidationError
 
 SENSITIVE_FIELDS: tuple[str, ...] = (
     "sleepMinutes",
@@ -78,20 +63,6 @@ def _energy_to_model_scale(value: int | None) -> float:
     if v > 10.0:
         v = max(1.0, min(10.0, round(v / 10.0)))
     return float(max(1.0, min(10.0, v)))
-
-
-def _injured_yesterday_float(raw: object) -> float:
-    """Firestore ``injuredYesterday`` from daily_checkins (legacy: daily_health) → 0/1 feature."""
-    if raw is None:
-        return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
-    if raw is True:
-        return 1.0
-    if raw is False:
-        return 0.0
-    try:
-        return 1.0 if int(raw) else 0.0
-    except (TypeError, ValueError):
-        return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
 
 
 def _safe_float(value: object, fallback: float = 0.0) -> float:
@@ -172,47 +143,47 @@ def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) ->
     if expected_columns:
         missing = [c for c in expected_columns if c not in df.columns]
         if missing:
-            raise ValueError(f"Model expects missing feature columns: {missing}")
+            raise ValidationError(f"Model expects missing feature columns: {missing}")
         df = df.loc[:, expected_columns]
 
     aligned = df.astype("float64")
     if not pd.Series(pd.notna(aligned.to_numpy().ravel())).all():
-        raise ValueError("Feature vector contains NaN values")
+        raise ValidationError("Feature vector contains NaN values")
     if not pd.Series(pd.Series(aligned.to_numpy().ravel()).map(math.isfinite)).all():
-        raise ValueError("Feature vector contains non-finite values")
+        raise ValidationError("Feature vector contains non-finite values")
 
     if "stress_level" in aligned.columns:
         v = float(aligned["stress_level"].iloc[0])
         if v < 1.0 or v > 10.0:
-            raise ValueError(f"stress_level out of expected scaled range [1,10]: {v}")
+            raise ValidationError(f"stress_level out of expected scaled range [1,10]: {v}")
     if "muscle_soreness" in aligned.columns:
         v = float(aligned["muscle_soreness"].iloc[0])
         if v < 1.0 or v > 10.0:
-            raise ValueError(f"muscle_soreness out of expected scaled range [1,10]: {v}")
+            raise ValidationError(f"muscle_soreness out of expected scaled range [1,10]: {v}")
     if "energy_level" in aligned.columns:
         v = float(aligned["energy_level"].iloc[0])
         if v < 1.0 or v > 10.0:
-            raise ValueError(f"energy_level out of expected scaled range [1,10]: {v}")
+            raise ValidationError(f"energy_level out of expected scaled range [1,10]: {v}")
     if "injured_yesterday" in aligned.columns:
         v = float(aligned["injured_yesterday"].iloc[0])
         if v < 0.0 or v > 1.0:
-            raise ValueError(f"injured_yesterday out of expected range [0,1]: {v}")
+            raise ValidationError(f"injured_yesterday out of expected range [0,1]: {v}")
     if "age" in aligned.columns:
         v = float(aligned["age"].iloc[0])
         if v < 12.0 or v > 90.0:
-            raise ValueError(f"age out of expected range [12,90]: {v}")
+            raise ValidationError(f"age out of expected range [12,90]: {v}")
     if "history_injury_count" in aligned.columns:
         v = float(aligned["history_injury_count"].iloc[0])
         if v < 0.0 or v > 50.0:
-            raise ValueError(f"history_injury_count out of expected range [0,50]: {v}")
+            raise ValidationError(f"history_injury_count out of expected range [0,50]: {v}")
     if "nutrition_intake_calories" in aligned.columns:
         v = float(aligned["nutrition_intake_calories"].iloc[0])
         if v < 0.0 or v > 8000.0:
-            raise ValueError(f"nutrition_intake_calories out of expected range [0,8000]: {v}")
+            raise ValidationError(f"nutrition_intake_calories out of expected range [0,8000]: {v}")
     if "acwr_ratio" in aligned.columns:
         v = float(aligned["acwr_ratio"].iloc[0])
         if v < 0.35 or v > 2.8:
-            raise ValueError(f"acwr_ratio out of expected range [0.35,2.8]: {v}")
+            raise ValidationError(f"acwr_ratio out of expected range [0.35,2.8]: {v}")
     return aligned
 
 
@@ -223,7 +194,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     Returns a DataFrame with exactly MODEL_FEATURE_COLUMNS (same order as training CSV).
     """
     d = payload.model_dump()
-    injured_yesterday = float(max(0.0, min(1.0, _injured_yesterday_float(d.get("injuredYesterday")))))
+    injured_yesterday = float(max(0.0, min(1.0, injured_yesterday_as_feature(d.get("injuredYesterday")))))
 
     sleep_minutes = d.get("sleepMinutes")
     sleep_hours = (
@@ -235,8 +206,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     steps = max(0.0, _safe_float(d.get("steps"), 0.0))
     distance_m = max(0.0, _safe_float(d.get("distanceMeters"), 0.0))
-    daily_distance_km = distance_m / 1000.0 if distance_m > 0 else max(0.0, steps * 0.0008)
-    daily_distance_km = float(min(60.0, daily_distance_km))
+    daily_distance_km_val = float(min(60.0, daily_distance_km(distance_m, steps)))
 
     active_cal = max(0.0, _safe_float(d.get("activeCalories"), 0.0))
     total_burned_health = max(0.0, _safe_float(d.get("totalCalories"), 0.0))
@@ -283,11 +253,11 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         daily_calories = float(DEFAULT_FEATURE_VALUES["daily_calories"] * min(1.25, 0.6 + meals_logged * 0.2))
     daily_calories = float(min(7000.0, max(800.0, daily_calories)))
 
-    workout_intensity = max(0.0, min(240.0, daily_distance_km * 5.5 + active_cal / 40.0))
+    workout_intensity = max(0.0, min(240.0, daily_distance_km_val * 5.5 + active_cal / 40.0))
     sensor_cadence = _safe_float(d.get("avgCadence"), 0.0)
     if sensor_cadence > 0:
         avg_cadence = float(max(120.0, min(200.0, sensor_cadence)))
-    elif steps > 0 and daily_distance_km > 0.05:
+    elif steps > 0 and daily_distance_km_val > 0.05:
         est_minutes = max(10.0, workout_intensity)
         avg_cadence = float(max(120.0, min(200.0, steps / est_minutes)))
     else:
@@ -321,24 +291,19 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         except (TypeError, ValueError):
             history_injury_count = float(DEFAULT_FEATURE_VALUES["history_injury_count"])
 
-    resting_hr_raw = _safe_float(d.get("restingHeartRate"), 0.0)
     hr_avg = _safe_float(d.get("heartRateAvg"), 0.0)
-    hr_min = _safe_float(d.get("heartRateMin"), 0.0)
-    if resting_hr_raw > 0:
-        resting_hr = resting_hr_raw
-    elif hr_min > 0:
-        resting_hr = hr_min
-    elif hr_avg > 0:
-        resting_hr = hr_avg
-    else:
-        resting_hr = float(DEFAULT_FEATURE_VALUES["resting_hr"])
-    resting_hr = float(max(38.0, min(95.0, resting_hr)))
+    resting_hr_val = resolve_resting_hr(
+        _safe_float(d.get("restingHeartRate"), 0.0),
+        _safe_float(d.get("heartRateMin"), 0.0),
+        hr_avg,
+        default=float(DEFAULT_FEATURE_VALUES["resting_hr"]),
+    )
 
     hrv_rmssd = _safe_float(d.get("hrvRmssd"), 0.0)
     if hrv_rmssd > 0:
         hrv_score = float(max(30.0, min(105.0, hrv_rmssd)))
     elif hr_avg > 0:
-        hrv_score = float(max(30.0, min(100.0, 110.0 - resting_hr * 0.65)))
+        hrv_score = hrv_proxy_from_resting_hr(resting_hr_val)
     else:
         hrv_score = float(DEFAULT_FEATURE_VALUES["hrv_score"])
 
@@ -356,8 +321,8 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     sensor_max_speed = _safe_float(d.get("maxSpeed"), 0.0)
     if sensor_avg_speed > 0:
         avg_speed = float(max(0.0, min(30.0, sensor_avg_speed)))
-    elif daily_distance_km > 0.05 and workout_intensity > 5:
-        avg_speed = float(max(0.0, min(30.0, daily_distance_km / (workout_intensity / 60.0))))
+    elif daily_distance_km_val > 0.05 and workout_intensity > 5:
+        avg_speed = float(max(0.0, min(30.0, daily_distance_km_val / (workout_intensity / 60.0))))
     else:
         avg_speed = float(DEFAULT_FEATURE_VALUES["avg_speed"])
     max_speed = float(max(0.0, min(40.0, sensor_max_speed))) if sensor_max_speed > 0 else avg_speed * 1.3
@@ -377,7 +342,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         "vo2_max": vo2_max,
         "history_injury_count": history_injury_count,
         "injured_yesterday": injured_yesterday,
-        "daily_distance_km": float(daily_distance_km),
+        "daily_distance_km": float(daily_distance_km_val),
         "workout_intensity_minutes": float(workout_intensity),
         "avg_cadence": float(avg_cadence),
         "elevation_gained_m": elevation_gained,
@@ -388,7 +353,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         "active_calories_burned": active_cal,
         "sleep_hours": float(sleep_hours),
         "hrv_score": float(hrv_score),
-        "resting_hr": float(resting_hr),
+        "resting_hr": float(resting_hr_val),
         "respiratory_rate": respiratory_rate,
         "spo2": spo2,
         "nutrition_intake_calories": float(nutrition_intake_calories),
