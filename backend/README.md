@@ -83,12 +83,26 @@ Docs: `http://localhost:8000/docs`
 
 ## Tests
 
-Run backend tests:
+Run all backend tests:
 
 ```bash
 cd backend
 python -m pytest tests/ -v
 ```
+
+Run **unit tests only** (no HTTP / Firestore / real model):
+
+```bash
+python -m pytest tests/unit/ -v -m unit
+```
+
+Run **integration tests** (FastAPI routes):
+
+```bash
+python -m pytest tests/ -v -m integration
+```
+
+Shared fixtures live in `tests/conftest.py`. Unit tests are under `tests/unit/`.
 
 ## Data storage
 

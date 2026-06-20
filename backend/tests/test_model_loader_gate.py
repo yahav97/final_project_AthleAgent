@@ -46,7 +46,7 @@ def test_load_model_rejects_manifest_below_recall_gate(tmp_path):
 
     out = model_loader.load_model(str(model_path), str(manifest_path))
     assert out is None
-    assert model_loader.get_model_gate_reason() == "manifest_recall_below_hard_gate"
+    assert model_loader.get_model_gate_reason() == "manifest_recall_below_policy_hard_min"
 
 
 def test_load_model_rejects_manifest_below_auc_gate(tmp_path):

@@ -1,10 +1,13 @@
 """Additional edge-case inference tests for RC1 hardening."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from main import app
 from schemas.inference import InjuryPredictionRequest
 from services.prediction_service import predict_injury_risk
+
+pytestmark = pytest.mark.integration
 
 
 def test_predict_extreme_sleep_zero_no_crash():
