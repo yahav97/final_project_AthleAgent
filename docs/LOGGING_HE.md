@@ -5,7 +5,7 @@
 | **גרסה** | 1.1 |
 | **תאריך** | 2026-06-20 |
 | **קהל יעד** | מפתחי Backend, Android, בוחני פרויקט גמר |
-| **מסמכים קשורים** | [HLD §11](../backend/docs/HLD.md) |
+| **מסמכים קשורים** | [HLD §11](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
 
 ---
 
@@ -53,6 +53,8 @@ flowchart LR
 |----------|---------|
 | `backend` | middleware, services, startup |
 | `android` | `POST /api/v1/observability/client-events` |
+
+**Docker:** `docker-compose.yml` ממפה `./logs` → `/app/logs` — אותו קובץ על ה-host (`logs/athleagent.log`).
 
 ---
 

@@ -11,7 +11,8 @@ Avoid duplicating content across files. Use this map:
 | [`RISK_SCORE.md`](RISK_SCORE.md) | **Risk score end-to-end** — ML inference, features, days window, API/Firestore output, thresholds |
 | [`MODEL.md`](MODEL.md) | **Production ML config only** — threshold, UI bands, live gate, script paths |
 | [`BACKEND.md`](BACKEND.md) | API, architecture, code layout |
+| [`../../docs/DOCKER.md`](../../docs/DOCKER.md) | Backend + ML — Docker setup for reviewers |
 
-**Project-wide design docs:** [`docs/HLD_PROJECT.md`](../../docs/HLD_PROJECT.md) · [`docs/LLD_PROJECT.md`](../../docs/LLD_PROJECT.md)
+**Project-wide design docs:** [`docs/HLD_PROJECT.md`](../../docs/HLD_PROJECT.md) · [`docs/LLD_PROJECT.md`](../../docs/LLD_PROJECT.md) · [`docs/DOCKER.md`](../../docs/DOCKER.md)
 
 **Code of truth for feature names:** `backend/services/model_features.py`

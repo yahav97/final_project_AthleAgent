@@ -467,11 +467,11 @@
 
 |           |                                                        |
 | --------- | ------------------------------------------------------ |
-| **תיאור** | Backend stateless; ML artifacts נפרדים                 |
-| **מדד**   | promote model בלי deploy קוד                           |
-| **יעד**   | `ML_model/run_pipeline.py` → `promoted.json` → restart |
-| **מדידה** | manual / documented procedure                          |
-| **ראיה**  | [MODEL.md](../backend/docs/MODEL.md)                   |
+| **תיאור** | Backend stateless; ML artifacts נפרדים; הרצה ב-Docker או Python מקומי |
+| **מדד**   | promote model בלי deploy קוד — restart container או uvicorn |
+| **יעד**   | `ML_model/run_pipeline.py` → `promoted.json` → `docker compose up --build` או restart |
+| **מדידה** | manual / documented procedure |
+| **ראיה**  | [MODEL.md](../backend/docs/MODEL.md) · [DOCKER.md](DOCKER.md) |
 
 
 ---
@@ -650,6 +650,7 @@ cd backend && pytest -q
 
 | מסמך                                                                                     | קשר ל-NFR                        |
 | ---------------------------------------------------------------------------------------- | -------------------------------- |
+| [DOCKER.md](DOCKER.md)                                                                   | הרצת backend + ML לבוחנים        |
 | [MODEL.md](../backend/docs/MODEL.md)                                                     | gates, promote, threshold        |
 | [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)                                           | confidence formula, risk bins    |
 | [FEATURES.md](../backend/docs/FEATURES.md)                                               | data completeness contract       |
@@ -666,6 +667,7 @@ cd backend && pytest -q
 | גרסה | תאריך      | שינוי                                             |
 | ---- | ---------- | ------------------------------------------------- |
 | 1.0  | 2026-06-20 | מסמך ראשון — 21 NFRs עם baseline מ-promoted model |
+| 1.1  | 2026-06-20 | NFR-MAINT-03 — הוספת Docker; מפת מסמכים |
 
 
 ---

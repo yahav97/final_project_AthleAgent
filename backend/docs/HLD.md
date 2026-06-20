@@ -3,10 +3,10 @@
 
 | שדה | ערך |
 |-----|-----|
-| **גרסה** | 1.1 |
+| **גרסה** | 1.2 |
 | **תאריך** | 2026-06-20 |
 | **קהל יעד** | מפתחי backend, DevOps, בוחנים |
-| **מסמכים קשורים** | [LLD.md](LLD.md) · [BACKEND.md](BACKEND.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) |
+| **מסמכים קשורים** | [LLD.md](LLD.md) · [BACKEND.md](BACKEND.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) · [docs/DOCKER.md](../../docs/DOCKER.md) |
 
 ---
 
@@ -280,16 +280,27 @@ flowchart TB
     end
 
     subgraph Local["Development"]
+        Docker[Docker backend :8000]
         UV[Uvicorn :8000]
         Emulator[Android Emulator 10.0.2.2]
     end
 
+    Emulator --> Docker
     Emulator --> UV
     CR --> FS
+    Docker --> FS
     UV --> FS
 ```
 
-**הרצה מקומית:**
+**הרצה עם Docker (מומלץ לבוחנים):**
+
+```bash
+# מתוך שורש הריפו — ראו docs/DOCKER.md
+docker compose up --build
+```
+
+**הרצה מקומית (Python):**
+
 ```bash
 cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000

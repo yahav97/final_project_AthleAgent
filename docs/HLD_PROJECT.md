@@ -6,7 +6,7 @@
 | **גרסה** | 1.0 |
 | **תאריך** | 2026-06-19 |
 | **קהל יעד** | מפתחים, בוחנים, stakeholders טכניים |
-| **מסמכים קשורים** | [LLD_PROJECT.md](LLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) |
+| **מסמכים קשורים** | [LLD_PROJECT.md](LLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
 
 ---
 
@@ -240,7 +240,16 @@ erDiagram
 | **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
 | **Gemini API** | Client → Google | meal vision, coaching text | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
 | **FastAPI Backend** | Client → Server | `POST /predict/daily` | `ApiClient.kt` |
-| **XGBoost** | Server (local) | injury probability | `prediction_service.py` |
+| **XGBoost** | Server (in-process) | injury probability | `prediction_service.py` |
+
+### 7.1 הרצה מקומית (Backend + ML)
+
+| מסלול | פקודה | מתי |
+|-------|--------|-----|
+| **Docker** | `docker compose up --build` (שורש repo) | בוחנים, setup מהיר |
+| **Python** | `uvicorn main:app` מתוך `backend/` | פיתוח עם `--reload` |
+
+> מדריך Docker: [DOCKER.md](DOCKER.md) · Android emulator → `10.0.2.2:8000` (ללא שינוי קוד)
 
 ---
 
@@ -322,7 +331,7 @@ final_project_AthleAgent/
 1. **Auth על API** — Firebase token middleware.
 2. **Repository layer ב-Android** — הפרדת Firestore מ-Activities.
 3. **Date-split sync** — יישום מלא ב-`WearableSyncActivity`.
-4. **Cloud deployment** — Backend על Cloud Run / Render.
+4. **Cloud deployment** — Backend על Cloud Run / Render (image ניתן לבנות מ-`Dockerfile` הקיים).
 5. **Firestore Rules** — hardening לפני production.
 
 ---
@@ -331,6 +340,7 @@ final_project_AthleAgent/
 
 | מסמך | תוכן |
 |------|------|
+| [DOCKER.md](DOCKER.md) | Backend + ML — Docker (בוחנים) |
 | [LLD_PROJECT.md](LLD_PROJECT.md) | עיצוב ברמה נמוכה — פרויקט מלא |
 | [backend/docs/HLD.md](../backend/docs/HLD.md) | HLD בקאנד |
 | [backend/docs/LLD.md](../backend/docs/LLD.md) | LLD בקאנד |

@@ -268,21 +268,40 @@ Response + Persist to Firestore (merge write)
 
 ---
 
-## 8. הפעלה מקומית
+## 8. הפעלה
+
+### Docker (מומלץ לבוחנים)
+
+מתוך שורש הריפו — פירוט מלא: [`docs/DOCKER.md`](../../docs/DOCKER.md)
 
 ```bash
+# backend/firebase-key.json חייב להיות קיים לפני ההרצה הראשונה
+docker compose up --build
+```
+
+אימות: `GET http://localhost:8000/status/ml` → `"status": "Live"`.
+
+### Python מקומי (פיתוח)
+
+```bash
+pip install -r backend/requirements.txt
 cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**דרישות:**
+**דרישות (שני המסלולים):**
 - Firebase credentials: `FIREBASE_SERVICE_ACCOUNT_KEY` או `GOOGLE_APPLICATION_CREDENTIALS`
 - גישה לפרויקט Firestore (`athleagent`)
 
 ### Environment Variables
 
 ```env
+# Local Python
 FIREBASE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
+
+# Docker (set automatically in docker-compose.yml)
+# FIREBASE_SERVICE_ACCOUNT_KEY=/app/backend/firebase-key.json
+
 GEMINI_API_KEY=your-gemini-api-key           # אופציונלי — בשימוש בלקוח בלבד
 ```
 

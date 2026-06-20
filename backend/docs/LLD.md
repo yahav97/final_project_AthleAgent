@@ -70,7 +70,8 @@ async def startup_event():
 |-------|--------|
 | Startup | Load XGBoost bundle from `MODEL_PATH` or `promoted.json` |
 | Shutdown | Log only |
-| Run | `uvicorn main:app --host 0.0.0.0 --port 8000` |
+| Run (Docker) | `docker compose up --build` from repo root — see [`docs/DOCKER.md`](../../docs/DOCKER.md) |
+| Run (local) | `uvicorn main:app --host 0.0.0.0 --port 8000` |
 
 ---
 

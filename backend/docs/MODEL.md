@@ -24,6 +24,8 @@ Model is **Blocked** (no `/predict/daily`) unless manifest passes:
 
 Pointer: `ML_model/artifacts/promoted.json` → `run_manifest.json`, `injury_model.pkl`.
 
+**Serving:** model loads in-process at backend startup (local `uvicorn` or [`docs/DOCKER.md`](../../docs/DOCKER.md)). After promotion, restart the server or rebuild the container.
+
 ## Training pipeline (scripts only)
 
 | Script | Role |

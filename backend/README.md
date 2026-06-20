@@ -50,7 +50,9 @@ If gate validation fails:
 
 ## Before You Run (for reviewers)
 
-Install dependencies **once** from the **repository root** (not from `backend/`):
+**Option A — Docker:** see [`docs/DOCKER.md`](../docs/DOCKER.md) (`docker compose up --build` from repo root).
+
+**Option B — Local Python:** install dependencies **once** from the **repository root** (not from `backend/`):
 
 ```bash
 pip install -r backend/requirements.txt
@@ -68,6 +70,18 @@ Promoted model pointer: `ML_model/artifacts/promoted.json`
 After install, verify ML status: `GET http://localhost:8000/status/ml` → expect `"status": "Live"`.
 
 Alternative (same file via root alias): `pip install -r requirements.txt`
+
+## Run with Docker
+
+For reviewers who prefer a one-command setup (backend + promoted model in one container):
+
+See **[`docs/DOCKER.md`](../docs/DOCKER.md)** — requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) **installed and running** (`docker version` must show Server), plus `backend/firebase-key.json`.
+
+```bash
+docker compose up --build
+```
+
+The local Python workflow below remains fully supported.
 
 ## Run Locally
 

@@ -400,8 +400,17 @@ GEMINI_API_KEY=...
 | `CORS_ORIGINS` | localhost ports |
 
 ### 7.3 Emulator Networking
-- Android emulator: `10.0.2.2:8000` → host `localhost:8000`
+- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `8000:8000`)
 - Physical device: IP של המחשב המארח
+
+### 7.4 Backend Deployment (local)
+
+| Method | Command | Notes |
+|--------|---------|-------|
+| **Docker** | `docker compose up --build` (repo root) | Backend + promoted model in one container; see [DOCKER.md](DOCKER.md) |
+| **Python** | `cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000` | Requires `pip install -r backend/requirements.txt` |
+
+Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Android app requires no changes.
 
 ---
 
@@ -445,3 +454,14 @@ cd backend && python -m pytest tests/ -v
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
 | Train | — | `ML_model/train_model.py` |
+
+---
+
+## 11. מפת מסמכים
+
+| מסמך | תוכן |
+|------|------|
+| [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
+| [HLD_PROJECT.md](HLD_PROJECT.md) | HLD פרויקט מלא |
+| [backend/docs/HLD.md](../backend/docs/HLD.md) | HLD בקאנד |
+| [backend/docs/LLD.md](../backend/docs/LLD.md) | LLD בקאנד |

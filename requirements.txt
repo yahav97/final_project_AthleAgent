@@ -1,2 +1,3 @@
 # Root entry point — backend dependencies live in backend/requirements.txt
+# Docker: same file is used in Dockerfile build — see docs/DOCKER.md
 -r backend/requirements.txt

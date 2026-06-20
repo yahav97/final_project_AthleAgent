@@ -89,7 +89,10 @@ Android             → Firestore (read finalRiskScore for UI)
 * Physical Android device (recommended) with [Health Connect](https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata)
 * Firebase project (`google-services.json`)
 * Gemini API key (`local.properties`)
-* Python 3.x + venv for the backend (see [`backend/README.md`](backend/README.md))
+* Backend — **either** Docker (Option A) **or** Python 3.11+ venv (Option B):
+  * **Docker:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed **and running** before `docker compose up` (see below)
+  * **Python:** venv + `pip install` — see [`backend/README.md`](backend/README.md)
+* `backend/firebase-key.json` — Firebase Admin service account (required for backend; not in git)
 
 ### Android app
 
@@ -108,6 +111,28 @@ Android             → Firestore (read finalRiskScore for UI)
 
 ### Backend (required for live predictions)
 
+**Option A — Docker (recommended for reviewers)**
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) if not already installed.
+2. **Start Docker Desktop** and wait until it shows **Running** (whale icon in the system tray — not "Starting").
+3. Verify the engine is up:
+   ```powershell
+   docker version
+   ```
+   You should see both **Client** and **Server** sections. If you get `dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker is not running yet — open Docker Desktop and try again.
+4. Place `backend/firebase-key.json` **before** the first run (see [`docs/DOCKER.md`](docs/DOCKER.md) if the file was missing on first attempt).
+5. From the repository root:
+
+```powershell
+docker compose up --build
+```
+
+Full guide: [`docs/DOCKER.md`](docs/DOCKER.md)
+
+Verify: `GET http://localhost:8000/status/ml` → `"status": "Live"`.
+
+**Option B — Local Python**
+
 From the repository root:
 
 ```bash
@@ -118,13 +143,14 @@ uvicorn main:app --reload
 
 Verify: `GET http://localhost:8000/status/ml` → `"status": "Live"`.
 
-Point the app Retrofit base URL at your backend host (see `ApiClient.kt`).
+Point the app Retrofit base URL at your backend host (see `ApiClient.kt` — emulator default `10.0.2.2:8000`).
 
 ## 📚 Documentation
 
 | Document | Content |
 |----------|---------|
 | [`docs/HLD_PROJECT.md`](docs/HLD_PROJECT.md) | High-level design |
+| [`docs/DOCKER.md`](docs/DOCKER.md) | Backend + ML via Docker |
 | [`docs/NFR.md`](docs/NFR.md) | Non-functional requirements |
 | [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline end-to-end |
 | [`backend/README.md`](backend/README.md) | Backend setup and API |

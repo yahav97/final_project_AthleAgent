@@ -1,0 +1,26 @@
+# Android
+android_app/
+.gradle/
+.idea/
+*.apk
+
+# Python / Environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ML Data & Notebooks (only artifacts are copied explicitly in Dockerfile)
+ML_model/notebooks/
+ML_model/data/
+*.csv
+*.parquet
+
+# Git & Cloud Secrets
+.git
+.gitignore
+backend/firebase-key.json
+.env
+logs/
