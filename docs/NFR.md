@@ -563,7 +563,7 @@ flowchart LR
         G --> H[jq aggregation]
     end
     subgraph Evidence
-        B --> I[Poster / Report]
+        B --> I[Submission evidence]
         H --> I
         D --> I
     end
@@ -578,7 +578,7 @@ flowchart LR
 3. צלם `/status/ml` — הצג metrics
 4. הרץ trace E2E אחד — `./backend/scripts/trace_request.sh`
 5. audit PHI — grep על לוג
-6. צרף baseline מ-§3.1 ל-poster
+6. צרף baseline מ-§3.1 לדוח ההגשה
 
 ---
 

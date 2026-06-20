@@ -310,7 +310,7 @@ final_project_AthleAgent/
 
 | נושא | תיאור |
 |------|--------|
-| **ארכיטקטורת Android** | README מציין MVVM; בפועל Activity-centric ללא ViewModels |
+| **ארכיטקטורת Android** | Activity-centric + View Binding; אין ViewModel/Repository (ראו README) |
 | **Date-split sync** | Backend מצפה sleep ב-{D} ועומס ב-{D-1}; Android כותב לעיתים שניהם ל-{D} |
 | **Backend auth** | לא מיושם ב-production routes |
 | **Gemini בבקאנד** | מפתח ב-config אך אין routes — Gemini רץ רק בלקוח |
