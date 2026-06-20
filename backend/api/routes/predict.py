@@ -40,37 +40,6 @@ def test_predict_injury(data: SimpleData):
     }
 
 
-@router.post("/demo_predict")
-def demo_predict_injury(data: AthleteData):
-    """Run a lightweight heuristic score for legacy demo clients.
-
-    Args:
-        data: Legacy athlete feature payload.
-
-    Returns:
-        dict: Risk percentage and categorical risk level.
-    """
-    score = 10.0
-
-    if data.sleep_hours < 5.0:
-        score += 30.0
-    elif data.sleep_hours < 7.0:
-        score += 15.0
-
-    score += data.muscle_soreness * 7.0
-    score += data.stress_level * 0.25
-
-    if data.daily_distance_km > 12.0:
-        score += 15.0
-
-    final_score = min(score, 100.0)
-
-    return {
-        "risk_percentage": round(final_score, 1),
-        "risk_level": "High" if final_score > 60 else "Medium" if final_score > 40 else "Low",
-    }
-
-
 @router.post("/predict/daily", response_model=InjuryPredictionResponse)
 def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredictionResponse:
     """

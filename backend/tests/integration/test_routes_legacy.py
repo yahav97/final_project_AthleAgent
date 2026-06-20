@@ -56,41 +56,6 @@ class TestTestPredictRoute:
         assert response.status_code == 422
 
 
-class TestDemoPredictRoute:
-    def test_post_demo_predict_low_risk_profile(self, api_client):
-        payload = _legacy_athlete_payload(
-            sleep_hours=8.0,
-            muscle_soreness=1,
-            stress_level=2,
-            daily_distance_km=5.0,
-        )
-        response = api_client.post("/demo_predict", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert set(data.keys()) == {"risk_percentage", "risk_level"}
-        assert data["risk_level"] == "Low"
-        assert 0.0 <= float(data["risk_percentage"]) <= 100.0
-
-    def test_post_demo_predict_high_risk_when_sleep_deprived(self, api_client):
-        payload = _legacy_athlete_payload(
-            sleep_hours=4.0,
-            muscle_soreness=5,
-            stress_level=8,
-            daily_distance_km=15.0,
-        )
-        response = api_client.post("/demo_predict", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["risk_level"] == "High"
-        assert float(data["risk_percentage"]) > 60.0
-
-    def test_post_demo_predict_missing_required_field_returns_422(self, api_client):
-        response = api_client.post("/demo_predict", json={"sleep_hours": 7.0})
-        assert response.status_code == 422
-
-
 class TestSklearnLegacyRoute:
     def test_post_sklearn_disabled_by_default_returns_410(self, api_client):
         assert settings.ENABLE_LEGACY_SKLEARN_ENDPOINT is False

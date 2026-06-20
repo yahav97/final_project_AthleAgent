@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -21,6 +21,15 @@ from utils.logging import logger
 
 def _to_date_key(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d")
+
+
+def _date_keys_in_range(start_day: datetime, end_day: datetime) -> list[str]:
+    keys: list[str] = []
+    day = start_day
+    while day <= end_day:
+        keys.append(day.strftime("%Y-%m-%d"))
+        day += timedelta(days=1)
+    return keys
 
 
 def _sleep_hours(doc: dict[str, Any]) -> float:
@@ -254,7 +263,7 @@ def save_daily_prediction_result(
             "finalRiskScore": round(risk_score * 100.0, 2),
             "riskLevel": result.get("risk_level"),
             "predictionConfidence": round(min(100.0, max(0.0, conf)), 2),
-            "predictionUpdatedAt": datetime.utcnow().isoformat(),
+            "predictionUpdatedAt": datetime.now(timezone.utc).isoformat(),
         }
         db.collection("users").document(user_id).collection("daily_health").document(date_key).set(doc, merge=True)
         return True
@@ -290,35 +299,20 @@ def fetch_user_history(
 
     try:
         user_ref = db.collection("users").document(user_id)
-        health_docs = user_ref.collection("daily_health").stream()
-        checkin_docs = user_ref.collection("daily_checkins").stream()
+        health_ref = user_ref.collection("daily_health")
+        checkin_ref = user_ref.collection("daily_checkins")
     except Exception:
         return []
 
-    health_by_date: dict[str, dict[str, Any]] = {}
-    for doc in health_docs:
-        key = doc.id
-        try:
-            d = _to_date_key(key)
-        except ValueError:
-            continue
-        if start_day <= d <= end_inclusive:
-            health_by_date[key] = doc.to_dict() or {}
-
-    checkin_by_date: dict[str, dict[str, Any]] = {}
-    for doc in checkin_docs:
-        key = doc.id
-        try:
-            d = _to_date_key(key)
-        except ValueError:
-            continue
-        if start_day <= d <= end_inclusive:
-            checkin_by_date[key] = doc.to_dict() or {}
-
     merged_rows: list[dict[str, Any]] = []
-    for key in sorted(health_by_date.keys()):
-        row = dict(health_by_date.get(key) or {})
-        row.update(checkin_by_date.get(key) or {})
+    for key in _date_keys_in_range(start_day, end_inclusive):
+        health_doc = health_ref.document(key).get()
+        if not health_doc.exists:
+            continue
+        row = dict(health_doc.to_dict() or {})
+        checkin_doc = checkin_ref.document(key).get()
+        if checkin_doc.exists:
+            row.update(checkin_doc.to_dict() or {})
         row["date_key"] = key
         merged_rows.append(row)
     return merged_rows

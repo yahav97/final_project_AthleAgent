@@ -11,9 +11,13 @@ from services.prediction_service import predict_injury_risk
 from services.preprocessing import validate_feature_vector_for_model
 from utils.exceptions import DatabaseError, MLModelError, ValidationError
 
+pytestmark = pytest.mark.integration
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
 
 @pytest.mark.skipif(
-    not (Path(__file__).resolve().parents[1] / "injury_model.pkl").is_file(),
+    not (_BACKEND_ROOT / "injury_model.pkl").is_file(),
     reason="injury_model.pkl not present",
 )
 def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
@@ -50,7 +54,6 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
 
 
 def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monkeypatch):
-    """When model is blocked by gate, service raises deterministic runtime error."""
     from services import prediction_service as ps
 
     monkeypatch.setattr(ps, "get_model", lambda: None)

@@ -2,6 +2,8 @@ import pytest
 
 from services.feature_engineering import compute_derived_features
 
+pytestmark = pytest.mark.unit
+
 
 def test_acwr_ratio_bounded():
     row = {

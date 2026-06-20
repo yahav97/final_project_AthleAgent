@@ -3,6 +3,8 @@ AthleAgent FastAPI Backend
 Main application entry point.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,14 +15,25 @@ from utils.logging import logger
 from api.routes.health import router as health_router
 from api.routes.predict import router as predict_router
 
-# Initialize FastAPI app
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load gated model on startup; log shutdown."""
+    from ml.model_loader import load_model
+
+    load_model(settings.MODEL_PATH)
+    logger.info("Starting %s v%s (Firestore-backed inference)", settings.PROJECT_NAME, settings.VERSION)
+    yield
+    logger.info("Shutting down server")
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Smart injury risk prediction system using ML",
+    lifespan=lifespan,
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -32,21 +45,6 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(predict_router)
 register_exception_handlers(app)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize on startup."""
-    from ml.model_loader import load_model
-
-    load_model(settings.MODEL_PATH)
-    logger.info("Starting %s v%s (Firestore-backed inference)", settings.PROJECT_NAME, settings.VERSION)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down server")
 
 
 if __name__ == "__main__":

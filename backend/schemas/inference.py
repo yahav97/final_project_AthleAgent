@@ -3,7 +3,7 @@
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
-# --- Legacy / demo payloads (Android demo_predict, test_predict) ---
+# --- Legacy payloads (test_predict mock, optional /predict/sklearn) ---
 
 
 class AthleteData(BaseModel):

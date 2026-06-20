@@ -73,3 +73,56 @@ class TestHistoricalDerivedFeatures:
         monkeypatch.setattr(hs, "fetch_user_history", lambda *a, **k: rows)
         ctx = hs.get_history_window_context("u1", "2026-05-09")
         assert ctx["confidence"] == expected_confidence
+
+
+class TestFetchUserHistory:
+    def test_reads_documents_by_date_key_not_collection_stream(self, monkeypatch):
+        get_calls: list[tuple[str, str]] = []
+
+        class _Snapshot:
+            def __init__(self, exists: bool, data: dict | None = None) -> None:
+                self.exists = exists
+                self._data = data or {}
+
+            def to_dict(self) -> dict:
+                return self._data
+
+        class _DocRef:
+            def __init__(self, collection: str, key: str) -> None:
+                self.collection = collection
+                self.key = key
+
+            def get(self) -> _Snapshot:
+                get_calls.append((self.collection, self.key))
+                if self.collection == "daily_health" and self.key == "2026-05-03":
+                    return _Snapshot(True, {"steps": 5000, "sleepMinutes": 420})
+                return _Snapshot(False)
+
+        class _Collection:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def document(self, key: str) -> _DocRef:
+                return _DocRef(self.name, key)
+
+        class _UserDoc:
+            def collection(self, name: str) -> _Collection:
+                return _Collection(name)
+
+        class _Db:
+            def collection(self, name: str):
+                class _Users:
+                    def document(self, uid: str) -> _UserDoc:
+                        return _UserDoc()
+
+                return _Users()
+
+        monkeypatch.setattr(hs, "_get_firestore_client", lambda: _Db())
+        rows = hs.fetch_user_history("u1", "2026-05-03", lookback_days=7, include_target_day=True)
+
+        assert len(rows) == 1
+        assert rows[0]["date_key"] == "2026-05-03"
+        assert rows[0]["steps"] == 5000
+        assert get_calls
+        assert all(call[0] in ("daily_health", "daily_checkins") for call in get_calls)
+        assert ("daily_health", "2026-05-03") in get_calls
