@@ -153,12 +153,15 @@
 
 #### 5. ב-`daily_health` — אחרי חיזוי (`POST /predict/daily`)
 
-| שדה Firestore | תוכן | ב-`InjuryPredictionResponse`? |
-|---|---|---|
-| `finalRiskScore` | הסתברות × 100 — **סיכון להיום** | כן — כ-`risk_score` (0–1) בתגובת API |
-| `riskLevel` | `Low` / `Medium` / `High` — **להיום** | כן — כ-`risk_level` |
-| `predictionConfidence` | 0–100 | כן — כ-`prediction_confidence` |
-| `predictionUpdatedAt` | ISO UTC | **לא** — רק ב-Firestore |
+> **תצוגה באפליקציה:** הדשבורד קורא **`finalRiskScore`** (0–100) מ-Firestore — **לא** את `risk_score` מתגובת ה-HTTP.  
+> `POST /predict/daily` הוא **trigger** בלבד; הבקאנד שומר את התוצאה ל-Firestore והאפליקציה קוראת משם.
+
+| שדה Firestore | תוכן | ב-`InjuryPredictionResponse`? | נקרא ב-UI? |
+|---|---|---|---|
+| `finalRiskScore` | הסתברות × 100 — **סיכון להיום** | כן — מקור: `risk_score` (0–1) | ✅ **כן** — מד + גרף |
+| `riskLevel` | `Low` / `Medium` / `High` — **להיום** | כן — כ-`risk_level` | ⚠️ Gemini בלבד |
+| `predictionConfidence` | 0–100 | כן — כ-`prediction_confidence` | ⚠️ Gemini בלבד |
+| `predictionUpdatedAt` | ISO UTC | **לא** — רק ב-Firestore | לא |
 
 מיפוי API ↔ Firestore:
 

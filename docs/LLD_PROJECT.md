@@ -106,15 +106,20 @@ final_project_AthleAgent/
 fun getDailyPrediction(@Body request: DailyPredictionRequest): Call<DailyPredictionResponse>
 ```
 
-**`PredictionModels.kt`**
+**`ApiService.kt`** (מקור אמת לחוזה HTTP):
 ```kotlin
-data class DailyPredictionRequest(val userId: String, val date: String)
-data class DailyPredictionResponse(
-    val risk_score: Float,
+@POST("/predict/daily")
+fun getDailyPrediction(@Body data: PredictionTriggerRequest): Call<PredictionResponse>
+
+data class PredictionResponse(
     val risk_level: String,
-    val prediction_confidence: Float
+    val risk_score: Float,              // 0.0–1.0 — לא נקרא לתצוגה
+    val prediction_confidence: Float    // 0–100
 )
 ```
+
+> **`PredictionModels.kt`** — DTO ישן ולא בשימוש; ניתן למחוק.  
+> **תצוגת ציון סיכון:** תמיד מ-`daily_health/{date}.finalRiskScore` (0–100) ב-Firestore, לא מ-body של POST.
 
 ### 2.4 Trigger לחיזוי — לוגיקה משותפת
 
@@ -132,7 +137,10 @@ flowchart TD
     Check -->|כן| API[POST /predict/daily]
     Check -->|לא| Wait[ממתין לנתון חסר]
     API --> FS[Backend כותב ל-daily_health]
+    FS --> UI[דשבורד קורא finalRiskScore מ-Firestore]
 ```
+
+> `POST /predict/daily` מחזיר `risk_score` (0–1) — האפליקציה בודקת רק הצלחה. התצוגה (מד, גרף) מ-`finalRiskScore` (0–100) ב-Firestore.
 
 ### 2.5 Health Connect — שדות שנכתבים
 

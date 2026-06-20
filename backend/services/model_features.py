@@ -1,93 +1,48 @@
-"""Feature column contract for injury_model.pkl (must match ML_model/athlete_injury_data.csv)."""
+"""Feature column contract for injury_model.pkl (loaded from disk, cached in memory)."""
 
-# Training CSV rows omit the four rolling-summary columns below; `ML_model/train_model.add_sequential_features`
-# recomputes them from per-athlete history so labels align with the synthetic pipeline.
-TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = (
-    "acwr_ratio_ma7",
-    "sleep_hours_ma7",
-)
+from __future__ import annotations
 
-MODEL_FEATURE_COLUMNS: list[str] = [
-    "bmi",
-    "age",
-    "body_fat_pct",
-    "vo2_max",
-    "history_injury_count",
-    "injured_yesterday",
-    "daily_distance_km",
-    "workout_intensity_minutes",
-    "avg_cadence",
-    "elevation_gained_m",
-    "floors_climbed",
-    "avg_speed",
-    "max_speed",
-    "avg_power",
-    "active_calories_burned",
-    "sleep_hours",
-    "hrv_score",
-    "resting_hr",
-    "respiratory_rate",
-    "spo2",
-    "nutrition_intake_calories",
-    "daily_calories",
-    "total_calories_burned",
-    "stress_level",
-    "muscle_soreness",
-    "energy_level",
-    "acute_load_7d",
-    "chronic_load_21d",
-    "acwr_ratio",
-    "acwr_ratio_ma7",
-    "calorie_balance",
-    "sleep_hours_ma7",
-    "sleep_debt_3d",
-    "hrv_drop",
-    "load_recovery_imbalance",
-    "speed_intensity_ratio",
-]
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
+_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "data" / "model_feature_contract.json"
+
+
+@lru_cache(maxsize=1)
+def _load_contract() -> dict[str, Any]:
+    with _CONTRACT_PATH.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid model feature contract at {_CONTRACT_PATH}")
+    return data
+
+
+def _feature_columns() -> tuple[str, ...]:
+    columns = _load_contract()["feature_columns"]
+    if not isinstance(columns, list) or not columns:
+        raise ValueError("model_feature_contract.json: feature_columns must be a non-empty list")
+    return tuple(str(column) for column in columns)
+
+
+def _default_values() -> dict[str, float]:
+    defaults = _load_contract()["default_values"]
+    if not isinstance(defaults, dict) or not defaults:
+        raise ValueError("model_feature_contract.json: default_values must be a non-empty object")
+    return {str(key): float(value) for key, value in defaults.items()}
+
+
+def _training_csv_exclude_columns() -> tuple[str, ...]:
+    excluded = _load_contract().get("training_csv_exclude_columns", ())
+    if not isinstance(excluded, list):
+        raise ValueError("model_feature_contract.json: training_csv_exclude_columns must be a list")
+    return tuple(str(column) for column in excluded)
+
+
+MODEL_FEATURE_COLUMNS: list[str] = list(_feature_columns())
+DEFAULT_FEATURE_VALUES: dict[str, float] = _default_values()
+TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = _training_csv_exclude_columns()
 TRAINING_BASE_FEATURE_COLUMNS: tuple[str, ...] = tuple(
-    c for c in MODEL_FEATURE_COLUMNS if c not in TRAINING_CSV_EXCLUDE_COLUMNS
+    column for column in MODEL_FEATURE_COLUMNS if column not in TRAINING_CSV_EXCLUDE_COLUMNS
 )
-
-# Population-style medians for imputation when the mobile payload is sparse.
-# New sensor features (body_fat, vo2_max, spo2, etc.) use neutral medians so
-# athletes without those sensors get a no-signal baseline.
-DEFAULT_FEATURE_VALUES: dict[str, float] = {
-    "bmi": 23.5,
-    "age": 28.0,
-    "body_fat_pct": 16.0,
-    "vo2_max": 48.0,
-    "history_injury_count": 0.0,
-    "injured_yesterday": 0.0,
-    "daily_distance_km": 3.5,
-    "workout_intensity_minutes": 45.0,
-    "avg_cadence": 168.0,
-    "elevation_gained_m": 50.0,
-    "floors_climbed": 5,
-    "avg_speed": 8.0,
-    "max_speed": 11.0,
-    "avg_power": 0.0,
-    "active_calories_burned": 350.0,
-    "sleep_hours": 7.0,
-    "hrv_score": 62.0,
-    "resting_hr": 54.0,
-    "respiratory_rate": 15.0,
-    "spo2": 97.0,
-    "nutrition_intake_calories": 2500.0,
-    "daily_calories": 2500.0,
-    "total_calories_burned": 2450.0,
-    "stress_level": 5.0,
-    "muscle_soreness": 5.0,
-    "energy_level": 5.0,
-    "acute_load_7d": 4.5,
-    "chronic_load_21d": 5.1,
-    "acwr_ratio": 1.0,
-    "acwr_ratio_ma7": 1.0,
-    "calorie_balance": 0.0,
-    "sleep_hours_ma7": 7.0,
-    "sleep_debt_3d": 1.0,
-    "hrv_drop": 0.0,
-    "load_recovery_imbalance": 1.0,
-    "speed_intensity_ratio": 1.3,
-}

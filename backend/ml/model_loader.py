@@ -8,10 +8,11 @@ from typing import Any, Optional
 
 import joblib
 
+from schemas.enums import ModelGateReason, ModelLiveStatus
 from utils.logging import logger
 
 _estimator: Optional[Any] = None
-_model_gate_reason: str = "model_not_loaded"
+_model_gate_reason: str = ModelGateReason.MODEL_NOT_LOADED.value
 _model_live: bool = False
 _active_manifest: dict[str, Any] = {}
 _active_promoted: dict[str, Any] = {}
@@ -99,37 +100,37 @@ def _resolve_effective_model_path(model_path: PathLike | None) -> Path:
     return _fallback_model_path()
 
 
-def _validate_manifest_for_live(manifest: dict[str, Any], model_path: Path) -> tuple[bool, str]:
+def _validate_manifest_for_live(manifest: dict[str, Any], model_path: Path) -> tuple[bool, ModelGateReason]:
     """Validate manifest quality gates before allowing model to be live."""
     winner = str(manifest.get("winner") or "").strip()
     if not winner:
-        return False, "manifest_missing_winner"
+        return False, ModelGateReason.MANIFEST_MISSING_WINNER
     metrics = manifest.get("winner_metrics") or {}
     try:
         recall = float(metrics.get("Recall@Threshold"))
     except (TypeError, ValueError):
-        return False, "manifest_invalid_recall"
+        return False, ModelGateReason.MANIFEST_INVALID_RECALL
     try:
         auc = float(metrics.get("ROC-AUC"))
     except (TypeError, ValueError):
-        return False, "manifest_invalid_auc"
+        return False, ModelGateReason.MANIFEST_INVALID_AUC
     if recall < MIN_RECALL_HARD:
-        return False, "manifest_recall_below_hard_gate"
+        return False, ModelGateReason.MANIFEST_RECALL_BELOW_HARD_GATE
     if auc < MIN_AUC_FOR_LIVE:
-        return False, "manifest_auc_too_low"
+        return False, ModelGateReason.MANIFEST_AUC_TOO_LOW
 
     policy = manifest.get("policy") or {}
     if "recall_hard_min" in policy:
         try:
             policy_hard_recall = float(policy["recall_hard_min"])
         except (TypeError, ValueError):
-            return False, "manifest_invalid_policy_recall_hard_min"
+            return False, ModelGateReason.MANIFEST_INVALID_POLICY_RECALL_HARD_MIN
         if recall < policy_hard_recall:
-            return False, "manifest_recall_below_policy_hard_min"
+            return False, ModelGateReason.MANIFEST_RECALL_BELOW_POLICY_HARD_MIN
 
     if not model_path.is_file():
-        return False, "model_file_not_found"
-    return True, "none"
+        return False, ModelGateReason.MODEL_FILE_NOT_FOUND
+    return True, ModelGateReason.NONE
 
 
 def _load_bundle_without_manifest(path: Path) -> Optional[Any]:
@@ -166,7 +167,7 @@ def load_model(
     if not path.is_file():
         logger.warning("Model file not found at %s. Run ML_model/train_model.py first.", path)
         _estimator = None
-        _model_gate_reason = "model_file_not_found"
+        _model_gate_reason = ModelGateReason.MODEL_FILE_NOT_FOUND.value
         _model_live = False
         _active_manifest = {}
         return None
@@ -182,12 +183,12 @@ def load_model(
             bundle = _load_bundle_without_manifest(path)
             if bundle is None:
                 _estimator = None
-                _model_gate_reason = "fallback_bundle_invalid"
+                _model_gate_reason = ModelGateReason.FALLBACK_BUNDLE_INVALID.value
                 _model_live = False
                 _active_manifest = {}
                 return None
             _estimator = bundle
-            _model_gate_reason = "none"
+            _model_gate_reason = ModelGateReason.NONE.value
             _model_live = True
             _active_manifest = {}
             logger.info(
@@ -204,7 +205,7 @@ def load_model(
 
         logger.warning("Manifest not found at %s; model will not be marked live.", manifest_candidate)
         _estimator = None
-        _model_gate_reason = "manifest_not_found"
+        _model_gate_reason = ModelGateReason.MANIFEST_NOT_FOUND.value
         _model_live = False
         _active_manifest = {}
         return None
@@ -215,7 +216,7 @@ def load_model(
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Manifest read failed at %s: %s", manifest_candidate, exc)
         _estimator = None
-        _model_gate_reason = "manifest_corrupted"
+        _model_gate_reason = ModelGateReason.MANIFEST_CORRUPTED.value
         _model_live = False
         _active_manifest = {}
         return None
@@ -224,13 +225,13 @@ def load_model(
     if not valid:
         logger.warning("Model gate rejected load: %s", reason)
         _estimator = None
-        _model_gate_reason = reason
+        _model_gate_reason = reason.value
         _model_live = False
         _active_manifest = manifest
         return None
 
     _estimator = joblib.load(path)
-    _model_gate_reason = "none"
+    _model_gate_reason = ModelGateReason.NONE.value
     _model_live = True
     _active_manifest = manifest
     logger.info(
@@ -286,7 +287,7 @@ def get_model_status() -> dict[str, Any]:
     if not run_id and isinstance(_active_promoted, dict):
         run_id = _active_promoted.get("run_id")
     return {
-        "status": "Live" if _model_live else "Blocked",
+        "status": ModelLiveStatus.LIVE.value if _model_live else ModelLiveStatus.BLOCKED.value,
         "gate_reason": _model_gate_reason,
         "winner": winner,
         "threshold": threshold,

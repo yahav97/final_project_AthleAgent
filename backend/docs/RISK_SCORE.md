@@ -1,7 +1,7 @@
 # חישוב ציון הסיכון (Daily Injury Risk Score) — מדריך מפורט
 
 > **מסמך זה:** הסבר מלא בעברית על איך נבנה ציון הסיכון, מאיזה ימים, אילו פרמטרים, מה חוזר לפרונט, ואילו ספים חלים.  
-> **קוד אמת:** `prediction_service.py` · `preprocessing.py` · `history_service.py` · `model_features.py`  
+> **קוד אמת:** `services/prediction/` · `services/preprocessing/` · `services/history/` · `data/model_feature_contract.json`  
 > **מודל פרודקשן:** XGBoostDeep — `ML_model/artifacts/promoted.json`  
 > **חוזה שדות Firestore:** [`FEATURES.md`](FEATURES.md)  
 > **קונפיג ML:** [`MODEL.md`](MODEL.md)
@@ -37,9 +37,10 @@
 | **איך מציגים באפליקציה?** | `finalRiskScore` = אחוז 0–100 (`risk_score × 100`) |
 | **על איזה יום?** | יום **D** (היום) — חיזוי בוקר, לא תחזית למחר |
 | **מאיפה הנתונים?** | שעון (Health Connect), סקר יומי, תזונה, פרופיל, היסטוריה 7 ימים |
-| **כמה פיצ'רים?** | **36** — רשימה קבועה ב־`model_features.py` |
-| **מה חוזר ל-API?** | 3 שדות: `risk_score`, `risk_level`, `prediction_confidence` |
-| **מה נשמר ב-Firestore?** | `finalRiskScore`, `riskLevel`, `predictionConfidence`, `predictionUpdatedAt` |
+| **כמה פיצ'רים?** | **36** — רשימה קבועה ב־`data/model_feature_contract.json` |
+| **מה חוזר ל-API?** | 3 שדות: `risk_score` (0–1), `risk_level`, `prediction_confidence` — **לא נקראים ב-UI** |
+| **מה נשמר ב-Firestore?** | `finalRiskScore`, `riskLevel`, `predictionConfidence`, `predictionUpdatedAt` — **מקור האמת לתצוגה** |
+| **מי מציג למשתמש?** | אנדרואיד קורא `finalRiskScore` מ-Firestore — לא את body של `POST /predict/daily` |
 
 ---
 
@@ -805,6 +806,9 @@ Provide a short 1-sentence recommendation for training today.
 
 #### תגובה (מה השרת מחזיר)
 
+> **חשוב:** תגובת ה-HTTP היא **אישור שהחיזוי רץ** + ערכים לדיבוג/בדיקות.  
+> **האפליקציה בפרודקשן לא משתמשת בה לתצוגה** — מקור האמת הוא Firestore (ראו למטה).
+
 ```json
 {
   "risk_score": 0.2341,
@@ -815,9 +819,11 @@ Provide a short 1-sentence recommendation for training today.
 
 | שדה API | טיפוס | ממופה ל-Firestore | נקרא ב-UI? |
 |---------|--------|-------------------|------------|
-| `risk_score` | float 0–1 | → `finalRiskScore` (×100) | ❌ ישירות לא |
-| `risk_level` | string | → `riskLevel` | ❌ ישירות לא |
-| `prediction_confidence` | float 0–100 | → `predictionConfidence` | ❌ ישירות לא |
+| `risk_score` | float 0–1 | → `finalRiskScore` (×100) | ❌ **לא** — Firestore בלבד |
+| `risk_level` | string | → `riskLevel` | ❌ **לא** — Firestore בלבד |
+| `prediction_confidence` | float 0–100 | → `predictionConfidence` | ❌ **לא** — Firestore בלבד |
+
+**זה תקין:** `risk_score` (0–1) ו-`finalRiskScore` (0–100) הם **אותו ערך בסקאלות שונות** — ההמרה נעשית בבקאנד לפני השמירה.
 
 #### מי קורא ל-API ומה עושה עם התשובה?
 
@@ -827,7 +833,8 @@ Provide a short 1-sentence recommendation for training today.
 | `DailyCheckInActivity` | אחרי סקר + יש steps | ❌ רק לוג |
 | `MealAnalysisActivity` | אחרי רישום ארוחה | ❌ רק לוג |
 
-האפליקציה מסתמכת על **Firestore listener / קריאה ב-onResume** — לא על body של ה-HTTP response.
+האפליקציה מסתמכת על **קריאה מ-Firestore** (`finalRiskScore`, `riskLevel`, `predictionConfidence`) — **לא** על body של תגובת `POST /predict/daily`.  
+בכל שלושת מסכי ה-trigger נבדק רק `response.isSuccessful`.
 
 מחלקת Retrofit (`ApiService.kt`):
 
@@ -1110,5 +1117,6 @@ risk_score = 0.2341
 | [`MODEL.md`](MODEL.md) | קונפיג מודל, gate, סף אימון 0.18 |
 | [`BACKEND.md`](BACKEND.md) | API, ארכיטקטורה, מבנה תיקיות |
 | [`ML_model/notebooks/model_improvement_journey.ipynb`](../../ML_model/notebooks/model_improvement_journey.ipynb) | מסע שיפור המודל, גרפים, השוואות |
-| `backend/services/model_features.py` | רשימת 36 פיצ'רים + defaults |
+| `backend/data/model_feature_contract.json` | רשימת 36 פיצ'רים + defaults |
+| `backend/services/model_features.py` | Loader ל-contract JSON |
 | `ML_model/artifacts/.../feature_importance.csv` | חשיבות פיצ'רים מהאימון |

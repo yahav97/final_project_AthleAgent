@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from config import settings
+from schemas.enums import HealthStatus
 
 router = APIRouter(tags=["Health"])
 
@@ -10,7 +11,7 @@ router = APIRouter(tags=["Health"])
 @router.get("/")
 async def root():
     return {
-        "status": "ok",
+        "status": HealthStatus.OK.value,
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
     }
@@ -18,4 +19,4 @@ async def root():
 
 @router.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": HealthStatus.HEALTHY.value}

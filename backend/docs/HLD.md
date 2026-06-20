@@ -3,8 +3,8 @@
 
 | שדה | ערך |
 |-----|-----|
-| **גרסה** | 1.0 |
-| **תאריך** | 2026-06-19 |
+| **גרסה** | 1.1 |
+| **תאריך** | 2026-06-20 |
 | **קהל יעד** | מפתחי backend, DevOps, בוחנים |
 | **מסמכים קשורים** | [LLD.md](LLD.md) · [BACKEND.md](BACKEND.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) |
 
@@ -93,7 +93,7 @@ flowchart TB
 | **Minimal trigger contract** | `{userId, date}` בלבד |
 | **Fail closed on model** | אם gate נכשל → 500, לא demo fallback |
 | **Merge write** | תוצאות חיזוי merge ל-`daily_health/{date}` |
-| **Defaults for sparse data** | `DEFAULT_FEATURE_VALUES` + confidence score |
+| **Defaults for sparse data** | `data/model_feature_contract.json` + `HistoryConfidence` enum |
 
 ---
 
@@ -142,6 +142,9 @@ flowchart TB
 | `prediction_confidence` | `predictionConfidence` | as-is |
 | — | `predictionUpdatedAt` | ISO UTC (Firestore only) |
 
+> **מקור האמת לתצוגה באנדרואיד:** Firestore (`finalRiskScore` 0–100), לא גוף תגובת `POST /predict/daily`.  
+> `risk_score` ב-API (0–1) הוא פלט ML גולמי; האפליקציה מפעילה trigger בלבד (`isSuccessful`) וקוראת את התוצאה מהמסמך ב-Firestore.
+
 ---
 
 ## 5. זרימת חיזוי (Production Flow)
@@ -168,8 +171,9 @@ sequenceDiagram
     ML-->>PS: probability
     PS->>PS: risk bands + confidence
     API->>HS: save_daily_prediction_result()
-    HS->>FS: merge write
-    API-->>Client: InjuryPredictionResponse
+    HS->>FS: merge write (finalRiskScore, riskLevel, …)
+    API-->>Client: InjuryPredictionResponse (trigger only — UI reads FS)
+    Note over Client,FS: Dashboard reads finalRiskScore from Firestore, not HTTP body
 ```
 
 ### 5.1 Date Merge Policy (יום D = יום ההתעוררות)
@@ -471,8 +475,8 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 
 | סוג | קבצים |
 |-----|-------|
-| Unit | `test_preprocessing.py`, `test_feature_engineering.py` |
-| Integration | `test_inference.py`, `test_history_service.py` |
+| Unit | `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py` |
+| Integration | `tests/integration/test_inference_edge_cases.py`, `tests/unit/test_history_service.py` |
 | Contract | `test_train_serve_parity.py`, `test_prediction_model_columns.py` |
 | Gates | `test_model_loader_gate.py` |
 | Error paths | `test_predict_error_mode.py` |

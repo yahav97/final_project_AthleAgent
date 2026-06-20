@@ -21,6 +21,8 @@ Production inference endpoint (minimal trigger). The backend loads `userId`/`dat
 - `risk_level` (`Low|Medium|High`)
 - `prediction_confidence` (`0..100`)
 
+**Android display:** the app does **not** use this HTTP body for UI. It triggers inference via `POST /predict/daily`, then reads **`finalRiskScore`** (0–100) from Firestore `daily_health/{date}`. The API `risk_score` and Firestore `finalRiskScore` are the same value on different scales (`×100`).
+
 ### `GET /status/ml`
 
 Internal operational endpoint:

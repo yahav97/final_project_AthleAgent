@@ -3,8 +3,8 @@
 
 | שדה | ערך |
 |-----|-----|
-| **גרסה** | 1.0 |
-| **תאריך** | 2026-06-19 |
+| **גרסה** | 1.1 |
+| **תאריך** | 2026-06-20 |
 | **קהל יעד** | מפתחי backend |
 | **מסמכים קשורים** | [HLD.md](HLD.md) · [FEATURES.md](FEATURES.md) · [docs/LLD_PROJECT.md](../../docs/LLD_PROJECT.md) |
 
@@ -16,27 +16,39 @@
 backend/
 ├── main.py                     # FastAPI app, CORS, startup load_model
 ├── config.py                   # Settings (pydantic-settings)
+├── data/
+│   └── model_feature_contract.json
 ├── api/
 │   └── routes/
 │       ├── health.py           # GET /, GET /health
-│       └── predict.py          # prediction endpoints
+│       ├── predict.py          # prediction endpoints
+│       └── observability.py    # client telemetry
 ├── services/
-│   ├── prediction_service.py   # orchestration
-│   ├── history_service.py      # Firestore + rolling features
-│   ├── preprocessing.py        # request → DataFrame, quality score
+│   ├── prediction_service.py   # backward-compat re-exports
+│   ├── prediction/             # service, bundle, confidence, firestore_mapping
+│   ├── history_service.py      # backward-compat re-exports
+│   ├── history/                # firestore_client, repository, rolling_features, date_utils
+│   ├── preprocessing/          # quality, validation, scales, request_mapping
 │   ├── feature_engineering.py  # derived features
-│   └── model_features.py       # 36 columns + defaults
+│   ├── field_transforms.py     # Firestore field helpers
+│   ├── model_features.py       # loads contract JSON from disk
+│   └── risk_levels.py
 ├── schemas/
-│   └── inference.py            # Pydantic models
+│   ├── inference.py            # Pydantic models
+│   ├── enums.py                # HistoryConfidence, ModelGateReason, ModelLiveStatus
+│   └── types.py
 ├── ml/
 │   └── model_loader.py         # joblib load + manifest gates
-├── external/
-│   └── google_auth.py          # ID token verify (unused)
+├── middleware/
+│   └── request_logging.py
 ├── utils/
 │   ├── logging.py
+│   ├── client_event_limiter.py # TTL + max-key eviction
 │   └── exceptions.py
 ├── scripts/                    # ops utilities
-└── tests/                      # pytest
+└── tests/
+    ├── unit/
+    └── integration/
 ```
 
 ---
@@ -83,8 +95,8 @@ class Settings(BaseSettings):
 
 | Route | Response |
 |-------|----------|
-| `GET /` | `{name, version, docs}` |
-| `GET /health` | `{status: "ok"}` |
+| `GET /` | `{status: "ok", service, version}` |
+| `GET /health` | `{status: "healthy"}` |
 
 ### 4.2 `predict.py`
 
@@ -98,6 +110,8 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 ```
 
 **Error handling:** any exception → HTTP 500 `"Prediction unavailable: {exc}"`
+
+**Client contract:** Android treats this endpoint as a **trigger** (`isSuccessful` only). UI reads `finalRiskScore` / `riskLevel` / `predictionConfidence` from Firestore after the merge write — not from the HTTP response body.
 
 #### `GET /status/ml`
 
@@ -140,18 +154,20 @@ All fields optional — service applies defaults.
 
 ## 6. Service Layer
 
-### 6.1 `prediction_service.py` — Function Map
+### 6.1 `services/prediction/` — Function Map
 
-| Function | Responsibility |
+| Module / Function | Responsibility |
 |----------|----------------|
-| `predict_injury_risk_from_firestore(user_id, date)` | Main entry: snapshot → predict |
-| `injury_prediction_request_from_firestore_snapshot(...)` | Firestore dict → Pydantic request |
-| `predict_injury_risk(payload)` | Core inference logic |
-| `_apply_history_confidence_fallback(df, payload)` | 7-day rolling enrichment |
-| `_resolve_model_bundle(loaded)` | Parse joblib dict contract |
-| `_prediction_confidence_0_100(history, quality)` | 0.6×history + 0.4×quality |
-| `persist_prediction_result_or_raise(...)` | Write or raise |
-| `training_base_feature_dict_from_request(...)` | Export path for retraining |
+| `service.predict_injury_risk_from_firestore` | Main entry: snapshot → predict |
+| `firestore_mapping.injury_prediction_request_from_firestore_snapshot` | Firestore dict → Pydantic request |
+| `service.predict_injury_risk` | Core inference logic |
+| `confidence.apply_history_confidence_fallback` | 7-day rolling enrichment |
+| `bundle.resolve_model_bundle` | Parse joblib dict contract |
+| `confidence.prediction_confidence_0_100` | 0.6×history + 0.4×quality |
+| `service.persist_prediction_result_or_raise` | Write or raise |
+| `service.training_base_feature_dict_from_request` | Export path for retraining |
+
+> `prediction_service.py` re-exports the above for backward compatibility and test monkeypatching.
 
 #### Inference Logic (`predict_injury_risk`)
 
@@ -180,18 +196,20 @@ All fields optional — service applies defaults.
 
 ---
 
-### 6.2 `history_service.py` — Function Map
+### 6.2 `services/history/` — Function Map
 
-| Function | Responsibility |
+| Module / Function | Responsibility |
 |----------|----------------|
-| `_get_firestore_client()` | Firebase Admin init (singleton) |
-| `fetch_daily_firestore_snapshot(user_id, date)` | Profile + D + D-1 docs |
-| `get_history_window_context(user_id, date, lookback=7)` | Rolling features + confidence |
-| `compute_historical_derived_features(rows)` | ACWR, sleep_debt, hrv_drop |
-| `save_daily_prediction_result(user_id, date, result)` | Merge write to daily_health |
-| `merge_nutrition_with_history(user_id, date, raw)` | Backfill missing nutrition |
-| `fetch_injury_tomorrow_label(user_id, date)` | Training label from D+1 checkin |
-| `stable_athlete_numeric_id(user_id)` | SHA256 → int for CSV export |
+| `firestore_client.get_firestore_client()` | Firebase Admin init (singleton) |
+| `repository.fetch_daily_firestore_snapshot` | Profile + D + D-1 docs |
+| `repository.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
+| `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
+| `repository.save_daily_prediction_result` | Merge write to daily_health |
+| `repository.merge_nutrition_with_history` | Backfill missing nutrition |
+| `repository.fetch_injury_tomorrow_label` | Training label from D+1 checkin |
+| `repository.stable_athlete_numeric_id` | SHA256 → int for CSV export |
+
+> `history_service.py` re-exports the above (including `_get_firestore_client` alias).
 
 #### Rolling Features (`compute_historical_derived_features`)
 
@@ -209,9 +227,9 @@ Input: list of `{date_key, daily_distance_km, sleep_hours, hrv_score}` per day.
 
 | Level | Condition | Rolling features |
 |-------|-----------|------------------|
-| `high` | ≥ 7 days history | computed from Firestore |
-| `medium` | 4–6 days | computed |
-| `low` | < 4 days or new athlete | `DEFAULT_FEATURE_VALUES` for rolling cols |
+| `HistoryConfidence.HIGH` | ≥ 7 days history | computed from Firestore |
+| `HistoryConfidence.MEDIUM` | 4–6 days | computed |
+| `HistoryConfidence.LOW` | < 4 days or new athlete | `DEFAULT_FEATURE_VALUES` for rolling cols |
 
 #### Firestore Read (`fetch_daily_firestore_snapshot`)
 
@@ -237,13 +255,15 @@ users/{uid}/daily_nutrition/{date-1}           → nutrition_yesterday
 
 ---
 
-### 6.3 `preprocessing.py`
+### 6.3 `services/preprocessing/`
 
-| Function | Responsibility |
+| Module / Function | Responsibility |
 |----------|----------------|
-| `injury_request_to_model_dataframe(payload)` | Pydantic → 1-row DataFrame (36 cols) |
-| `calculate_data_quality_score(payload)` | Completeness score 0–1 |
-| `validate_feature_vector_for_model(df, contract)` | Align columns to bundle |
+| `request_mapping.injury_request_to_model_dataframe` | Pydantic → 1-row DataFrame (36 cols) |
+| `quality.calculate_data_quality_score` | Completeness score 0–1 |
+| `validation.validate_feature_vector_for_model` | Align columns to bundle |
+| `scales.stress_to_model_scale` / `soreness_to_model_scale` / `energy_to_model_scale` | Android → training scale |
+| `helpers.safe_float` / `is_present` | Numeric + presence helpers |
 
 **Key transforms (request → model columns):**
 
@@ -273,27 +293,11 @@ Derived features computed in preprocessing:
 
 ---
 
-### 6.5 `model_features.py`
+### 6.5 `model_features.py` + `data/model_feature_contract.json`
 
-**36 model columns** (`MODEL_FEATURE_COLUMNS`):
+**36 model columns** — stored in `backend/data/model_feature_contract.json` and loaded once via `model_features.py` (not inline Python lists).
 
-```python
-MODEL_FEATURE_COLUMNS = [
-    "bmi", "age", "body_fat_pct", "vo2_max",
-    "history_injury_count", "injured_yesterday",
-    "daily_distance_km", "workout_intensity_minutes", "avg_cadence",
-    "elevation_gained_m", "floors_climbed", "avg_speed", "max_speed",
-    "avg_power", "active_calories_burned",
-    "sleep_hours", "hrv_score", "resting_hr", "respiratory_rate", "spo2",
-    "nutrition_intake_calories", "daily_calories", "total_calories_burned",
-    "stress_level", "muscle_soreness", "energy_level",
-    "acute_load_7d", "chronic_load_21d", "acwr_ratio", "acwr_ratio_ma7",
-    "calorie_balance", "sleep_hours_ma7", "sleep_debt_3d", "hrv_drop",
-    "load_recovery_imbalance", "speed_intensity_ratio",
-]
-```
-
-**Defaults:** `DEFAULT_FEATURE_VALUES` — population medians for imputation.
+**Defaults:** `default_values` in the same JSON — population medians for imputation.
 
 **Training exclusion:** `acwr_ratio_ma7`, `sleep_hours_ma7` recomputed in `train_model.add_sequential_features`.
 

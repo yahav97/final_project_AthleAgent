@@ -10,6 +10,8 @@ from schemas.observability import ClientEventIn, ClientEventType
 
 _lock = Lock()
 _last_seen: dict[str, float] = {}
+_MAX_TRACKED_KEYS = 10_000
+_STALE_ENTRY_SECONDS = 86_400
 
 
 def _rate_limit_seconds(event_type: ClientEventType) -> int:
@@ -26,6 +28,19 @@ def _rate_limit_seconds(event_type: ClientEventType) -> int:
     return settings.CLIENT_EVENT_RATE_LIMIT_ACTION_SEC
 
 
+def _evict_stale_entries(now: float) -> None:
+    stale_before = now - _STALE_ENTRY_SECONDS
+    stale_keys = [key for key, seen_at in _last_seen.items() if seen_at < stale_before]
+    for key in stale_keys:
+        _last_seen.pop(key, None)
+    if len(_last_seen) <= _MAX_TRACKED_KEYS:
+        return
+    overflow = len(_last_seen) - _MAX_TRACKED_KEYS
+    oldest_keys = sorted(_last_seen, key=_last_seen.get)[:overflow]
+    for key in oldest_keys:
+        _last_seen.pop(key, None)
+
+
 def should_accept_client_event(event: ClientEventIn, client_key: str) -> bool:
     """
     Return True if the event should be written to the unified log.
@@ -39,6 +54,7 @@ def should_accept_client_event(event: ClientEventIn, client_key: str) -> bool:
     dedupe_key = f"{client_key}:{event.event_type}:{event.tag}"
     now = time.monotonic()
     with _lock:
+        _evict_stale_entries(now)
         previous = _last_seen.get(dedupe_key)
         if previous is not None and (now - previous) < interval:
             return False

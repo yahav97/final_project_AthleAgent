@@ -40,19 +40,44 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 backend/
 ├── main.py                         # FastAPI entry point
 ├── config.py                       # Configuration
+├── data/
+│   └── model_feature_contract.json # רשימת עמודות + defaults (נטען מהדיסק)
 ├── api/routes/
-│   └── predict.py                  # POST /predict/daily, POST /demo_predict
+│   ├── health.py                   # GET /, GET /health
+│   ├── predict.py                  # POST /predict/daily
+│   └── observability.py            # client telemetry
 ├── services/
-│   ├── prediction_service.py       # לוגיקת חיזוי ראשית
-│   ├── preprocessing.py            # הנדסת פיצ'רים + איכות נתונים
-│   ├── history_service.py          # היסטוריה מ-Firestore + rolling features
-│   └── model_features.py          # רשימת פיצ'רים + defaults
+│   ├── prediction_service.py       # shim — ייבוא תאימות
+│   ├── prediction/                 # orchestration, bundle, confidence, firestore mapping
+│   ├── history_service.py          # shim — ייבוא תאימות
+│   ├── history/                    # Firestore client, repository, rolling features
+│   ├── preprocessing/              # quality, validation, scales, request mapping
+│   ├── feature_engineering.py      # derived features (ACWR proxies)
+│   ├── field_transforms.py         # Firestore field helpers
+│   ├── model_features.py           # loader ל-contract JSON (cache בזיכרון)
+│   └── risk_levels.py              # Low/Medium/High cutoffs
 ├── schemas/
-│   └── inference.py                # Pydantic schemas (request/response)
+│   ├── inference.py                # Pydantic request/response
+│   ├── enums.py                    # HistoryConfidence, ModelGateReason, …
+│   └── types.py                    # RiskLevel Literal
 ├── ml/
-│   └── model_loader.py            # טעינת מודל + gates
-└── tests/                          # pytest
+│   └── model_loader.py             # טעינת מודל + manifest gates
+├── middleware/
+│   └── request_logging.py
+├── utils/
+│   ├── logging.py
+│   ├── client_event_limiter.py     # rate limit + TTL eviction
+│   └── exceptions.py
+└── tests/
+    ├── unit/
+    └── integration/
 ```
+
+**הערות ארגון:**
+- קבצים מעל ~250 שורות פוצלו לחבילות (`preprocessing/`, `history/`, `prediction/`).
+- `model_feature_contract.json` נשמר על הדיסק; `model_features.py` טוען פעם אחת (לא רשימות כבדות בקוד).
+- `schemas/enums.py` מחליף מחרוזות קבועות (`HistoryConfidence`, `ModelGateReason`, `ModelLiveStatus`).
+- תיקיית `external/` (Google OAuth שלא היה בשימוש) הוסרה.
 
 ---
 
@@ -76,23 +101,22 @@ backend/
 5. `predict_proba` על המודל החי
 6. שמירת תוצאה ל-Firestore (merge)
 
-**הפלט:**
+**הפלט (API — לצורכי אימות/דיבוג, לא לתצוגה באפליקציה):**
 ```json
 {
   "risk_score": 0.25,
   "risk_level": "Medium",
-  "recommendation": "Consider reducing training load...",
-  "data_quality_score": 0.85,
-  "data_quality_status": "good"
+  "prediction_confidence": 82.5
 }
 ```
 
+> **`risk_score` ב-API הוא הסתברות 0–1** (פלט ML). **האפליקציה לא קוראת את גוף התשובה** — רק בודקת `response.isSuccessful`.  
+> **מקור האמת לתצוגה:** Firestore → `finalRiskScore` (0–100). ראו [§6.1](#61-מקור-האמת-לתצוגה-firestore-לא-תגובת-post).
+
 **שדות שנשמרים ב-Firestore** (`daily_health/{date}` merge):
-- `finalRiskScore` (0-100)
+- `finalRiskScore` (0–100)
 - `riskLevel`
-- `backendRecommendation`
-- `dataQualityScore`
-- `dataQualityStatus`
+- `predictionConfidence`
 - `predictionUpdatedAt`
 
 ### `POST /demo_predict` (legacy/דמו — לא ייצור)
@@ -178,6 +202,29 @@ Response + Persist to Firestore (merge write)
 
 ## 6. Data Contract (Frontend ↔ Backend)
 
+### 6.1 מקור האמת לתצוגה: Firestore, לא תגובת POST
+
+זרימת החיזוי בפרודקשן **תקינה** — אין חוסר התאמה בפועל:
+
+| שלב | מה קורה |
+|-----|---------|
+| 1 | אנדרואיד שולח `POST /predict/daily` עם `{ userId, date }` |
+| 2 | הבקאנד מחשב `risk_score` (0–1) ושומר ל-Firestore: `finalRiskScore = risk_score × 100` |
+| 3 | האפליקציה **לא קוראת** את `risk_score` מתגובת ה-HTTP — רק `isSuccessful` |
+| 4 | דשבורד ספורטאי/מאמן קורא **`finalRiskScore`** מ-`daily_health/{date}` ומציג 0–100% |
+
+**לכן:** ההבדל בין `risk_score` (0–1) ב-API לבין `finalRiskScore` (0–100) ב-Firestore הוא **המרה מכוונת**, לא באג.  
+`ApiService.PredictionResponse` ב-Retrofit מוגדר לצורך טיפוס/לוג — לא לתצוגת UI.
+
+### 6.2 נושאים אחרים לתיאום עם פרונט (אופציונלי)
+
+| נושא | Android | Backend | דחיפות |
+|------|---------|---------|--------|
+| **DTO ישן** | `PredictionModels.kt` (לא בשימוש) | `InjuryPredictionResponse` | ניקוי תיעוד בלבד |
+| **תאריך עומס פיזי** | כותב sleep + עומס אתמול **שניהם** ל-`daily_health/{today}` | קורא עומס מ-`{D-1}` (fallback `{D}`) | תיאום סנכרון |
+| **Gate לפני trigger** | בודק `steps` ב-`daily_health/{today}` | מדיניות: עומס מ-`{D-1}`, שינה מ-`{D}` | תיאום סנכרון |
+| **Endpoints** | רק `POST /predict/daily` | גם `/health`, `/status/ml` — לא מחוברים | אין השפעה |
+
 ### Trigger (מהאפליקציה)
 
 הפרונט שולח רק `userId` + `date` ל-`POST /predict/daily`.
@@ -236,8 +283,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ```env
 FIREBASE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
-GOOGLE_CLIENT_ID=your-google-client-id       # אופציונלי
-GEMINI_API_KEY=your-gemini-api-key           # אופציונלי
+GEMINI_API_KEY=your-gemini-api-key           # אופציונלי — בשימוש בלקוח בלבד
 ```
 
 ---
@@ -257,9 +303,10 @@ GEMINI_API_KEY=your-gemini-api-key           # אופציונלי
 | קובץ | תפקיד |
 |------|--------|
 | `api/routes/predict.py` | נתיבי API |
-| `services/prediction_service.py` | לוגיקת חיזוי |
-| `services/preprocessing.py` | הנדסת פיצ'רים |
-| `services/history_service.py` | היסטוריה + Firestore |
-| `services/model_features.py` | רשימת עמודות + defaults |
+| `services/prediction/` | לוגיקת חיזוי (service, bundle, confidence) |
+| `services/preprocessing/` | הנדסת פיצ'רים + איכות נתונים |
+| `services/history/` | היסטוריה + Firestore |
+| `data/model_feature_contract.json` | 36 עמודות + defaults |
 | `schemas/inference.py` | Pydantic models |
+| `schemas/enums.py` | Enum-ים לסטטוסים ו-confidence |
 | `ml/model_loader.py` | טעינת מודל + gates |
