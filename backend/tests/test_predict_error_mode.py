@@ -11,9 +11,10 @@ def test_predict_daily_returns_500_when_model_gate_blocks(monkeypatch):
         "fetch_daily_firestore_snapshot",
         lambda uid, d: {
             "profile": {},
-            "daily_health": {"sleepMinutes": 450, "steps": 7400},
+            "daily_health": {"sleepMinutes": 450},
+            "daily_health_yesterday": {"steps": 7400},
             "daily_checkins": {"stressLevel": 33, "muscleSoreness": 3},
-            "daily_nutrition": {},
+            "daily_nutrition_yesterday": {},
         },
     )
     monkeypatch.setattr(ps, "get_model", lambda: None)

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from datetime import timedelta
+
 from ml.model_loader import get_model, get_model_gate_reason
 from schemas.inference import InjuryPredictionRequest
 from services.history_service import (
+    _to_date_key,
     fetch_daily_firestore_snapshot,
     get_history_window_context,
     merge_nutrition_with_history,
@@ -154,6 +157,28 @@ def _firestore_doc_heartrate_avg(doc: dict[str, Any]) -> Any:
     return doc.get("avgHeartRate")
 
 
+def _field_from_docs(
+    primary: dict[str, Any],
+    fallback: dict[str, Any],
+    field_options: list[str],
+    *,
+    prefer_primary: bool,
+) -> Any:
+    """Read the first non-null field name; order of docs depends on ``prefer_primary``."""
+    docs = (primary, fallback) if prefer_primary else (fallback, primary)
+    for doc in docs:
+        for field in field_options:
+            val = doc.get(field)
+            if val is not None and val != 0:
+                return val
+    for doc in docs:
+        for field in field_options:
+            val = doc.get(field)
+            if val is not None:
+                return val
+    return 0
+
+
 def injury_prediction_request_from_firestore_snapshot(
     user_id: str,
     date_key: str,
@@ -161,15 +186,20 @@ def injury_prediction_request_from_firestore_snapshot(
 ) -> InjuryPredictionRequest:
     """
     Build the same ``InjuryPredictionRequest`` as the production Firestore path.
-    Merge policy matches ``predict_injury_risk_from_firestore``:
-    prefer same-day documents for all health signals, fallback to date-1 snapshot when needed.
+
+    Morning prediction merge policy (API date = wake-up day ``D``):
+    - Sleep / recovery: ``daily_health/{D}`` only (last night ending this morning).
+    - Physical load: ``daily_health/{D-1}`` first, fallback ``{D}`` (legacy combined sync).
+    - Survey: ``daily_checkins/{D}``.
+    - Nutrition: ``daily_nutrition/{D-1}`` + backfill from earlier days.
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
     health_yesterday = snapshot.get("daily_health_yesterday") or {}
     checkins = snapshot.get("daily_checkins") or {}
-    nutrition_raw = snapshot.get("daily_nutrition") or {}
-    nutrition = merge_nutrition_with_history(user_id, date_key, nutrition_raw)
+    nutrition_raw = snapshot.get("daily_nutrition_yesterday") or {}
+    yesterday_key = (_to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
+    nutrition = merge_nutrition_with_history(user_id, yesterday_key, nutrition_raw)
 
     hist_profile = profile.get("historyInjuryCount")
     if hist_profile is None:
@@ -183,19 +213,15 @@ def injury_prediction_request_from_firestore_snapshot(
     if ij_raw is None:
         ij_raw = health_today.get("injured_yesterday")
 
-    def _today_then_yesterday(field_options: list[str]) -> Any:
-        """Helper to search for multiple possible field names, first today, then yesterday."""
-        for field in field_options:
-            val = health_today.get(field)
-            if val is not None and val != 0: # Avoid grabbing 0 if another name has the real value
-                return val
-        for field in field_options:
-            val = health_yesterday.get(field)
-            if val is not None:
-                return val
-        return 0
+    def _today_only(field_options: list[str]) -> Any:
+        return _field_from_docs(health_today, {}, field_options, prefer_primary=True)
 
-    hr_avg_today = _firestore_doc_heartrate_avg(health_today)
+    def _yesterday_then_today(field_options: list[str]) -> Any:
+        return _field_from_docs(health_yesterday, health_today, field_options, prefer_primary=True)
+
+    hr_avg = _firestore_doc_heartrate_avg(health_yesterday)
+    if hr_avg is None:
+        hr_avg = _firestore_doc_heartrate_avg(health_today)
 
     return InjuryPredictionRequest(
         userId=user_id,
@@ -207,35 +233,35 @@ def injury_prediction_request_from_firestore_snapshot(
         # --- HEALTH CONNECT ALIGNMENT --- 
         # By passing a list, the server checks both what the ML model wants 
         # and what the Android app actually sent.
-        sleepMinutes=_today_then_yesterday(["sleepMinutes", "sleep_minutes"]),
-        steps=_today_then_yesterday(["steps", "daily_steps"]),
-        distanceMeters=_today_then_yesterday(["distanceMeters", "distance_meters", "daily_distance_meters"]),
-        activeCalories=_today_then_yesterday(["activeCalories", "active_calories", "active_calories_burned"]),
-        totalCalories=_today_then_yesterday(["totalCalories", "total_calories", "daily_calories"]),
+        sleepMinutes=_today_only(["sleepMinutes", "sleep_minutes"]),
+        steps=_yesterday_then_today(["steps", "daily_steps"]),
+        distanceMeters=_yesterday_then_today(["distanceMeters", "distance_meters", "daily_distance_meters"]),
+        activeCalories=_yesterday_then_today(["activeCalories", "active_calories", "active_calories_burned"]),
+        totalCalories=_yesterday_then_today(["totalCalories", "total_calories", "daily_calories"]),
         
-        heartRateAvg=hr_avg_today if hr_avg_today is not None else _firestore_doc_heartrate_avg(health_yesterday),
-        heartRateMax=_today_then_yesterday(["heartRateMax", "heart_rate_max"]),
-        heartRateMin=_today_then_yesterday(["heartRateMin", "heart_rate_min"]),
+        heartRateAvg=hr_avg,
+        heartRateMax=_yesterday_then_today(["heartRateMax", "heart_rate_max"]),
+        heartRateMin=_yesterday_then_today(["heartRateMin", "heart_rate_min"]),
         
-        weightKg=_today_then_yesterday(["weightKg", "weight_kg"]),
-        heightCm=_today_then_yesterday(["heightCm", "height_cm"]),
-        bmrCalories=_today_then_yesterday(["bmrCalories", "bmr_calories"]),
+        weightKg=_yesterday_then_today(["weightKg", "weight_kg"]),
+        heightCm=_yesterday_then_today(["heightCm", "height_cm"]),
+        bmrCalories=_yesterday_then_today(["bmrCalories", "bmr_calories"]),
         
-        hrvRmssd=_today_then_yesterday(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
-        restingHeartRate=_today_then_yesterday(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
-        bodyFatPct=_today_then_yesterday(["bodyFatPct", "body_fat_pct"]),
-        vo2Max=_today_then_yesterday(["vo2Max", "vo2_max"]),
+        hrvRmssd=_yesterday_then_today(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
+        restingHeartRate=_yesterday_then_today(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
+        bodyFatPct=_yesterday_then_today(["bodyFatPct", "body_fat_pct"]),
+        vo2Max=_yesterday_then_today(["vo2Max", "vo2_max"]),
         
-        elevationGainedMeters=_today_then_yesterday(["elevationGainedMeters", "elevation_gained_meters"]),
-        floorsClimbed=_today_then_yesterday(["floorsClimbed", "floors_climbed"]),
+        elevationGainedMeters=_yesterday_then_today(["elevationGainedMeters", "elevation_gained_meters"]),
+        floorsClimbed=_yesterday_then_today(["floorsClimbed", "floors_climbed"]),
         
-        avgSpeed=_today_then_yesterday(["avgSpeed", "avg_speed"]),
-        maxSpeed=_today_then_yesterday(["maxSpeed", "max_speed"]),
-        avgPower=_today_then_yesterday(["avgPower", "avg_power"]),
-        avgCadence=_today_then_yesterday(["avgCadence", "avg_cadence"]),
+        avgSpeed=_yesterday_then_today(["avgSpeed", "avg_speed"]),
+        maxSpeed=_yesterday_then_today(["maxSpeed", "max_speed"]),
+        avgPower=_yesterday_then_today(["avgPower", "avg_power"]),
+        avgCadence=_yesterday_then_today(["avgCadence", "avg_cadence"]),
         
-        respiratoryRate=_today_then_yesterday(["respiratoryRate", "respiratory_rate"]),
-        oxygenSaturation=_today_then_yesterday(["oxygenSaturation", "oxygen_saturation", "spo2"]),
+        respiratoryRate=_yesterday_then_today(["respiratoryRate", "respiratory_rate"]),
+        oxygenSaturation=_yesterday_then_today(["oxygenSaturation", "oxygen_saturation", "spo2"]),
         # ---------------------------------
         
         energyLevel=checkins.get("energyLevel"),
@@ -344,12 +370,11 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     """
     Single-source serving path: load inputs from Firestore and run production inference.
 
-    Merge policy:
-    - ``daily_health/{date}``: preferred source for health/load fields.
-    - ``daily_health/{date-1}``: fallback when same-day fields are missing.
-    - ``daily_checkins/{date}``: subjective survey.
-    - ``daily_nutrition/{date}``: nutrition aggregates; missing fields filled from prior days via
-      ``merge_nutrition_with_history``.
+    Merge policy (wake-up day ``D``):
+    - Sleep: ``daily_health/{D}``.
+    - Physical load: ``daily_health/{D-1}`` (fallback ``{D}`` for legacy docs).
+    - Survey: ``daily_checkins/{D}``.
+    - Nutrition: ``daily_nutrition/{D-1}`` + ``merge_nutrition_with_history``.
     """
     snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
     if not snapshot:

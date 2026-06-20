@@ -117,8 +117,13 @@ backend/
 
 ### שדות `daily_health/{date}`
 
-**מהאפליקציה (סנכרון):**
-`sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `totalCalories`, `bmrCalories`, `heartRateAvg`, `heartRateMax`, `heartRateMin`, `weightKg`, `lastSync`
+**מהאפליקציה (סנכרון — יעד לפרונט):**
+- `{D}`: `sleepMinutes` (בוקר), עומס פיזי **חלקי** במהלך היום
+- `{D-1}`: עומס פיזי **יום מלא** (נדרס בבוקר D עם אגרגציה 00:00–23:59)
+
+שדות פיזיים: `steps`, `distanceMeters`, `activeCalories`, `totalCalories`, `bmrCalories`, `heartRateAvg`, `heartRateMax`, `heartRateMin`, `weightKg`, `lastSync`
+
+> פירוט מלא: [FEATURES.md — משימות Android](FEATURES.md#משימות-android--סנכרון-שעון-לשותף-פרונט)
 
 **מהבקאנד (אחרי חיזוי):**
 `finalRiskScore`, `riskLevel`, `backendRecommendation`, `dataQualityScore`, `dataQualityStatus`, `predictionUpdatedAt`
@@ -139,9 +144,10 @@ Android → POST /predict/daily (userId + date)
     ▼
 Backend loads from Firestore:
     ├── users/{uid} (profile)
-    ├── daily_health/{date}
-    ├── daily_checkins/{date}
-    └── daily_nutrition/{date}
+    ├── daily_health/{date}          ← sleep (last night)
+    ├── daily_health/{date-1}        ← physical load (yesterday)
+    ├── daily_checkins/{date}        ← survey (today)
+    └── daily_nutrition/{date-1}     ← nutrition (yesterday)
     │
     ▼
 Preprocessing:
@@ -180,7 +186,8 @@ Response + Persist to Firestore (merge write)
 ### Required Minimum Daily Fields
 
 השדות שחייבים להיות ב-Firestore לחיזוי יציב:
-`sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `totalCalories`, `heartRateAvg`, `weightKg`, `bmrCalories`, `stressLevel`, `muscleSoreness`
+`sleepMinutes` ב-`daily_health/{date}`, `steps` ושאר העומס ב-`daily_health/{date-1}`,
+`stressLevel` / `muscleSoreness` ב-`daily_checkins/{date}`, תזונה ב-`daily_nutrition/{date-1}`
 
 ### Recommendation Text
 

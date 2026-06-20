@@ -19,14 +19,16 @@
 
 כשהמשתמש פותח את האפליקציה **בבוקר של יום D**, החיזוי מתייחס ל**סיכון הפציעה היום** (מיידי), לא לתחזית למחר.
 
-**מה נכנס לקלט (תאריך API = `D` — היום):**
+**מה נכנס לקלט (תאריך API = `D` — היום, יום הקימה):**
 
 | מקור | תאריך במסמך | מה נכלל |
 |---|---|---|
-| שעון / בריאות | `daily_health/{D}` | שינה מהלילה האחרון, סנכרון בוקר (חלקי) |
-| שעון / בריאות | `daily_health/{D-1}` | **fallback** — עומס אתמול (צעדים, מרחק, קלוריות…) אם היום עדיין חסר |
+| שעון / שינה | `daily_health/{D}` | שינה מהלילה שזה עתה נגמר (סנכרון בוקר) |
+| שעון / עומס | `daily_health/{D-1}` | צעדים, מרחק, קלוריות שרופות, דופק, HRV… (יום מלא אתמול) |
+| שעון / עומס (legacy) | `daily_health/{D}` | fallback אם מסמך אתמול חסר (סנכרון ישן משולב) |
 | סקר | `daily_checkins/{D}` | סטרס, כאב, אנרגיה, **`injuredYesterday`** (= פציעה ב-**D−1**) |
-| תזונה | `daily_nutrition/{D}` | צריכה (אתמול/היום לפי מה שנרשם) |
+| תזונה | `daily_nutrition/{D-1}` | צריכה אתמול |
+| תזונה (fallback) | `daily_nutrition/{D-2}…` | עד 14 ימים אחורה אם אתמול חסר |
 | היסטוריה | 7 ימים עד **D−1** | ACWR, חוב שינה, `hrv_drop` (rolling) |
 
 **מה יוצא:**
@@ -41,15 +43,64 @@
 
 ---
 
+## משימות Android — סנכרון שעון (לשותף פרונט)
+
+> **סטטוס:** הבקאנד כבר מיישם את פיצול התאריכים (ראו למטה).  
+> **הקוד הנוכחי** ב-`WearableSyncActivity` עדיין שומר שינה + פיזי יחד ל-`daily_health/{D}` — **לא מיושם עדיין**.
+
+### מה הבקאנד קורא בבוקר (יום D)
+
+| נתון | Firestore | הערה |
+|---|---|---|
+| שינה | `daily_health/{D}` | הלילה שזה עתה נגמר |
+| עומס פיזי | `daily_health/{D-1}` | יום לוח שנה מלא אתמול |
+| סקר | `daily_checkins/{D}` | |
+| תזונה | `daily_nutrition/{D-1}` | ארוחות נרשמות תחת תאריך היום; המודל קורא אתמול |
+
+### אסטרטגיית סנכרון מומלצת — פיזי לשני תאריכים
+
+ב**כל** הרצת סנכרון (בוקר / אחרי אימון):
+
+1. **שינה** (רק בבוקר) — Health Connect: אתמול 18:00 → היום 12:00 → `sleepMinutes` ב-`daily_health/{D}` בלבד.
+2. **פיזי אתמול** — אגרגציה 00:00–23:59 של **D−1** → כל שדות העומס (`steps`, `distanceMeters`, `heartRateAvg`, …) ל-`daily_health/{D-1}` (`set` + `merge`).
+3. **פיזי היום** — אגרגציה 00:00 → **עכשיו** של **D** → אותם שדות פיזיים ל-`daily_health/{D}` (**בלי** `sleepMinutes`).
+
+**למה לכתוב פיזי גם ל-{D} וגם ל-{D-1}?**
+
+- במהלך יום D המסמך `{D}` מציג עומס **חלקי** (תצוגה / עדכון אחרי אימון).
+- בבוקר **D+1** הסנכרון שולף שוב את יום D **מלא** (00:00–23:59) ו**דורס** את `daily_health/{D}` — אז למודל בבוקר D+1 זה הופך ל"אתמול המלא".
+
+```
+ערב D:     sync → daily_health/D = צעדים חלקיים (08:00–20:00)
+בוקר D+1:  sync → daily_health/D = צעדים מלאים (00:00–23:59 של D)  ← המודל קורא את זה כ-D-1
+           sync → daily_health/D+1 = sleepMinutes (לילה D→D+1)
+```
+
+### תנאי להפעלת חיזוי (`POST /predict/daily`)
+
+| מסך | יעד |
+|---|---|
+| `WearableSyncActivity` | אחרי סנכרון — אם יש סקר ב-`daily_checkins/{D}` |
+| `DailyCheckInActivity` | אם `sleepMinutes` ב-`daily_health/{D}` **ו**-`steps` ב-`daily_health/{D-1}` |
+| `MealAnalysisActivity` | אותם תנאי + סקר |
+
+### קבצים לעדכון (פרונט)
+
+- `WearableSyncActivity.kt` — פיצול שמירה + שליפה כפולה לפיזי
+- `DailyCheckInActivity.kt`, `MealAnalysisActivity.kt` — בדיקת `steps` ב-{D-1} (לא רק ב-{D})
+- `HomeAthleteActivity.kt` — "סונכרן שעון" = `sleepMinutes` ב-{D}
+
+---
+
 ## 1. מקורות הנתונים (Firestore)
 
 | Collection | Document | תפקיד | טווח זמן |
 |---|---|---|---|
 | `users/{uid}` | פרופיל | רישום: `age`, `historyInjuryCount` | קבוע |
-| `users/{uid}/daily_health/{date}` | בריאות + פלט חיזוי | שעון; אחרי `/predict/daily`: `finalRiskScore`… | **יום נוכחי** (+ אתמול fallback) |
+| `users/{uid}/daily_health/{date}` | בריאות + פלט חיזוי | שינה ב-`{D}`; עומס ב-`{D-1}`; אחרי `/predict/daily`: `finalRiskScore`… | **יום קימה** + **אתמול** |
 | `users/{uid}/daily_health/{date-6}…{date}` | היסטוריה | rolling features (מרחק, שינה, HRV) | **7 ימים** |
 | `users/{uid}/daily_checkins/{date}` | דיווח עצמי | stress, soreness, energy | **יום נוכחי** |
-| `users/{uid}/daily_nutrition/{date}` | תזונה | protein, carbs, meals, calories | **יום נוכחי** (fallback 14 ימים) |
+| `users/{uid}/daily_nutrition/{date}` | תזונה | protein, carbs, meals, calories | **יום הרישום** (למודל: **אתמול** `D-1`) |
 
 ### חוזה שדות — לפי מקור
 
@@ -119,27 +170,29 @@
 
 ### רשומות Health Connect מהשעון (21)
 
-| רשומת HC | שדה ב-`daily_health` | סינכרון Android (`WearableSyncActivity`) | מודל |
+**יעד סנכרון** (ראו [משימות Android](#משימות-android--סנכרון-שעון-לשותף-פרונט)): שינה → `{D}`; פיזי → `{D-1}` (יום מלא) + `{D}` (חלקי).
+
+| רשומת HC | שדה ב-`daily_health` | יעד שמירה (מודל) | מודל |
 |---|---|---|---|
-| **SleepSession** | `sleepMinutes` | כן | כן |
-| **ActiveCaloriesBurned** | `activeCalories` | כן | כן |
-| **BasalMetabolicRate** | `bmrCalories` | כן | כן |
-| **Steps** | `steps` | כן | כן |
-| **Distance** | `distanceMeters` | כן | כן |
-| **HeartRateSeries** | `heartRateAvg` / `Max` / `Min` | כן (אגרגציה יומית) | כן |
-| **Weight** | `weightKg` | כן | כן |
-| **Height** | `heightCm` | לא | כן |
-| **HeartRateVariabilityRmssd** | `hrvRmssd` | לא | כן |
-| **RestingHeartRate** | `restingHeartRate` | לא | כן |
-| **BodyFat** | `bodyFatPct` | לא | כן |
-| **Vo2Max** | `vo2Max` | לא | כן |
-| **ElevationGained** | `elevationGainedMeters` | לא | כן |
-| **FloorsClimbed** | `floorsClimbed` | לא | כן |
-| **SpeedSeries** | `avgSpeed` / `maxSpeed` | לא | כן |
-| **PowerSeries** | `avgPower` | לא | כן |
-| **StepsCadenceSeries** | `avgCadence` | לא | כן |
-| **RespiratoryRate** | `respiratoryRate` | לא | כן |
-| **OxygenSaturation** | `oxygenSaturation` | לא | כן |
+| **SleepSession** | `sleepMinutes` | `{D}` | כן |
+| **ActiveCaloriesBurned** | `activeCalories` | `{D-1}` | כן |
+| **BasalMetabolicRate** | `bmrCalories` | `{D-1}` | כן |
+| **Steps** | `steps` | `{D-1}` | כן |
+| **Distance** | `distanceMeters` | `{D-1}` | כן |
+| **HeartRateSeries** | `heartRateAvg` / `Max` / `Min` | `{D-1}` | כן |
+| **Weight** | `weightKg` | `{D-1}` | כן |
+| **Height** | `heightCm` | — | כן |
+| **HeartRateVariabilityRmssd** | `hrvRmssd` | `{D-1}` | כן |
+| **RestingHeartRate** | `restingHeartRate` | `{D-1}` | כן |
+| **BodyFat** | `bodyFatPct` | `{D-1}` | כן |
+| **Vo2Max** | `vo2Max` | `{D-1}` | כן |
+| **ElevationGained** | `elevationGainedMeters` | `{D-1}` | כן |
+| **FloorsClimbed** | `floorsClimbed` | `{D-1}` | כן |
+| **SpeedSeries** | `avgSpeed` / `maxSpeed` | `{D-1}` | כן |
+| **PowerSeries** | `avgPower` | — | כן |
+| **StepsCadenceSeries** | `avgCadence` | `{D-1}` | כן |
+| **RespiratoryRate** | `respiratoryRate` | `{D-1}` | כן |
+| **OxygenSaturation** | `oxygenSaturation` | `{D-1}` | כן |
 | **ExerciseSession** | — (מומלץ: משך/סוג אימון) | הרשאה בלבד, לא נשמר | מוערך (`workout_intensity`) |
 | **LeanBodyMass** | — | לא | לא |
 

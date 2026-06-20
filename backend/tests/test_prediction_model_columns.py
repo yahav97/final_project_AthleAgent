@@ -30,7 +30,7 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
             "daily_health": {"sleepMinutes": 480},
             "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
             "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2},
-            "daily_nutrition": {},
+            "daily_nutrition_yesterday": {},
         },
     )
     monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", lambda *a, **k: None)
@@ -96,7 +96,7 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
             "daily_health": {"sleepMinutes": 470},
             "daily_health_yesterday": {"steps": 8300, "heartRateAvg": 58},
             "daily_checkins": {"muscleSoreness": 3, "stressLevel": 35, "energyLevel": 60},
-            "daily_nutrition": {"totalProtein": 130, "totalCarbs": 290, "mealsLoggedCount": 3},
+            "daily_nutrition_yesterday": {"totalProtein": 130, "totalCarbs": 290, "mealsLoggedCount": 3},
         },
     )
     monkeypatch.setattr(
@@ -143,6 +143,26 @@ def test_validate_feature_vector_enforces_exact_training_order():
         },
     )
     assert list(aligned.columns) == ["bmi", "nutrition_intake_calories", "sleep_hours"]
+
+
+def test_firestore_snapshot_split_date_merge_policy():
+    from services.prediction_service import injury_prediction_request_from_firestore_snapshot
+
+    req = injury_prediction_request_from_firestore_snapshot(
+        "u1",
+        "2026-06-16",
+        {
+            "profile": {},
+            "daily_health": {"sleepMinutes": 480, "steps": 50},
+            "daily_health_yesterday": {"steps": 8300, "sleepMinutes": 360, "heartRateAvg": 58},
+            "daily_checkins": {"muscleSoreness": 3, "stressLevel": 35, "energyLevel": 60},
+            "daily_nutrition_yesterday": {"totalProtein": 130, "totalCarbs": 290, "mealsLoggedCount": 3},
+        },
+    )
+    assert req.sleepMinutes == 480
+    assert req.steps == 8300
+    assert req.heartRateAvg == 58
+    assert req.totalProtein == 130
 
 
 def test_validate_feature_vector_raises_when_missing_column():

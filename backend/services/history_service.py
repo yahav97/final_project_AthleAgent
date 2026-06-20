@@ -189,10 +189,11 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
 
 def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any]:
     """
-    Fetch profile + today's health/check-in/nutrition + previous calendar day's health.
+    Fetch profile + wake-up day health/check-in + prior-day health and nutrition.
 
     Serve-time merge policy is applied in ``prediction_service``:
-    prefer ``daily_health/{date}`` values and fallback to ``daily_health/{date-1}`` when missing.
+    sleep from ``daily_health/{date}``; physical from ``daily_health/{date-1}``;
+    survey from ``daily_checkins/{date}``; nutrition from ``daily_nutrition/{date-1}``.
     """
     db = _get_firestore_client()
     if db is None:
@@ -203,21 +204,21 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
         yesterday_key = (_to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
         health_yesterday_ref = user_ref.collection("daily_health").document(yesterday_key)
         checkin_ref = user_ref.collection("daily_checkins").document(date_key)
-        nutrition_ref = user_ref.collection("daily_nutrition").document(date_key)
+        nutrition_yesterday_ref = user_ref.collection("daily_nutrition").document(yesterday_key)
         logger.info(
             "fetch_daily_firestore_snapshot paths: profile=%s daily_health=%s daily_health_yesterday=%s "
-            "daily_checkins=%s daily_nutrition=%s",
+            "daily_checkins=%s daily_nutrition_yesterday=%s",
             user_ref.path,
             health_ref.path,
             health_yesterday_ref.path,
             checkin_ref.path,
-            nutrition_ref.path,
+            nutrition_yesterday_ref.path,
         )
         user_doc = user_ref.get()
         health_doc = health_ref.get()
         health_yesterday_doc = health_yesterday_ref.get()
         checkin_doc = checkin_ref.get()
-        nutrition_doc = nutrition_ref.get()
+        nutrition_yesterday_doc = nutrition_yesterday_ref.get()
     except Exception:
         return {}
 
@@ -226,17 +227,22 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
         "daily_health": health_doc.to_dict() if health_doc.exists else {},
         "daily_health_yesterday": health_yesterday_doc.to_dict() if health_yesterday_doc.exists else {},
         "daily_checkins": checkin_doc.to_dict() if checkin_doc.exists else {},
-        "daily_nutrition": nutrition_doc.to_dict() if nutrition_doc.exists else {},
+        "daily_nutrition_yesterday": (
+            nutrition_yesterday_doc.to_dict() if nutrition_yesterday_doc.exists else {}
+        ),
     }
 
 
-def merge_nutrition_with_history(user_id: str, date_key: str, today: dict[str, Any]) -> dict[str, Any]:
+def merge_nutrition_with_history(user_id: str, date_key: str, primary: dict[str, Any]) -> dict[str, Any]:
     """
     Fill missing nutrition aggregates from recent prior days (same user).
 
+    For morning prediction on wake-up day ``D``, pass ``primary`` from ``daily_nutrition/{D-1}``
+    and ``date_key=D`` so backfill scans ``D-2``, ``D-3``, … when yesterday is incomplete.
+
     Only nutrition fields may be backfilled from history; load/recovery come from the client.
     """
-    out = dict(today or {})
+    out = dict(primary or {})
     keys = ("totalProtein", "totalCarbs", "mealsLoggedCount", "totalCalories")
 
     def field_missing(k: str) -> bool:

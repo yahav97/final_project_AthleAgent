@@ -1,8 +1,8 @@
 """
 Export a training CSV from Firestore with **serve parity**:
 
-Same merge policy as ``predict_injury_risk_from_firestore`` (sleep/injury today;
-load from yesterday; check-in today; nutrition today + server-side backfill).
+Same merge policy as ``predict_injury_risk_from_firestore`` (sleep on D;
+load from D-1; check-in on D; nutrition from D-1 + server-side backfill).
 
 Labels ``injury_tomorrow`` come from ``injuredYesterday`` on ``daily_checkins/{date+1}``
 (legacy fallback: ``daily_health/{date+1}``). Rows without a next-day check-in or
