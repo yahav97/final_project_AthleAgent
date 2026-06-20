@@ -260,7 +260,7 @@ POST /predict/daily {userId, date}
     ├─ calculate_data_quality_score()
     │
     ├─ model.predict_proba() → proba
-    │     bands: High ≥ 0.70, Medium ≥ 0.40
+    │     classify_risk_level: Low ≤ 20%, Medium 21–70%, High > 70%
     │
     └─ save_daily_prediction_result()
           merge → daily_health/{date}
@@ -424,10 +424,9 @@ cd backend && python -m pytest tests/ -v
 | # | רכיב | פער | השפעה |
 |---|------|-----|--------|
 | 1 | Android sync | physical load נשמר ב-{D} במקום {D-1} | Backend fallback ל-{D} |
-| 2 | prediction_service | bands 0.40/0.70 vs MODEL.md 0.11/0.18 | UI inconsistent |
-| 3 | google_auth.py | לא מחובר ל-routes | API פתוח |
-| 4 | Android | אין ViewModel/Repository | קושי בבדיקות unit |
-| 5 | model_loader vs MODEL.md | Recall gate 0.80 vs doc 0.85 | doc drift |
+| 2 | google_auth.py | לא מחובר ל-routes | API פתוח |
+| 3 | Android | אין ViewModel/Repository | קושי בבדיקות unit |
+| 4 | model_loader vs MODEL.md | Recall gate 0.80 vs doc 0.85 | doc drift |
 
 ---
 

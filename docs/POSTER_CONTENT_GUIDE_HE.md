@@ -171,11 +171,16 @@ Yahav Simon, Tzuf Feldon | מנחה: [שם]
 - פלט: `risk_level` (Low / Medium / High) + `risk_score` (0–1) + `prediction_confidence`.
 
 ### ספי סיכון (להדגשה בפוסטר)
-| רמה | ציון (הסתברות) |
-|-----|----------------|
-| Low | < 0.11 |
-| Medium | 0.11 – 0.18 |
-| High | ≥ 0.18 |
+
+**Production (UI + `riskLevel`):**
+
+| רמה | `finalRiskScore` (%) | צבע |
+|-----|----------------------|-----|
+| Low | 0 – 20 | ירוק |
+| Medium | 21 – 70 | צהוב / כתום |
+| High | 71 – 100 | אדום |
+
+**אימון (manifest):** סף **0.18** — Recall/Precision בלבד, לא לתצוגה.
 
 ---
 
@@ -472,7 +477,8 @@ Project: AthleAgent
 Tagline: Shifting Athlete Care from Reaction to Prevention
 Authors: Yahav Simon, Tzuf Feldon
 Stack: Kotlin Android, FastAPI, Firestore, Firebase Auth, Health Connect, Gemini Vision, XGBoost
-Model: XGBoostDeep, 36 features, threshold 0.18 (High >= 0.18)
+Model: XGBoostDeep, 36 features, training threshold 0.18 (Recall metrics)
+Production UI/riskLevel: Low ≤20%, Medium 21–70%, High >70%
 Metrics: Recall 86.6%, Precision 14.1%, ROC-AUC 0.723, Brier 0.115, FPR 65.1%
 Dataset (last train): 345k rows synthetic
 Top features: hrv_drop, stress_level, load_recovery_imbalance, injured_yesterday, acwr_ratio
@@ -494,7 +500,7 @@ Roles: Athlete app + Coach team dashboard
 משימה:
 1. עבור סעיף-סעיף והפק טקסט סופי קצר לכל תיבה בפוסטר (כותרת משנה + 3–5 שורות או 4–6 תבליטים).
 2. שמור על טון אקדמי-מקצועי, לא שיווקי מדי.
-3. הדגש מספרים: 36 פיצ'רים, Recall 86.6%, ספי סיכון 0.11/0.18.
+3. הדגש מספרים: 36 פיצ'רים, Recall 86.6%, רמות סיכון 20/70% (production), סף אימון 0.18.
 4. הפרד בבירור בין ספורטאי למאמן.
 5. ציין במפורש שהערכת ML היא על דאטה סינתטי עם מנגנון hazard ריאליסטי.
 6. הוסף בשורה אחת לכל סקשן מה להציע כויזואליה (דיאגרמה/גרף/צילום מסך).

@@ -606,27 +606,31 @@ risk_score = float(result.get("risk_score") or 0.0)
 
 ```
 risk_score = predict_proba(...)   # 0.0 – 1.0
+pct = int(risk_score * 100)       # תואם Android toInt()
 
-אם risk_score >= 0.70  →  "High"
-אם risk_score >= 0.40  →  "Medium"
-אחרת                   →  "Low"
+אם pct > 70   →  "High"
+אם pct > 20   →  "Medium"
+אחרת          →  "Low"
 ```
 
-קוד (`prediction_service.predict_injury_risk`):
+קוד (`services/risk_levels.classify_risk_level`):
 
 ```python
-high_cutoff = 0.70
-medium_cutoff = 0.40
-risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cutoff else "Low"
+pct = int(probability * 100)
+if pct > 70:
+    return "High"
+if pct > 20:
+    return "Medium"
+return "Low"
 ```
 
 #### טבלת תרגום
 
-| `riskLevel` | תנאי `risk_score` | שקול `finalRiskScore` | בעברית |
-|-------------|-------------------|----------------------|--------|
-| `Low` | < 0.40 | < 40% | סיכון נמוך |
-| `Medium` | 0.40 – 0.699… | 40% – 69% | סיכון בינוני |
-| `High` | ≥ 0.70 | ≥ 70% | סיכון גבוה |
+| `riskLevel` | תנאי `finalRiskScore` (%) | שקול `risk_score` | בעברית |
+|-------------|---------------------------|-------------------|--------|
+| `Low` | 0 – 20 | ≤ 0.20 | סיכון נמוך |
+| `Medium` | 21 – 70 | > 0.20 – ≤ 0.70 | סיכון בינוני |
+| `High` | 71 – 100 | > 0.70 | סיכון גבוה |
 
 #### איך האפליקציה משתמשת?
 
@@ -634,19 +638,22 @@ risk_level = "High" if proba >= high_cutoff else "Medium" if proba >= medium_cut
 - **כן נשלח ל-Gemini** בפרומפט לייצור המלצה:
 
 ```
-ML Injury Risk Score: 23% (Risk Level: Low, AI Confidence: 78.5%).
+ML Injury Risk Score: 23% (Risk Level: Medium, AI Confidence: 78.5%).
 ```
 
 - דשבורד מאמן: **לא קורא** `riskLevel` — רק `finalRiskScore` + `aiRecommendation`.
 
-#### הבדל מצבע המד
+#### התאמה לצבע המד (Android)
 
 | `finalRiskScore` | `riskLevel` (שרת) | צבע UI (אפליקציה) |
 |------------------|-------------------|-------------------|
-| 23% | `Low` | צהוב (כי > 20) |
+| 15% | `Low` | ירוק |
+| 23% | `Medium` | צהוב |
 | 45% | `Medium` | צהוב |
 | 65% | `Medium` | כתום |
 | 75% | `High` | אדום |
+
+> צהוב (21–50) וכתום (51–70) הם **גוונים ויזואליים** בתוך רמת `Medium` — הסיווג הקטגוריאלי זהה.
 
 ---
 
@@ -902,7 +909,7 @@ data class PredictionResponse(
 | פרמטר | עברית | טווח | מחושב איך | מוצג? | איפה |
 |-------|-------|------|-----------|-------|------|
 | `finalRiskScore` | ציון סיכון % | 0–100 | `round(risk_score×100,2)` | ✅ מד + גרף | ספורטאי, מאמן |
-| `riskLevel` | רמת סיכון | Low/Med/High | ספים 0.40 / 0.70 על `risk_score` | ⚠️ Gemini בלבד | ספורטאי |
+| `riskLevel` | רמת סיכון | Low/Med/High | `classify_risk_level` — 20% / 70% (תואם Android) | ⚠️ Gemini בלבד | ספורטאי |
 | `predictionConfidence` | ביטחון בקלט | 0–100 | 60% היסטוריה + 40% איכות | ⚠️ Gemini בלבד | ספורטאי |
 | `predictionUpdatedAt` | זמן עדכון | ISO string | `utcnow()` | ❌ | — |
 | `aiRecommendation` | המלצת אימון | טקסט | Gemini באפליקציה | ✅ טקסט | ספורטאי, מאמן |
@@ -912,49 +919,38 @@ data class PredictionResponse(
 
 ## 12. ספים (Thresholds) — כל השכבות
 
-יש **4 שכבות ספים שונות** — חשוב לא לערבב:
+יש **3 שכבות ספים** — חשוב לא לערבב:
 
-### 12.1 שכבה 1: `risk_level` — קוד שירות (פרודקשן נוכחי)
+### 12.1 שכבה 1: `risk_level` + צבעי UI — production (מיושר)
 
-קובץ: `prediction_service.py` — **hardcoded**:
+קובץ: `services/risk_levels.py` — **תואם Android** (`AthleteDashboardActivity`, `CoachDashboardActivity`):
 
-| רמה | תנאי `risk_score` | שקול `finalRiskScore` | בעברית |
-|-----|-------------------|----------------------|--------|
-| **Low** | `< 0.40` | `< 40%` | סיכון נמוך |
-| **Medium** | `0.40 ≤ x < 0.70` | `40% – 69%` | סיכון בינוני |
-| **High** | `≥ 0.70` | `≥ 70%` | סיכון גבוה |
+| רמה | `finalRiskScore` (%) | צבע Android |
+|-----|----------------------|-------------|
+| **Low** | 0 – 20 | ירוק |
+| **Medium** | 21 – 70 | צהוב (21–50) / כתום (51–70) |
+| **High** | 71 – 100 | אדום |
 
 ```python
-high_cutoff = 0.70
-medium_cutoff = 0.40
-risk_level = "High" if proba >= 0.70 else "Medium" if proba >= 0.40 else "Low"
+pct = int(probability * 100)
+if pct > 70:
+    return "High"
+if pct > 20:
+    return "Medium"
+return "Low"
 ```
 
-### 12.2 שכבה 2: סף אימון (Manifest) — לא ל-UI
+### 12.2 שכבה 2: סף אימון (Manifest) — מטריקות ML בלבד
 
-מ־`MODEL.md` / `run_manifest.json`:
+מ־`run_manifest.json`:
 
 | סף | ערך | שימוש |
 |----|-----|-------|
-| Operating threshold | **0.18** | מטריקות Recall/Precision באימון |
-| UI bands (מתועד) | Low < 0.11, Medium 0.11–0.18, High ≥ 0.18 | **מתועד ב-MODEL.md — לא מיושם בקוד שירות** |
+| Operating threshold | **0.18** | Recall@Threshold, Precision, FPR — **לא** לסיווג `risk_level` ב-production |
 
-> **פער ידוע:** `model_threshold` ו-`medium_threshold` נטענים מ-bundle אך **לא משמשים** לסיווג `risk_level`. ראו issue פוטנציאלי לתיקון עתידי.
+> `threshold` ו-`medium_threshold` ב-bundle נטענים ל-gates ולתיעוד — **לא** משמשים ל-`classify_risk_level`.
 
-### 12.3 שכבה 3: צבעי UI (Android)
-
-לפי `finalRiskScore` (אחוז) — **עיצוב בלבד**:
-
-| טווח % | צבע |
-|--------|-----|
-| ≤ 20 | ירוק |
-| 21–50 | צהוב |
-| 51–70 | כתום |
-| > 70 | אדום |
-
-יכול להיות מצב: `risk_level=Low` (23%) אבל צבע **צהוב** (כי > 20).
-
-### 12.4 שכבה 4: בינים סטטיסטיים (אימון)
+### 12.3 שכבה 3: בינים סטטיסטיים (אימון)
 
 מ־`run_manifest.json` → `risk_bins`:
 
@@ -964,22 +960,18 @@ risk_level = "High" if proba >= 0.70 else "Medium" if proba >= 0.40 else "Low"
 | 20–50% | yellow | ~11% |
 | 50–100% | red | ~37% |
 
-אלה **סטטיסטיקת אימון** — לא ספי UI ישירים.
+אלה **סטטיסטיקת אימון** — לא ספי production.
 
-### 12.5 סיכום השכבות
+### 12.4 סיכום השכבות
 
 ```
                     ┌─────────────────────────────────────┐
   risk_score (ML)   │  0.0 ──────────────── 1.0          │
                     └─────────────────────────────────────┘
                               │
-         risk_level (שרת)     │  Low <0.40 | Med 0.40-0.69 | High ≥0.70
+  risk_level + Android UI     │  Low ≤20 | Med 21–70 | High >70
                               │
-    finalRiskScore (UI %)     │  0 ──────────────── 100
-                              │
-         צבעי Android         │  ירוק≤20 | צהוב≤50 | כתום≤70 | אדום>70
-                              │
-    סף אימון (manifest)       │  threshold=0.18 (Recall optimization)
+    סף אימון (manifest)       │  threshold=0.18 (Recall metrics only)
 ```
 
 ---
@@ -1073,8 +1065,8 @@ risk_score = 0.2341
 |-----|-----|------|
 | `risk_score` | 0.2341 | 23.41% הסתברות |
 | `finalRiskScore` | 23.41 | מוצג כ-**23%** במד |
-| `risk_level` | **Low** | < 0.40 |
-| צבע UI | **צהוב** | 21–50% (לא תואם ל-risk_level — זה OK) |
+| `risk_level` | **Medium** | 21–70% |
+| צבע UI | **צהוב** | 21–50% — תואם `Medium` |
 | `prediction_confidence` | ~72 | medium history + איכות סבירה |
 
 ---

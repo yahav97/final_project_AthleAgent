@@ -191,8 +191,8 @@ Data Quality Check:
     │
     ▼
 Model Inference (XGBoostDeep):
-    • 34 features → predict_proba
-    • threshold = 0.18 → risk_level
+    • 36 features → predict_proba
+    • classify_risk_level(proba) — Low ≤ 20%, Medium 21–70%, High > 70%
     │
     ▼
 Response + Persist to Firestore (merge write)

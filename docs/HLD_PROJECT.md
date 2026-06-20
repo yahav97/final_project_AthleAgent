@@ -312,7 +312,6 @@ final_project_AthleAgent/
 |------|--------|
 | **ארכיטקטורת Android** | README מציין MVVM; בפועל Activity-centric ללא ViewModels |
 | **Date-split sync** | Backend מצפה sleep ב-{D} ועומס ב-{D-1}; Android כותב לעיתים שניהם ל-{D} |
-| **סף סיכון** | קוד inference: High ≥ 0.70, Medium ≥ 0.40; UI/docs: 0.11/0.18 |
 | **Backend auth** | לא מיושם ב-production routes |
 | **Gemini בבקאנד** | מפתח ב-config אך אין routes — Gemini רץ רק בלקוח |
 
@@ -325,7 +324,6 @@ final_project_AthleAgent/
 3. **Date-split sync** — יישום מלא ב-`WearableSyncActivity`.
 4. **Cloud deployment** — Backend על Cloud Run / Render.
 5. **Firestore Rules** — hardening לפני production.
-6. **Unified thresholds** — יישור בין MODEL.md, UI, ו-`prediction_service.py`.
 
 ---
 

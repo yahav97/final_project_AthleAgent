@@ -248,10 +248,10 @@ flowchart LR
 | שלב | פלט |
 |-----|-----|
 | `predict_proba` | probability 0–1 (injury class) |
-| Risk bands | High ≥ 0.70 · Medium ≥ 0.40 · Low otherwise |
+| Risk bands | Low ≤ 20% · Medium 21–70% · High > 70% (`services/risk_levels.py`, aligned with Android) |
 | Confidence | blend: 60% history confidence + 40% data quality |
 
-> **הערה:** ספי UI ב-MODEL.md (0.11/0.18) שונים מספי inference בקוד (0.40/0.70) — יש ליישר.
+> **הערה:** סף אימון **0.18** ב-manifest משמש Recall/Precision בלבד — לא לסיווג `risk_level` ב-production.
 
 ### 7.3 Feature Count
 36 features — מקור אמת: `services/model_features.py`

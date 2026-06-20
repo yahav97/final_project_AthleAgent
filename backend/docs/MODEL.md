@@ -11,8 +11,8 @@
 |------|-------|
 | Model | `XGBoostDeep` |
 | Feature count | 36 (`backend/services/model_features.py`) |
-| Operating threshold | `0.18` → **High** risk if score ≥ 0.18 |
-| UI bands | Low &lt; 0.11 · Medium 0.11–0.18 · High ≥ 0.18 |
+| Training threshold | `0.18` — Recall/Precision metrics at promotion (`run_manifest.json`) |
+| Production risk bands | Low ≤ 20% · Medium 21–70% · High > 70% — `services/risk_levels.py`, aligned with Android UI |
 | Prediction target | Injury risk **today** (calendar day D), morning inference |
 
 ## Live gate (`backend/ml/model_loader.py`)

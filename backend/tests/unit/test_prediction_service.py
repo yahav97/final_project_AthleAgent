@@ -158,7 +158,15 @@ class TestPredictInjuryRisk:
 
     @pytest.mark.parametrize(
         ("probability", "expected_level"),
-        [(0.75, "High"), (0.50, "Medium"), (0.15, "Low")],
+        [
+            (0.75, "High"),
+            (0.71, "High"),
+            (0.70, "Medium"),
+            (0.50, "Medium"),
+            (0.21, "Medium"),
+            (0.20, "Low"),
+            (0.15, "Low"),
+        ],
     )
     def test_risk_level_cutoffs(
         self,

@@ -180,7 +180,7 @@ All fields optional — service applies defaults.
 6. if model is None → raise RuntimeError("model_not_live:...")
 7. X = validate_feature_vector_for_model(df, model_contract)
 8. proba = model.predict_proba(X)[0, 1]
-9. risk_level = bands(proba): High ≥ 0.70, Medium ≥ 0.40
+9. risk_level = classify_risk_level(proba): Low ≤ 20%, Medium 21–70%, High > 70% (`risk_levels.py`)
 10. return {risk_level, risk_score: proba, prediction_confidence}
 ```
 
@@ -473,11 +473,10 @@ flowchart TD
 
 | # | Location | Issue |
 |---|----------|-------|
-| 1 | `prediction_service.py:359-361` | Risk bands 0.40/0.70 ≠ MODEL.md 0.11/0.18 |
-| 2 | `external/google_auth.py` | Not imported by any route |
-| 3 | `config.GEMINI_API_KEY` | Configured but no Gemini routes |
-| 4 | Android → Firestore | Physical load on {D} not {D-1}; backend has fallback |
-| 5 | `MODEL.md` vs `model_loader.py` | Doc says Recall ≥ 0.85; code uses 0.80 |
+| 1 | `external/google_auth.py` | Not imported by any route |
+| 2 | `config.GEMINI_API_KEY` | Configured but no Gemini routes |
+| 3 | Android → Firestore | Physical load on {D} not {D-1}; backend has fallback |
+| 4 | `MODEL.md` vs `model_loader.py` | Doc says Recall ≥ 0.85; code uses 0.80 |
 
 ---
 
