@@ -1,0 +1,8 @@
+# Notebook-only dependencies (analysis + Run All in model_improvement_journey.ipynb)
+#
+#   pip install -r ML_model/requirements-notebook.txt
+#
+-r ../requirements.txt
+matplotlib>=3.7.0
+jupyter>=1.0.0
+ipython>=8.0.0

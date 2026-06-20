@@ -1,0 +1,16 @@
+{
+  "include": ["backend", "ML_model"],
+  "ignore": ["**/*.ipynb"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/venv",
+    "android_app",
+    "research_archive"
+  ],
+  "extraPaths": ["backend", "ML_model"],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning"
+}
