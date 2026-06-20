@@ -415,6 +415,11 @@ def extract_feature_importance(model, feature_names: list[str]) -> pd.DataFrame 
     return None
 
 
+def _project_relative_path(path: str, project_root: str) -> str:
+    """Store artifact paths relative to the repo root for portability."""
+    return os.path.relpath(path, project_root).replace("\\", "/")
+
+
 def main() -> None:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -548,10 +553,14 @@ def main() -> None:
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "run_id": run_id,
-        "artifacts_dir": artifacts_dir,
-        "dataset_path": dataset_path,
+        "artifacts_dir": _project_relative_path(artifacts_dir, project_root),
+        "dataset_path": _project_relative_path(dataset_path, project_root),
         "dataset_rows": int(len(df)),
-        "benchmark_path": benchmark_path if os.path.exists(benchmark_path) else None,
+        "benchmark_path": (
+            _project_relative_path(benchmark_path, project_root)
+            if os.path.exists(benchmark_path)
+            else None
+        ),
         "threshold": best_operating_threshold,
         "policy": model_bundle["policy"],
         "winner": best_model_name,

@@ -88,3 +88,44 @@ class TestGetModelStatus:
         status = model_loader.get_model_status()
         assert status["status"] == "Blocked"
         assert status["gate_reason"] != "none"
+
+
+class TestPromotedPointerResolution:
+    def test_resolves_relative_promoted_path(self, monkeypatch, tmp_path):
+        project_root = tmp_path / "proj"
+        artifacts = project_root / "ML_model" / "artifacts" / "run1"
+        artifacts.mkdir(parents=True)
+        model_path, manifest_path = _write_valid_bundle(artifacts)
+
+        promoted_file = project_root / "ML_model" / "artifacts" / "promoted.json"
+        promoted_file.write_text(
+            json.dumps({"model_path": "ML_model/artifacts/run1/injury_model.pkl"}),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(model_loader, "_project_root", lambda: project_root)
+        result = model_loader.load_model()
+        assert result is not None
+        assert model_loader.get_model_gate_reason() == "none"
+
+    def test_falls_back_when_promoted_path_missing(self, monkeypatch, tmp_path):
+        project_root = tmp_path / "proj"
+        promoted_dir = project_root / "ML_model" / "artifacts"
+        promoted_dir.mkdir(parents=True)
+        promoted_file = promoted_dir / "promoted.json"
+        promoted_file.write_text(
+            json.dumps({"model_path": "ML_model/artifacts/missing/injury_model.pkl"}),
+            encoding="utf-8",
+        )
+
+        backend_dir = project_root / "backend"
+        backend_dir.mkdir()
+        fallback_model, manifest_path = _write_valid_bundle(backend_dir)
+        manifest_path.unlink()
+
+        monkeypatch.setattr(model_loader, "_project_root", lambda: project_root)
+        monkeypatch.setattr(model_loader, "_fallback_model_path", lambda: fallback_model)
+        result = model_loader.load_model()
+        assert result is not None
+        assert model_loader.get_model_gate_reason() == "none"
+        assert model_loader.get_model_status()["status"] == "Live"

@@ -46,6 +46,27 @@ If gate validation fails:
 - model status becomes `Blocked`
 - `POST /predict/daily` returns HTTP 500 (no fallback predictions)
 
+## Before You Run (for reviewers)
+
+Install dependencies **once** from the **repository root** (not from `backend/`):
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+The backend loads a **joblib** bundle whose estimator is **XGBoost** (`XGBoostDeep`). These packages are **required** at the pinned versions in `backend/requirements.txt`:
+
+| Package | Version | Role |
+|---------|---------|------|
+| `joblib` | `1.5.3` | Load `injury_model.pkl` at startup |
+| `scikit-learn` | `1.8.0` | Preprocessing pipeline inside the saved model |
+| `xgboost` | `3.1.2` | Classifier used for `/predict/daily` inference |
+
+Promoted model pointer: `ML_model/artifacts/promoted.json`  
+After install, verify ML status: `GET http://localhost:8000/status/ml` → expect `"status": "Live"`.
+
+Alternative (same file via root alias): `pip install -r requirements.txt`
+
 ## Run Locally
 
 ### 1) Create virtual environment
@@ -68,8 +89,10 @@ source .venv/bin/activate
 
 ### 2) Install dependencies
 
+From the repository root:
+
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 3) Start backend

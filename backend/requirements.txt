@@ -1,0 +1,38 @@
+# =============================================================================
+# AthleAgent Backend — install from repository root BEFORE starting uvicorn
+#
+#   pip install -r backend/requirements.txt
+#
+# ML stack loads the promoted artifact (XGBoostDeep) via joblib:
+#   ML_model/artifacts/promoted.json  →  injury_model.pkl
+#
+# Tested with Python 3.11+ (also verified on 3.14):
+#   joblib 1.5.3 | scikit-learn 1.8.0 | xgboost 3.1.2
+# =============================================================================
+
+# --- ML inference (required — do not remove) ---
+joblib==1.5.3
+scikit-learn==1.8.0
+xgboost==3.1.2
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<3.0.0
+
+# --- FastAPI server ---
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+pydantic[email]>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+httpx>=0.25.0
+
+# --- Firebase / Google ---
+google-auth>=2.23.0
+firebase-admin>=6.5.0
+google-generativeai>=0.3.0
+
+# --- Optional utilities ---
+pillow>=10.0.0
+
+# --- Tests (pytest run from backend/) ---
+pytest>=7.4.0

@@ -30,14 +30,12 @@ def _latest_artifacts_dir(ml_dir: Path) -> Path:
 
 def _promote(ml_dir: Path, artifacts_dir: Path, degraded_rc: bool) -> None:
     promoted_path = ml_dir / "artifacts" / "promoted.json"
-    payload = {
-        "artifacts_dir": str(artifacts_dir),
-        "model_path": str(artifacts_dir / "injury_model.pkl"),
-        "manifest_path": str(artifacts_dir / "run_manifest.json"),
-        "degraded_rc": degraded_rc,
-    }
+    model_rel = (artifacts_dir / "injury_model.pkl").relative_to(ml_dir.parent).as_posix()
+    payload = {"model_path": model_rel}
     with open(promoted_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
+    if degraded_rc:
+        print("Warning: promoted with degraded validation (exit code 2).")
     print(f"Promoted artifact set: {artifacts_dir}")
 
 
