@@ -322,9 +322,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | HTTP middleware | `middleware/request_logging.py` | Smart filtering, `X-Request-ID` echo, `duration_ms` |
 | Client events API | `POST /api/v1/observability/client-events` | Android errors + navigation + key actions |
 | Rate limiter | `utils/client_event_limiter.py` | Dedup screen/action/sync events |
-| ML ops audit | `ML_model/artifacts/ops_events.jsonl` | Training/promotion timeline (separate) |
 | Trace helper | `backend/scripts/trace_request.sh` | `jq` by `request_id`, `event`, or `source` |
-| **מדריך בעברית** | [`docs/LOGGING_HE.md`](../../docs/LOGGING_HE.md) | מסמך מלא: ארכitektura, חקירת תקלות, Android spec |
+| **מדריך בעברית** | [`docs/LOGGING_HE.md`](../../docs/LOGGING_HE.md) | לוגים מאוחדים, חקירת תקלות, Android spec |
 
 **Log file:** [`logs/athleagent.log`](../../logs/athleagent.log) — gitignored, JSON Lines, **single source for troubleshooting**.
 
@@ -414,7 +413,6 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 |--------|-------|
 | Run snapshot | `ML_model/artifacts/<run_id>/run_manifest.json` |
 | Promotion pointer | `ML_model/artifacts/promoted.json` |
-| Ops timeline | `ML_model/artifacts/ops_events.jsonl` |
 | Live status | `GET /status/ml` |
 
 ### 11.3 Firestore (data audit)
