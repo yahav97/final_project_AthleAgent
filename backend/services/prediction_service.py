@@ -300,6 +300,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         quality_score,
         quality.get("sensitive_missing", []),
         quality.get("hard_missing", []),
+        extra={"event": "predict_data_quality"},
     )
     prediction_confidence = _prediction_confidence_0_100(history_confidence, quality_score)
     defaulted_critical_count = _count_defaulted_critical_features(df)
@@ -308,6 +309,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         payload.userId,
         prediction_confidence,
         defaulted_critical_count,
+        extra={"event": "predict_confidence_summary"},
     )
 
     loaded_model = get_model()
@@ -327,6 +329,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             payload.userId,
             blocked_reason,
             prediction_confidence,
+            extra={"event": "predict_blocked"},
         )
         raise MLModelError(
             f"Model is not live: {blocked_reason}",

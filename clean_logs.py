@@ -39,11 +39,17 @@ def _remove_pycache_dirs(root: Path) -> int:
     return removed
 
 
+from pathlib import Path
+
+
 def _remove_old_logs(root: Path, days: int) -> int:
+    """Remove rotated log backups and stale logs; keep active athleagent.log."""
     removed = 0
     cutoff = time.time() - days * 24 * 60 * 60
-    for path in root.rglob("*.log"):
+    for path in root.rglob("*.log*"):
         try:
+            if path.name == "athleagent.log":
+                continue
             if path.stat().st_mtime < cutoff:
                 path.unlink()
                 removed += 1

@@ -4,7 +4,18 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-ML_STATUS_KEYS = {"status", "gate_reason", "winner", "threshold", "policy", "degraded_rc"}
+ML_STATUS_KEYS = {
+    "status",
+    "gate_reason",
+    "winner",
+    "threshold",
+    "policy",
+    "degraded_rc",
+    "run_id",
+    "promoted_at_utc",
+    "manifest_path",
+    "winner_metrics",
+}
 
 
 class TestMlStatusRoute:
@@ -18,6 +29,8 @@ class TestMlStatusRoute:
         assert isinstance(data["gate_reason"], str)
         assert isinstance(data["policy"], dict)
         assert isinstance(data["degraded_rc"], bool)
+        assert "winner_metrics" in data
+        assert isinstance(data["winner_metrics"], dict)
 
     def test_get_status_is_read_only_and_idempotent(self, api_client):
         snapshots = [api_client.get("/status/ml").json() for _ in range(5)]

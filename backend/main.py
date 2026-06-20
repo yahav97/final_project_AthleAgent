@@ -9,10 +9,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
+from middleware.request_logging import RequestLoggingMiddleware
 from utils.exceptions import register_exception_handlers
 from utils.logging import logger
 
 from api.routes.health import router as health_router
+from api.routes.observability import router as observability_router
 from api.routes.predict import router as predict_router
 
 
@@ -23,9 +25,14 @@ async def lifespan(app: FastAPI):
 
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     load_model(settings.MODEL_PATH)
-    logger.info("Starting %s v%s (Firestore-backed inference)", settings.PROJECT_NAME, settings.VERSION)
+    logger.info(
+        "Starting %s v%s (Firestore-backed inference)",
+        settings.PROJECT_NAME,
+        settings.VERSION,
+        extra={"event": "server_startup"},
+    )
     yield
-    logger.info("Shutting down server")
+    logger.info("Shutting down server", extra={"event": "server_shutdown"})
 
 
 app = FastAPI(
@@ -42,9 +49,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(health_router)
 app.include_router(predict_router)
+app.include_router(observability_router)
 register_exception_handlers(app)
 
 

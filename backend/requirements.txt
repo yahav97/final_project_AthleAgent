@@ -33,6 +33,7 @@ google-generativeai>=0.3.0
 
 # --- Optional utilities ---
 pillow>=10.0.0
+python-json-logger>=2.0.0
 
 # --- Tests (pytest run from backend/) ---
 pytest>=7.4.0

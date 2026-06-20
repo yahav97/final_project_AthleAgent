@@ -5,7 +5,7 @@ Loads settings from environment variables with sensible defaults.
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -15,6 +15,16 @@ def _default_firebase_service_account_key() -> Path | None:
     """If `backend/firebase-key.json` exists, use it (file must stay untracked)."""
     p = Path(__file__).resolve().parent / "firebase-key.json"
     return p if p.is_file() else None
+
+
+def _project_root() -> Path:
+    """Repository root (parent of backend/)."""
+    return Path(__file__).resolve().parents[1]
+
+
+def _default_log_dir() -> Path:
+    """Unified system log directory at repo root."""
+    return _project_root() / "logs"
 
 
 class Settings(BaseSettings):
@@ -44,6 +54,17 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "AthleAgent API"
     VERSION: str = "1.0.0"
+
+    LOG_DIR: Path = Field(default_factory=_default_log_dir)
+    LOG_FILE_NAME: str = "athleagent.log"
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: Literal["text", "json"] = "json"
+
+    # Min seconds between identical client telemetry keys (0 = no limit)
+    CLIENT_EVENT_RATE_LIMIT_SCREEN_SEC: int = 30
+    CLIENT_EVENT_RATE_LIMIT_ACTION_SEC: int = 10
+    CLIENT_EVENT_RATE_LIMIT_SYNC_SEC: int = 15
+    CLIENT_EVENT_RATE_LIMIT_ML_TRIGGER_SEC: int = 5
 
     CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",

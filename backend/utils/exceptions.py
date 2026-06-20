@@ -42,7 +42,13 @@ def register_exception_handlers(app: FastAPI) -> None:
         _request: Request,
         exc: AthleAgentException,
     ) -> JSONResponse:
-        logger.warning("domain_error status=%s code=%s message=%s", exc.status_code, exc.code, exc)
+        logger.warning(
+            "domain_error status=%s code=%s message=%s",
+            exc.status_code,
+            exc.code,
+            exc,
+            extra={"event": "domain_error"},
+        )
         body: dict[str, str] = {"detail": str(exc)}
         if exc.code:
             body["code"] = exc.code

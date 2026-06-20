@@ -28,6 +28,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
+
+from ml_ops_log import append_ops_event
 from sklearn.preprocessing import StandardScaler
 
 if sys.platform == "win32":
@@ -585,6 +587,16 @@ def main() -> None:
     manifest_path = os.path.join(artifacts_dir, "run_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
+
+    append_ops_event(
+        "training_completed",
+        run_id=run_id,
+        winner=best_model_name,
+        recall=float(winner_operating_metrics["Recall@Threshold"]),
+        roc_auc=float(best_row["ROC-AUC"]),
+        threshold=best_operating_threshold,
+        artifacts_dir=_project_relative_path(artifacts_dir, project_root),
+    )
 
     if importance_df is not None:
         importance_df.to_csv(os.path.join(artifacts_dir, "feature_importance.csv"), index=False)

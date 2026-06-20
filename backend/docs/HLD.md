@@ -312,12 +312,159 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## 11. Observability
 
+### 11.1 Unified system log (Backend + Android)
+
+| רכיב | מיקום | תיאור |
+|------|--------|--------|
+| **Unified log file** | `logs/athleagent.log` (repo root) | Backend HTTP + domain events + Android telemetry |
+| JSON Lines logger | `utils/logging.py` | `RotatingFileHandler` (10 MB × 5), stdout mirror |
+| Request context | `utils/request_context.py` | `contextvars`: `request_id`, `user_id` |
+| HTTP middleware | `middleware/request_logging.py` | Smart filtering, `X-Request-ID` echo, `duration_ms` |
+| Client events API | `POST /api/v1/observability/client-events` | Android errors + navigation + key actions |
+| Rate limiter | `utils/client_event_limiter.py` | Dedup screen/action/sync events |
+| ML ops audit | `ML_model/artifacts/ops_events.jsonl` | Training/promotion timeline (separate) |
+| Trace helper | `backend/scripts/trace_request.sh` | `jq` by `request_id`, `event`, or `source` |
+
+**Log file:** [`logs/athleagent.log`](../../logs/athleagent.log) — gitignored, JSON Lines, **single source for troubleshooting**.
+
+**Environment variables** (`config.py`):
+
+| Variable | Default | תיאור |
+|----------|---------|--------|
+| `LOG_DIR` | `<repo>/logs` | Unified log directory |
+| `LOG_FILE_NAME` | `athleagent.log` | Active log filename |
+| `LOG_FORMAT` | `json` | `json` or `text` |
+| `LOG_LEVEL` | `INFO` | Python log level |
+| `CLIENT_EVENT_RATE_LIMIT_*_SEC` | 30/10/15/5 | screen / action / sync / ml_trigger |
+
+**Log schema (JSON) — all entries include `source`:**
+
+```json
+{
+  "timestamp": "2026-06-20T10:15:30.123Z",
+  "level": "INFO",
+  "logger": "athleagent",
+  "message": "http_request_completed",
+  "source": "backend",
+  "request_id": "a1b2c3d4-...",
+  "user_id": "firebaseUid",
+  "event": "http_request_completed",
+  "method": "POST",
+  "path": "/predict/daily",
+  "status_code": 200,
+  "duration_ms": 842,
+  "service": "AthleAgent API",
+  "version": "1.0.0"
+}
+```
+
+**Android client event (same file, `source: android`):**
+
+```json
+{
+  "event": "client_event",
+  "source": "android",
+  "client_event_type": "ml_trigger",
+  "client_tag": "ML_Trigger",
+  "client_message": "predict/daily onFailure: Connection refused",
+  "client_screen": "DailyCheckInActivity",
+  "request_id": "...",
+  "user_id": "..."
+}
+```
+
+**Allowed `client_event_type` values:**
+
+| Type | When to use | Backend log level | Rate limit |
+|------|-------------|-------------------|------------|
+| `error` | Retrofit/Firestore/Gemini failures | WARNING | none |
+| `screen_view` | Main Activity opened | INFO | 30s / screen |
+| `user_action` | Submit check-in, save meal, join team | INFO | 10s / action |
+| `ml_trigger` | Before/after `/predict/daily` call | INFO | 5s |
+| `sync` | Watch sync started/completed/failed | INFO | 15s |
+
+**Backend domain events** (`source: backend`):
+
+- `http_request_completed`, `http_unhandled_error`
+- `predict_data_quality`, `predict_confidence_summary`, `predict_blocked`
+- `model_loaded`, `domain_error`, `server_startup`, `server_shutdown`
+
+**Trace examples:**
+
+```bash
+./backend/scripts/trace_request.sh trace-req-001
+./backend/scripts/trace_request.sh --event client_event
+./backend/scripts/trace_request.sh --source android
+jq 'select(.path=="/predict/daily")' logs/athleagent.log
+```
+
+**Manual test (no Android):**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/observability/client-events \
+  -H "Content-Type: application/json" \
+  -H "X-Request-ID: test-manual-001" \
+  -d '{"event_type":"screen_view","level":"INFO","tag":"Dashboard","screen":"AthleteDashboardActivity","message":"screen_opened","user_id":"demo","app_version":"1.0"}'
+```
+
+### 11.2 ML lineage
+
 | מנגנון | מיקום |
 |--------|-------|
-| Structured logging | `utils/logging.py` |
-| ML status endpoint | `GET /status/ml` |
-| Prediction logs | `predict_data_quality`, `predict_confidence_summary` |
-| Health check | `GET /health` |
+| Run snapshot | `ML_model/artifacts/<run_id>/run_manifest.json` |
+| Promotion pointer | `ML_model/artifacts/promoted.json` |
+| Ops timeline | `ML_model/artifacts/ops_events.jsonl` |
+| Live status | `GET /status/ml` |
+
+### 11.3 Firestore (data audit)
+
+Predictions and daily snapshots = **state**. Unified log = **events** (no raw health payloads).
+
+### 11.4 Appendix — Android integration spec (required changes)
+
+> Kotlin not implemented in backend sprint. Wire these when updating the Android app.
+
+**Dependencies:** `okhttp` 4.12, `timber` 5.0.1
+
+**New files:**
+
+| File | Purpose |
+|------|---------|
+| `network/CorrelationIdInterceptor.kt` | Header `X-Request-ID` on all API calls |
+| `network/RequestIdHolder.kt` | Last request ID for error correlation |
+| `network/ObservabilityApi.kt` | `POST api/v1/observability/client-events` |
+| `observability/ClientEventReporter.kt` | Fire-and-forget reporter (IO dispatcher) |
+
+**Modify:**
+
+| File | Change |
+|------|--------|
+| `ApiClient.kt` | OkHttp client + interceptor |
+| `App.kt` | Timber init (debug tree) |
+| Activity `onCreate` | `screen_view` for main screens |
+| ML Retrofit callbacks | `ml_trigger` + `error` on failure |
+| `WearableSyncActivity` | `sync` events |
+| Check-in / meal submit | `user_action` |
+
+**Events to emit (minimum for graduation demo):**
+
+| Activity | event_type | tag | message example |
+|----------|------------|-----|-----------------|
+| `AthleteDashboardActivity` | `screen_view` | `Dashboard` | `screen_opened` |
+| `DailyCheckInActivity` | `screen_view` | `DailyCheckIn` | `screen_opened` |
+| `DailyCheckInActivity` | `user_action` | `DailyCheckIn` | `checkin_submitted` |
+| `DailyCheckInActivity` | `ml_trigger` | `ML_Trigger` | `predict_daily_started` |
+| `DailyCheckInActivity` | `error` | `ML_Trigger` | `onFailure: ...` |
+| `WearableSyncActivity` | `sync` | `Sync` | `health_connect_sync_completed` |
+| `MealAnalysisActivity` | `ml_trigger` | `ML_Trigger` | `predict_daily_started` |
+
+**Client rules:**
+
+- Message ≤ 500 chars; no PHI; no stack traces
+- Include `user_id` (Firebase uid) when logged in
+- Reuse `RequestIdHolder.current` as `request_id`
+- Swallow reporter failures silently (never block UI)
+- Local debug remains Logcat/Timber only
 
 ---
 

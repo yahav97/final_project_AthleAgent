@@ -18,6 +18,7 @@ from services.prediction_service import (
     resolve_model_bundle,
 )
 from services.risk_levels import LEGACY_SKLEARN_HIGH, LEGACY_SKLEARN_MEDIUM, classify_risk_level
+from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
 
@@ -46,6 +47,7 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
     Minimal trigger endpoint: frontend sends only userId/date; backend loads all
     relevant daily data directly from Firestore and runs production inference.
     """
+    user_id_var.set(trigger.userId)
     result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
     persist_prediction_result_or_raise(
         trigger.userId,
