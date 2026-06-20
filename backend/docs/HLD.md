@@ -324,6 +324,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | Rate limiter | `utils/client_event_limiter.py` | Dedup screen/action/sync events |
 | ML ops audit | `ML_model/artifacts/ops_events.jsonl` | Training/promotion timeline (separate) |
 | Trace helper | `backend/scripts/trace_request.sh` | `jq` by `request_id`, `event`, or `source` |
+| **מדריך בעברית** | [`docs/LOGGING_HE.md`](../../docs/LOGGING_HE.md) | מסמך מלא: ארכitektura, חקירת תקלות, Android spec |
 
 **Log file:** [`logs/athleagent.log`](../../logs/athleagent.log) — gitignored, JSON Lines, **single source for troubleshooting**.
 
