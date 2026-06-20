@@ -259,7 +259,7 @@ erDiagram
 - אין rate limiting על API.
 
 ### 8.3 המלצות לייצור
-1. Firebase ID Token verification בבקאנד (`external/google_auth.py` קיים אך לא מחובר).
+1. Firebase ID Token verification בבקאנד.
 2. Firestore Rules: athlete רואה רק את עצמו; coach רואה athletes בקבוצה.
 3. HTTPS + API Gateway / Cloud Run עם IAM.
 

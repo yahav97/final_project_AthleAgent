@@ -303,7 +303,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - **אין authentication** על `/predict/daily`
 - Firebase Admin SDK עם service account ל-Firestore
 - CORS מוגבל ל-localhost
-- `google_auth.py` קיים אך **לא מחובר**
 
 ### 10.2 המלצות Production
 1. Middleware: verify Firebase ID Token
