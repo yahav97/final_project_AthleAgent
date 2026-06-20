@@ -8,6 +8,7 @@ import pytest
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import MODEL_FEATURE_COLUMNS
 from services.prediction_service import predict_injury_risk
+from services.preprocessing import validate_feature_vector_for_model
 from utils.exceptions import DatabaseError, MLModelError, ValidationError
 
 

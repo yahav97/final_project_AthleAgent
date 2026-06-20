@@ -2,6 +2,8 @@
 
 import pytest
 
+from utils.exceptions import DatabaseError
+
 pytestmark = pytest.mark.integration
 
 DAILY_TRIGGER = {"userId": "test-athlete-001", "date": "2026-05-09"}
@@ -80,22 +82,29 @@ class TestPredictDailySuccess:
 
 
 class TestPredictDailyErrors:
-    def test_prediction_failure_returns_500_with_detail(
+    def test_prediction_failure_returns_503_with_detail(
         self, api_client, mock_daily_prediction_pipeline
     ):
-        mock_daily_prediction_pipeline(predict_raises=RuntimeError("firestore_timeout"))
+        mock_daily_prediction_pipeline(
+            predict_raises=DatabaseError("Firestore request timed out", code="firestore_timeout")
+        )
         response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
 
-        assert response.status_code == 500
-        assert "Prediction unavailable" in response.json()["detail"]
-        assert "firestore_timeout" in response.json()["detail"]
+        assert response.status_code == 503
+        data = response.json()
+        assert "Firestore request timed out" in data["detail"]
+        assert data["code"] == "firestore_timeout"
 
-    def test_persist_failure_returns_500(self, api_client, mock_daily_prediction_pipeline):
-        mock_daily_prediction_pipeline(persist_raises=RuntimeError("write_failed"))
+    def test_persist_failure_returns_503(self, api_client, mock_daily_prediction_pipeline):
+        mock_daily_prediction_pipeline(
+            persist_raises=DatabaseError("Firestore write failed", code="write_failed")
+        )
         response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
 
-        assert response.status_code == 500
-        assert "write_failed" in response.json()["detail"]
+        assert response.status_code == 503
+        data = response.json()
+        assert "Firestore write failed" in data["detail"]
+        assert data["code"] == "write_failed"
 
     def test_model_gate_blocks_inference(
         self,
@@ -112,5 +121,7 @@ class TestPredictDailyErrors:
 
         response = api_client.post("/predict/daily", json={"userId": "u1", "date": "2026-04-30"})
 
-        assert response.status_code == 500
-        assert "Prediction unavailable" in response.json()["detail"]
+        assert response.status_code == 503
+        data = response.json()
+        assert "Model is not live" in data["detail"]
+        assert data["code"] == "model_not_live:manifest_corrupted"
