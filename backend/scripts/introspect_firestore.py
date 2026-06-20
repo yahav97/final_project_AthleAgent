@@ -83,7 +83,7 @@ def main() -> int:
     from config import settings
     from services.history_service import _get_firestore_client
 
-    cred = settings.FIREBASE_SERVICE_ACCOUNT_KEY or __import__("os").environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    cred = settings.FIREBASE_SERVICE_ACCOUNT_KEY or settings.GOOGLE_APPLICATION_CREDENTIALS
     print("--- Credentials (path only) ---")
     print(f"  FIREBASE_SERVICE_ACCOUNT_KEY / GOOGLE_APPLICATION_CREDENTIALS: {cred or '<not set — init may fail>'}")
     print()
@@ -96,7 +96,7 @@ def main() -> int:
             from firebase_admin import firestore as fb_firestore
 
             if cred and Path(cred).is_file():
-                c = fb_cred.Certificate(cred)
+                c = fb_cred.Certificate(str(cred))
                 if not firebase_admin._apps:
                     firebase_admin.initialize_app(c)
                 db = fb_firestore.client()

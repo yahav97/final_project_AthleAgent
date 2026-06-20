@@ -1,5 +1,7 @@
 """Production risk band cutoffs for API responses."""
 
+from schemas.types import RiskLevel
+
 RISK_HIGH_CUTOFF = 0.70
 RISK_MEDIUM_CUTOFF = 0.40
 
@@ -13,7 +15,7 @@ def classify_risk_level(
     *,
     high: float = RISK_HIGH_CUTOFF,
     medium: float = RISK_MEDIUM_CUTOFF,
-) -> str:
+) -> RiskLevel:
     if probability >= high:
         return "High"
     if probability >= medium:

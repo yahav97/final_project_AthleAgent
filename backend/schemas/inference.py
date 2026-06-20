@@ -1,6 +1,8 @@
 """Request/response shapes for injury risk inference."""
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+
+from schemas.types import RiskLevel, validate_date_key
 
 
 # --- Legacy payloads (test_predict mock, optional /predict/sklearn) ---
@@ -148,12 +150,22 @@ class InjuryPredictionRequest(BaseModel):
         description="Meal-logged kcal sum that day (Firestore totalCalories on nutrition doc); not Health burn.",
     )
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def _validate_date(cls, value: object) -> object:
+        return validate_date_key(value)
+
 
 class DailyPredictionTriggerRequest(BaseModel):
     """Minimal trigger contract: backend loads full daily snapshot from Firestore."""
 
     userId: str = Field(..., description="Firebase Auth uid")
     date: str = Field(..., description="Day key yyyy-MM-dd")
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _validate_date(cls, value: object) -> object:
+        return validate_date_key(value)
 
 
 class InjuryPredictionResponse(BaseModel):
@@ -167,7 +179,7 @@ class InjuryPredictionResponse(BaseModel):
     - ``predictionUpdatedAt`` (ISO UTC) is written to Firestore only, not returned here.
     """
 
-    risk_level: str = Field(..., description="Low | Medium | High — persisted as riskLevel")
+    risk_level: RiskLevel = Field(..., description="Low | Medium | High — persisted as riskLevel")
     risk_score: float = Field(
         ...,
         ge=0.0,

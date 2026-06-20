@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
+from pathlib import Path
 from typing import Any, Optional
 
 import joblib
@@ -18,27 +18,33 @@ _active_manifest: dict[str, Any] = {}
 MIN_RECALL_HARD = 0.80
 MIN_AUC_FOR_LIVE = 0.68
 
+PathLike = Path | str
 
-def _manifest_path_from_model_path(model_path: str) -> str:
+
+def _as_path(path: PathLike) -> Path:
+    """Normalize str or Path to a resolved Path."""
+    return path if isinstance(path, Path) else Path(path)
+
+
+def _manifest_path_from_model_path(model_path: Path) -> Path:
     """Return manifest path candidate relative to model path/project layout."""
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    default_manifest = os.path.join(project_root, "ML_model", "run_manifest.json")
-    model_dir_manifest = os.path.join(os.path.dirname(model_path), "run_manifest.json")
-    return model_dir_manifest if os.path.exists(model_dir_manifest) else default_manifest
+    model_dir_manifest = model_path.parent / "run_manifest.json"
+    default_manifest = _project_root() / "ML_model" / "run_manifest.json"
+    return model_dir_manifest if model_dir_manifest.is_file() else default_manifest
 
 
-def _project_root() -> str:
+def _project_root() -> Path:
     """Resolve project root path from backend/ml module location."""
-    return os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    return Path(__file__).resolve().parents[2]
 
 
-def _resolve_promoted_artifact_paths() -> tuple[str | None, str | None]:
+def _resolve_promoted_artifact_paths() -> tuple[Path | None, Path | None]:
     """Resolve model/manifest from promoted pointer if available."""
-    promoted_path = os.path.join(_project_root(), "ML_model", "artifacts", "promoted.json")
-    if not os.path.exists(promoted_path):
+    promoted_path = _project_root() / "ML_model" / "artifacts" / "promoted.json"
+    if not promoted_path.is_file():
         return None, None
     try:
-        with open(promoted_path, "r", encoding="utf-8") as f:
+        with promoted_path.open("r", encoding="utf-8") as f:
             promoted = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None, None
@@ -46,10 +52,10 @@ def _resolve_promoted_artifact_paths() -> tuple[str | None, str | None]:
     manifest_path = promoted.get("manifest_path")
     if not isinstance(model_path, str) or not isinstance(manifest_path, str):
         return None, None
-    return model_path, manifest_path
+    return Path(model_path), Path(manifest_path)
 
 
-def _validate_manifest_for_live(manifest: dict[str, Any], model_path: str) -> tuple[bool, str]:
+def _validate_manifest_for_live(manifest: dict[str, Any], model_path: Path) -> tuple[bool, str]:
     """Validate manifest quality gates before allowing model to be live.
 
     Args:
@@ -85,12 +91,15 @@ def _validate_manifest_for_live(manifest: dict[str, Any], model_path: str) -> tu
         if recall < policy_hard_recall:
             return False, "manifest_recall_below_policy_hard_min"
 
-    if not os.path.exists(model_path):
+    if not model_path.is_file():
         return False, "model_file_not_found"
     return True, "none"
 
 
-def load_model(model_path: str | None = None, manifest_path: str | None = None) -> Optional[Any]:
+def load_model(
+    model_path: PathLike | None = None,
+    manifest_path: PathLike | None = None,
+) -> Optional[Any]:
     """Load and gate-validate the promoted model bundle.
 
     Args:
@@ -102,8 +111,13 @@ def load_model(model_path: str | None = None, manifest_path: str | None = None) 
     """
     global _estimator, _model_gate_reason, _model_live, _active_manifest
     promoted_model_path, promoted_manifest_path = _resolve_promoted_artifact_paths()
-    path = model_path or promoted_model_path or os.path.join(os.path.dirname(os.path.dirname(__file__)), "injury_model.pkl")
-    if not os.path.exists(path):
+    path = (
+        _as_path(model_path)
+        if model_path is not None
+        else promoted_model_path
+        or Path(__file__).resolve().parents[1] / "injury_model.pkl"
+    )
+    if not path.is_file():
         logger.warning("Model file not found at %s. Run ML_model/train_model.py first.", path)
         _estimator = None
         _model_gate_reason = "model_file_not_found"
@@ -111,8 +125,12 @@ def load_model(model_path: str | None = None, manifest_path: str | None = None) 
         _active_manifest = {}
         return None
 
-    manifest_candidate = manifest_path or promoted_manifest_path or _manifest_path_from_model_path(path)
-    if not os.path.exists(manifest_candidate):
+    manifest_candidate = (
+        _as_path(manifest_path)
+        if manifest_path is not None
+        else promoted_manifest_path or _manifest_path_from_model_path(path)
+    )
+    if not manifest_candidate.is_file():
         logger.warning("Manifest not found at %s; model will not be marked live.", manifest_candidate)
         _estimator = None
         _model_gate_reason = "manifest_not_found"
@@ -121,7 +139,7 @@ def load_model(model_path: str | None = None, manifest_path: str | None = None) 
         return None
 
     try:
-        with open(manifest_candidate, "r", encoding="utf-8") as f:
+        with manifest_candidate.open("r", encoding="utf-8") as f:
             manifest = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Manifest read failed at %s: %s", manifest_candidate, exc)

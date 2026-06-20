@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     """Load gated model on startup; log shutdown."""
     from ml.model_loader import load_model
 
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     load_model(settings.MODEL_PATH)
     logger.info("Starting %s v%s (Firestore-backed inference)", settings.PROJECT_NAME, settings.VERSION)
     yield

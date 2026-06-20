@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -104,10 +103,10 @@ def _get_firestore_client():
         return None
 
     if not firebase_admin._apps:
-        cred_path = settings.FIREBASE_SERVICE_ACCOUNT_KEY or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        cred_path = settings.FIREBASE_SERVICE_ACCOUNT_KEY or settings.GOOGLE_APPLICATION_CREDENTIALS
         try:
             if cred_path:
-                cred = credentials.Certificate(cred_path)
+                cred = credentials.Certificate(str(cred_path))
                 firebase_admin.initialize_app(cred)
             else:
                 firebase_admin.initialize_app()
