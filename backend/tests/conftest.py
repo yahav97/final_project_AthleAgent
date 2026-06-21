@@ -123,7 +123,7 @@ def minimal_prediction_request() -> InjuryPredictionRequest:
 def firestore_snapshot() -> dict[str, Any]:
     """Representative Firestore daily snapshot for merge-policy tests."""
     return {
-        "profile": {"age": 31, "historyInjuryCount": 2},
+        "profile": {"birth_date": "1995-01-01", "historyInjuryCount": 2},
         "daily_health": {"sleepMinutes": 480, "steps": 50},
         "daily_health_yesterday": {
             "steps": 8300,
