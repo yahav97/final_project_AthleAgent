@@ -17,7 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.core.graphics.toColorInt
-
+import java.util.Calendar
 import com.yahav.athleagent.network.ApiClient
 import com.yahav.athleagent.network.ApiService
 import com.yahav.athleagent.observability.ClientEventReporter
@@ -140,44 +140,60 @@ class DailyCheckInActivity : AppCompatActivity() {
 
     private fun checkAndTriggerPredictionInBackground() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val today = dateFormat.format(Date())
+
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DATE, -1)
+        val yesterday = dateFormat.format(cal.time)
+
         val db = FirebaseFirestore.getInstance()
 
-        val healthRef = db.collection("users").document(userId).collection("daily_health").document(today)
+        val todayHealthRef = db.collection("users").document(userId).collection("daily_health").document(today)
+        val yesterdayHealthRef = db.collection("users").document(userId).collection("daily_health").document(yesterday)
+        val todayCheckinRef = db.collection("users").document(userId).collection("daily_checkins").document(today)
 
-        healthRef.get().addOnSuccessListener { healthDoc ->
-            val hasWatch = healthDoc.exists() && healthDoc.contains("sleepMinutes")
+        todayHealthRef.get().addOnSuccessListener { todayHealthDoc ->
+            yesterdayHealthRef.get().addOnSuccessListener { yesterdayHealthDoc ->
+                todayCheckinRef.get().addOnSuccessListener { todayCheckinDoc ->
 
-            if (hasWatch) {
-                Log.d("ML_Trigger", "Survey completed and Watch Sync is already present. Triggering core prediction.")
-                eventReporter.reportEvent("ml_trigger", "Triggering core prediction from CheckIn")
+                    // בדיקת התנאים המפוצלים החדשה לפי דרישות צוף
+                    val hasTodaySleep = todayHealthDoc.exists() && todayHealthDoc.contains("sleepMinutes")
+                    val hasYesterdayPhysical = yesterdayHealthDoc.exists() && yesterdayHealthDoc.contains("steps")
+                    val hasTodaySurvey = todayCheckinDoc.exists() && todayCheckinDoc.contains("energyLevel")
 
-                val startTime = System.currentTimeMillis() // Start timing
-                val requestData = ApiService.PredictionTriggerRequest(userId, today)
+                    if (hasTodaySleep && hasYesterdayPhysical && hasTodaySurvey) {
+                        Log.d("ML_Trigger", "All parameters verified (Today Sleep + Yesterday Physical + Survey). Triggering prediction.")
+                        eventReporter.reportEvent("ml_trigger", "Triggering core prediction with full cross-day context")
 
-                ApiClient.apiService.getDailyPrediction(requestData)
-                    .enqueue(object : Callback<ApiService.PredictionResponse> {
-                        override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
-                            val duration = System.currentTimeMillis() - startTime // Calculate duration
-                            if (response.isSuccessful) {
-                                Log.d("ML_Trigger", "Core prediction triggered successfully in ${duration}ms!")
-                                val metadata = mapOf("duration_ms" to duration.toString())
-                                if (duration > 3000) {
-                                    eventReporter.reportEvent("ml_performance_warning", "Prediction took over 3 seconds", metadata)
-                                } else {
-                                    eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully", metadata)
+                        val startTime = System.currentTimeMillis()
+                        val requestData = ApiService.PredictionTriggerRequest(userId, today)
+
+                        ApiClient.apiService.getDailyPrediction(requestData)
+                            .enqueue(object : Callback<ApiService.PredictionResponse> {
+                                override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
+                                    val duration = System.currentTimeMillis() - startTime
+                                    if (response.isSuccessful) {
+                                        Log.d("ML_Trigger", "Core prediction triggered successfully in ${duration}ms!")
+                                        val metadata = mapOf("duration_ms" to duration.toString())
+                                        if (duration > 3000) {
+                                            eventReporter.reportEvent("ml_performance_warning", "Prediction took over 3 seconds", metadata)
+                                        } else {
+                                            eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully", metadata)
+                                        }
+                                    } else {
+                                        eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
+                                    }
                                 }
-                            } else {
-                                eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
-                            }
-                        }
-                        override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
-                            Log.e("ML_Trigger", "Failed to trigger prediction", t)
-                            eventReporter.reportEvent("error", "Prediction trigger failed: ${t.message}")
-                        }
-                    })
-            } else {
-                Log.d("ML_Trigger", "Survey saved, but waiting for Watch Sync before running the model.")
+                                override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
+                                    Log.e("ML_Trigger", "Failed to trigger prediction", t)
+                                    eventReporter.reportEvent("error", "Prediction trigger failed: ${t.message}")
+                                }
+                            })
+                    } else {
+                        Log.d("ML_Trigger", "Skipping trigger due to missing variables. TodaySleep=$hasTodaySleep, YesterdayPhysical=$hasYesterdayPhysical, TodaySurvey=$hasTodaySurvey")
+                    }
+                }
             }
         }
     }
