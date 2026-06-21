@@ -142,6 +142,12 @@ class TestFirestoreSnapshotMapping:
         assert req.totalProtein == 130
         assert req.nutritionTotalCalories == 2550
 
+    def test_age_from_birth_date_in_profile(self, firestore_snapshot):
+        snap = dict(firestore_snapshot)
+        snap["profile"] = {"birth_date": "1995-01-01", "historyInjuryCount": 2}
+        req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        assert req.age == 31
+
     def test_injured_yesterday_from_checkins(self, firestore_snapshot):
         snap = dict(firestore_snapshot)
         snap["daily_checkins"] = dict(snap["daily_checkins"], injuredYesterday=1)

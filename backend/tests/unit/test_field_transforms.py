@@ -6,6 +6,8 @@ import pytest
 
 from services import history_service as hs
 from services.field_transforms import (
+    age_from_birth_date,
+    age_from_profile,
     daily_distance_km,
     daily_distance_km_from_doc,
     injured_yesterday_as_feature,
@@ -17,6 +19,30 @@ from services.field_transforms import (
 from services.model_features import DEFAULT_FEATURE_VALUES
 
 pytestmark = pytest.mark.unit
+
+
+class TestAgeFromProfile:
+    def test_computes_age_from_birth_date(self):
+        assert age_from_birth_date("1995-01-01", as_of_date="2026-06-16") == 31
+
+    def test_birthday_not_yet_occurred_this_year(self):
+        assert age_from_birth_date("1995-12-31", as_of_date="2026-06-16") == 30
+
+    def test_age_from_profile_uses_birth_date(self):
+        profile = {"birth_date": "1995-01-01"}
+        assert age_from_profile(profile, as_of_date="2026-06-16") == 31
+
+    def test_age_from_profile_accepts_birth_date_camel_case(self):
+        profile = {"birthDate": "1995-01-01"}
+        assert age_from_profile(profile, as_of_date="2026-06-16") == 31
+
+    def test_clamps_computed_age(self):
+        assert age_from_profile({"birth_date": "2020-01-01"}, as_of_date="2026-06-16") == 12
+        assert age_from_profile({"birth_date": "1900-01-01"}, as_of_date="2026-06-16") == 90
+
+    def test_missing_or_invalid_birth_date_returns_none(self):
+        assert age_from_profile({}) is None
+        assert age_from_profile({"birth_date": "not-a-date"}) is None
 
 
 class TestDailyDistanceKm:

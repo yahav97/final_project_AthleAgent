@@ -2,7 +2,7 @@
 Write realistic demo field values to Firestore for one athlete (merge writes).
 
 Intended for the new/updated contract fields:
-  - users/{uid}: age, historyInjuryCount
+  - users/{uid}: birth_date, historyInjuryCount
   - daily_health/{date}: sleepMinutes, injuredYesterday, … (today)
   - daily_health/{date-1}: steps, distanceMeters, HR, weight, … (yesterday / physical)
   - daily_checkins/{date}: stress, soreness, energy
@@ -72,7 +72,7 @@ def main() -> int:
     now_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     profile: dict[str, Any] = {
-        "age": 24,
+        "birth_date": "1995-01-01",
         "historyInjuryCount": 1,
     }
 

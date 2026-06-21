@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any, Mapping
 
 from services.model_features import DEFAULT_FEATURE_VALUES
@@ -9,7 +10,49 @@ from services.model_features import DEFAULT_FEATURE_VALUES
 STEPS_TO_KM = 0.0008
 RESTING_HR_MIN = 38.0
 RESTING_HR_MAX = 95.0
+AGE_MIN = 12
+AGE_MAX = 90
 DEFAULT_RESTING_HR = float(DEFAULT_FEATURE_VALUES["resting_hr"])
+
+
+def _clamp_age(age: int) -> int:
+    return int(max(AGE_MIN, min(AGE_MAX, age)))
+
+
+def _parse_date_key(value: str) -> date | None:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) -> int | None:
+    """Compute full years of age from ``birth_date`` (yyyy-MM-dd) as of ``as_of_date``."""
+    if birth_date is None:
+        return None
+    birth_str = str(birth_date).strip()
+    if not birth_str:
+        return None
+    birth = _parse_date_key(birth_str[:10])
+    if birth is None:
+        return None
+
+    ref = _parse_date_key(as_of_date) if as_of_date else date.today()
+    if ref is None:
+        ref = date.today()
+
+    age = ref.year - birth.year - ((ref.month, ref.day) < (birth.month, birth.day))
+    return _clamp_age(age)
+
+
+def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> int | None:
+    """Compute model age from Firestore profile ``birth_date`` (or ``birthDate``)."""
+    birth_raw = profile.get("birth_date")
+    if birth_raw is None:
+        birth_raw = profile.get("birthDate")
+    if birth_raw is None:
+        return None
+    return age_from_birth_date(birth_raw, as_of_date=as_of_date)
 
 
 def parse_injured_yesterday_flag(raw: object) -> int | None:

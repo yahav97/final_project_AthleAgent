@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from schemas.inference import InjuryPredictionRequest
-from services.field_transforms import injured_yesterday_for_request
+from services.field_transforms import age_from_profile, injured_yesterday_for_request
 from services.history_service import _to_date_key, merge_nutrition_with_history
 
 
@@ -88,7 +88,7 @@ def injury_prediction_request_from_firestore_snapshot(
     return InjuryPredictionRequest(
         userId=user_id,
         date=date_key,
-        age=profile.get("age"),
+        age=age_from_profile(profile, as_of_date=date_key),
         historyInjuryCount=hist_profile,
         injuredYesterday=injured_yesterday_for_request(injured_raw),
         sleepMinutes=today_only(["sleepMinutes", "sleep_minutes"]),
