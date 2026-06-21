@@ -27,6 +27,7 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -121,27 +122,49 @@ class WearableSyncActivity : AppCompatActivity() {
                 val physicalData = fetchPhysicalData(yesterdayStart, yesterdayEnd)
 
                 val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user"
-                val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-                val healthDataToSave: MutableMap<String, Any> = mutableMapOf(
+                // חישוב מפתחות התאריכים (היום ואתמול)
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val todayKey = dateFormat.format(Date())
+
+                val cal = Calendar.getInstance()
+                cal.add(Calendar.DATE, -1)
+                val yesterdayKey = dateFormat.format(cal.time)
+
+                // 1. נתוני שינה להיום בלבד
+                val sleepDataToSave = mapOf(
                     "sleepMinutes" to sleepMinutes,
                     "lastSync" to FieldValue.serverTimestamp()
                 )
-                healthDataToSave.putAll(physicalData)
 
-                FirebaseFirestore.getInstance().collection("users").document(userId)
+                // 2. נתונים פיזיים של אתמול
+                val physicalDataToSave = physicalData.toMutableMap().apply {
+                    put("lastSync", FieldValue.serverTimestamp())
+                }
+
+                val db = FirebaseFirestore.getInstance()
+
+                // ביצוע שמירה מפוצלת ב-Firestore
+                db.collection("users").document(userId)
                     .collection("daily_health").document(todayKey)
-                    .set(healthDataToSave, SetOptions.merge())
+                    .set(sleepDataToSave, SetOptions.merge())
                     .addOnSuccessListener {
 
-                        checkAndTriggerPredictionInBackground()
+                        // שמירת נתוני אתמול מתבצעת מיד לאחר הצלחת הראשונה
+                        db.collection("users").document(userId)
+                            .collection("daily_health").document(yesterdayKey)
+                            .set(physicalDataToSave, SetOptions.merge())
+                            .addOnSuccessListener {
 
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            Snackbar.make(binding.root, "Sync complete!", Snackbar.LENGTH_LONG)
-                                .setBackgroundTint("#3A6578".toColorInt()).show()
-                            delay(1500)
-                            finish()
-                        }
+                                checkAndTriggerPredictionInBackground()
+
+                                lifecycleScope.launch(Dispatchers.Main) {
+                                    Snackbar.make(binding.root, "Sync complete!", Snackbar.LENGTH_LONG)
+                                        .setBackgroundTint("#3A6578".toColorInt()).show()
+                                    delay(1500)
+                                    finish()
+                                }
+                            }
                     }
 
             } catch (e: Exception) {
@@ -265,16 +288,23 @@ class WearableSyncActivity : AppCompatActivity() {
 
             if (hasSurvey) {
                 Log.d("ML_Trigger", "Watch synchronized and Survey is already present. Triggering core prediction.")
-
                 eventReporter.reportEvent("ml_trigger", "Triggering core prediction from WearableSync")
 
+                val startTime = System.currentTimeMillis()
                 val requestData = ApiService.PredictionTriggerRequest(userId, today)
+
                 ApiClient.apiService.getDailyPrediction(requestData)
                     .enqueue(object : Callback<ApiService.PredictionResponse> {
                         override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
+                            val duration = System.currentTimeMillis() - startTime
                             if (response.isSuccessful) {
-                                Log.d("ML_Trigger", "Core prediction triggered successfully!")
-                                eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully")
+                                Log.d("ML_Trigger", "Core prediction triggered successfully in ${duration}ms!")
+                                val metadata = mapOf("duration_ms" to duration.toString())
+                                if (duration > 3000) {
+                                    eventReporter.reportEvent("ml_performance_warning", "Prediction took over 3 seconds", metadata)
+                                } else {
+                                    eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully", metadata)
+                                }
                             } else {
                                 eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
                             }
