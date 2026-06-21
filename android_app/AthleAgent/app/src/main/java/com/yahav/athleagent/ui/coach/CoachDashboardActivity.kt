@@ -18,7 +18,12 @@ import androidx.core.content.ContextCompat
 import com.yahav.athleagent.R
 import androidx.core.graphics.toColorInt
 import com.yahav.athleagent.model.AthleteItem
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+import com.yahav.athleagent.network.ApiClient
+import com.yahav.athleagent.observability.ClientEventReporter
 
 class CoachDashboardActivity : AppCompatActivity() {
 
@@ -29,10 +34,14 @@ class CoachDashboardActivity : AppCompatActivity() {
     private val athleteList = mutableListOf<AthleteItem>()
     private lateinit var adapter: AthleteAdapter
 
+    private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCoachDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        eventReporter.reportEvent("screen_view", "CoachDashboardActivity opened")
 
         setupRecyclerView()
         loadTeamAthletes()
@@ -40,7 +49,6 @@ class CoachDashboardActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         adapter = AthleteAdapter(athleteList) { selectedAthlete ->
-            // Handle athlete selection from the list
             showAthleteDetails(selectedAthlete)
         }
         binding.coachDashRVAthletes.layoutManager = LinearLayoutManager(this)
@@ -51,7 +59,6 @@ class CoachDashboardActivity : AppCompatActivity() {
     private fun loadTeamAthletes() {
         val coachUid = auth.currentUser?.uid ?: return
 
-        // Find the coach's team
         db.collection("teams").whereEqualTo("coachId", coachUid).get()
             .addOnSuccessListener { teams ->
                 if (teams.isEmpty) {
@@ -67,7 +74,6 @@ class CoachDashboardActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                // Fetch each athlete's name using their UID to display in the list
                 athleteList.clear()
                 athleteUids.forEach { uid ->
                     db.collection("users").document(uid).get()
@@ -82,11 +88,11 @@ class CoachDashboardActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun showAthleteDetails(athlete: AthleteItem) {
-        // Show the details panel
+        eventReporter.reportEvent("user_action", "Coach viewed athlete details", mapOf("athlete_id" to athlete.uid))
+
         binding.coachDashLayoutDetails.visibility = View.VISIBLE
         binding.coachDashTXTAthleteName.text = athlete.name
 
-        // Clear previous data from the screen before loading new data
         binding.coachDashPRGRiskScore.progress = 0
         binding.coachDashTXTScore.text = "--%"
         binding.coachDashTXTAiRecommendation.text = "Loading data..."
@@ -96,29 +102,41 @@ class CoachDashboardActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun loadAthleteHealthData(athleteUid: String) {
-        // Fetch data without sorting in Firebase to bypass the need for a composite index
+        // Find today's specific document first to ensure the coach sees the latest ML prediction
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+        db.collection("users").document(athleteUid)
+            .collection("daily_health").document(today)
+            .get()
+            .addOnSuccessListener { todayDoc ->
+                if (todayDoc.exists() && todayDoc.contains("finalRiskScore")) {
+                    val currentRisk = todayDoc.getDouble("finalRiskScore")?.toInt() ?: 0
+                    val aiRec = todayDoc.getString("aiRecommendation") ?: "Recommendation generated today."
+                    updateRiskUI(currentRisk, aiRec)
+                } else {
+                    // fallback to latest available if today is not synced yet
+                    binding.coachDashTXTAiRecommendation.text = "Athlete has not synced data for today yet."
+                }
+
+                // Then load history for the chart
+                loadHistoricalChartData(athleteUid)
+            }
+            .addOnFailureListener {
+                binding.coachDashTXTAiRecommendation.text = "Error loading data."
+            }
+    }
+
+    private fun loadHistoricalChartData(athleteUid: String) {
         db.collection("users").document(athleteUid)
             .collection("daily_health")
             .get()
             .addOnSuccessListener { documents ->
                 if (documents.isEmpty) {
-                    binding.coachDashTXTAiRecommendation.text = "No health data available for this athlete yet."
                     binding.coachDashCHARTHistory.clear()
                     return@addOnSuccessListener
                 }
 
-                // Sort documents by their ID (date) in ascending order
                 val sortedDocs = documents.documents.sortedBy { it.id }
-
-                // The most recent document is now at the end of the list
-                val latestDoc = sortedDocs.last()
-                val currentRisk = latestDoc.getDouble("finalRiskScore")?.toInt() ?: 0
-                val aiRec = latestDoc.getString("aiRecommendation") ?: "recommendation generated today."
-
-                // Update the risk score and AI recommendation
-                updateRiskUI(currentRisk, aiRec)
-
-                // Take up to the last 7 days for the chart
                 val lastSevenDocs = if (sortedDocs.size > 7) {
                     sortedDocs.takeLast(7)
                 } else {
@@ -140,28 +158,20 @@ class CoachDashboardActivity : AppCompatActivity() {
                     updateChart(entries)
                 }
             }
-            .addOnFailureListener {
-                binding.coachDashTXTAiRecommendation.text = "Error loading data."
-            }
     }
 
     @SuppressLint("SetTextI18n")
     private fun updateRiskUI(riskScore: Int, aiRecommendation: String) {
-        // 1. Determine styling and color based on the risk score range
         val (drawableResId, textColorHex) = when (riskScore) {
-            in 0..20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")   // Green
-            in 21..50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300") // Yellow
-            in 51..70 -> Pair(R.drawable.progress_drawable_orange, "#F57C00") // Orange
-            else -> Pair(R.drawable.progress_drawable_red, "#B71C1C")         // Red
+            in 0..20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")
+            in 21..50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300")
+            in 51..70 -> Pair(R.drawable.progress_drawable_orange, "#F57C00")
+            else -> Pair(R.drawable.progress_drawable_red, "#B71C1C")
         }
 
-        // 2. Apply the selected drawable to the ProgressBar
         binding.coachDashPRGRiskScore.progressDrawable = ContextCompat.getDrawable(this, drawableResId)
-
-        // 3. Update the progress value (must be done after setting the drawable)
         binding.coachDashPRGRiskScore.progress = riskScore
 
-        // 4. Update the text labels and their corresponding colors
         binding.coachDashTXTScore.text = "$riskScore%"
         binding.coachDashTXTScore.setTextColor(textColorHex.toColorInt())
         binding.coachDashTXTAiRecommendation.text = " $aiRecommendation"

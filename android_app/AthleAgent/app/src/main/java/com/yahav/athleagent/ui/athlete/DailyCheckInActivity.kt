@@ -20,6 +20,7 @@ import androidx.core.graphics.toColorInt
 
 import com.yahav.athleagent.network.ApiClient
 import com.yahav.athleagent.network.ApiService
+import com.yahav.athleagent.observability.ClientEventReporter
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -27,18 +28,20 @@ import retrofit2.Response
 class DailyCheckInActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDailyCheckInBinding
 
-    // Variables to store the user's selected data
     private var selectedSoreness: Int = 3
     private var energyLevel: Float = 60f
     private var stressLevel: Float = 30f
-
-    // ML Target Field (0 = Not Injured, 1 = Injured)
     private var injuredYesterday: Int = 0
+
+    // מדווח האירועים
+    private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDailyCheckInBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        eventReporter.reportEvent("screen_view", "DailyCheckInActivity opened")
 
         initListeners()
     }
@@ -116,6 +119,9 @@ class DailyCheckInActivity : AppCompatActivity() {
             .collection("daily_checkins").document(today)
             .set(checkInData, SetOptions.merge())
             .addOnSuccessListener {
+
+                eventReporter.reportEvent("user_action", "Daily Check-in submitted")
+
                 Snackbar.make(binding.root, "Check-in Saved Successfully!", Snackbar.LENGTH_LONG)
                     .setBackgroundTint("#3A6578".toColorInt())
                     .show()
@@ -139,21 +145,35 @@ class DailyCheckInActivity : AppCompatActivity() {
 
         val healthRef = db.collection("users").document(userId).collection("daily_health").document(today)
 
-        // הסקר כבר נשמר בהצלחה, נבדוק רק אם גם השעון כבר סונכרן היום
         healthRef.get().addOnSuccessListener { healthDoc ->
-            val hasWatch = healthDoc.exists() && healthDoc.contains("steps")
+            val hasWatch = healthDoc.exists() && healthDoc.contains("sleepMinutes")
 
             if (hasWatch) {
                 Log.d("ML_Trigger", "Survey completed and Watch Sync is already present. Triggering core prediction.")
+                eventReporter.reportEvent("ml_trigger", "Triggering core prediction from CheckIn")
 
+                val startTime = System.currentTimeMillis() // Start timing
                 val requestData = ApiService.PredictionTriggerRequest(userId, today)
+
                 ApiClient.apiService.getDailyPrediction(requestData)
                     .enqueue(object : Callback<ApiService.PredictionResponse> {
                         override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
-                            if (response.isSuccessful) Log.d("ML_Trigger", "Core prediction triggered successfully!")
+                            val duration = System.currentTimeMillis() - startTime // Calculate duration
+                            if (response.isSuccessful) {
+                                Log.d("ML_Trigger", "Core prediction triggered successfully in ${duration}ms!")
+                                val metadata = mapOf("duration_ms" to duration.toString())
+                                if (duration > 3000) {
+                                    eventReporter.reportEvent("ml_performance_warning", "Prediction took over 3 seconds", metadata)
+                                } else {
+                                    eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully", metadata)
+                                }
+                            } else {
+                                eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
+                            }
                         }
                         override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
                             Log.e("ML_Trigger", "Failed to trigger prediction", t)
+                            eventReporter.reportEvent("error", "Prediction trigger failed: ${t.message}")
                         }
                     })
             } else {

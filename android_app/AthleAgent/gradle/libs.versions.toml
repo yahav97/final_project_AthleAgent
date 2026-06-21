@@ -17,6 +17,8 @@ generativeai = "0.9.0"
 mpandroidchart = "3.1.0"
 play-services-auth = "21.0.0"
 health-connect = "1.1.0"
+okhttp = "4.12.0"
+timber = "5.0.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
@@ -37,3 +39,5 @@ generativeai = { module = "com.google.ai.client.generativeai:generativeai", vers
 mpandroidchart = { module = "com.github.PhilJay:MPAndroidChart", version.ref = "mpandroidchart" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
 androidx-health-connect-client = { module = "androidx.health.connect:connect-client", version.ref = "health-connect" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }

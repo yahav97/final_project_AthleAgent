@@ -23,6 +23,8 @@ import com.yahav.athleagent.R
 import com.yahav.athleagent.databinding.ActivityHomeAthleteBinding
 import com.yahav.athleagent.model.AlertItem
 import com.yahav.athleagent.ui.auth.LoginActivity
+import com.yahav.athleagent.network.ApiClient
+import com.yahav.athleagent.observability.ClientEventReporter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -36,6 +38,9 @@ class HomeAthleteActivity : AppCompatActivity() {
     private val userId by lazy { FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123" }
 
     private var imageUri: Uri? = null
+
+    // אתחול מערכת הלוגים החדשה
+    private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     private val getContentLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -57,6 +62,9 @@ class HomeAthleteActivity : AppCompatActivity() {
 
         binding = ActivityHomeAthleteBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // דיווח כניסה למסך לשרת הלוגים
+        eventReporter.reportEvent("screen_view", "HomeAthleteActivity opened")
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -126,41 +134,40 @@ class HomeAthleteActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-// Fetches the user's name from Firebase
     @SuppressLint("SetTextI18n")
     private fun fetchUserName() {
-    val currentUser = FirebaseAuth.getInstance().currentUser
-    var displayName = currentUser?.displayName
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        var displayName = currentUser?.displayName
 
-    db.collection("users").document(userId).get()
-        .addOnSuccessListener { document ->
-            if (document.exists()) {
-                val dbName = document.getString("fullName") ?: document.getString("firstName")
-                if (!dbName.isNullOrEmpty()) {
-                    displayName = dbName
-                }
-
-                val teamId = document.getString("teamId")
-                if (!teamId.isNullOrEmpty()) {
-                    db.collection("teams").document(teamId).get().addOnSuccessListener { teamDoc ->
-                        val teamName = teamDoc.getString("TeamName") ?: "Unknown Team"
-                        binding.athleteHomeLBLTeamName.text = teamName
-
-                        binding.athleteHomeLBLTeamName.setCompoundDrawablesRelative(null, null, null, null)
-                        binding.athleteHomeLBLTeamName.setOnClickListener(null)
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val dbName = document.getString("fullName") ?: document.getString("firstName")
+                    if (!dbName.isNullOrEmpty()) {
+                        displayName = dbName
                     }
-                } else {
-                    binding.athleteHomeLBLTeamName.setOnClickListener {
-                        startActivity(Intent(this@HomeAthleteActivity, JoinTeamActivity::class.java))
+
+                    val teamId = document.getString("teamId")
+                    if (!teamId.isNullOrEmpty()) {
+                        db.collection("teams").document(teamId).get().addOnSuccessListener { teamDoc ->
+                            val teamName = teamDoc.getString("TeamName") ?: "Unknown Team"
+                            binding.athleteHomeLBLTeamName.text = teamName
+
+                            binding.athleteHomeLBLTeamName.setCompoundDrawablesRelative(null, null, null, null)
+                            binding.athleteHomeLBLTeamName.setOnClickListener(null)
+                        }
+                    } else {
+                        binding.athleteHomeLBLTeamName.setOnClickListener {
+                            startActivity(Intent(this@HomeAthleteActivity, JoinTeamActivity::class.java))
+                        }
                     }
                 }
+                binding.athleteHomeLBLName.text = displayName ?: "Athlete"
             }
-            binding.athleteHomeLBLName.text = displayName ?: "Athlete"
-        }
-        .addOnFailureListener {
-            binding.athleteHomeLBLName.text = displayName ?: "Athlete"
-        }
-}
+            .addOnFailureListener {
+                binding.athleteHomeLBLName.text = displayName ?: "Athlete"
+            }
+    }
 
     private fun checkDailyDataStatus() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -181,7 +188,10 @@ class HomeAthleteActivity : AppCompatActivity() {
         Tasks.whenAllComplete(wearableTask, checkinTask, mealTask)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    if (wearableTask.isSuccessful && wearableTask.result.exists()) hasWearableSync = true
+                    // תיקון: מוודאים שקיימת שינה של היום, ולא רק מסמך ריק
+                    if (wearableTask.isSuccessful && wearableTask.result.exists() && wearableTask.result.contains("sleepMinutes")) {
+                        hasWearableSync = true
+                    }
                     if (checkinTask.isSuccessful && checkinTask.result.exists()) hasCheckIn = true
                     if (mealTask.isSuccessful && mealTask.result.exists()) hasMeal = true
 

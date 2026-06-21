@@ -30,14 +30,14 @@
                 android:padding="@dimen/spacing_32">
 
                 <com.google.android.material.textview.MaterialTextView
-                    android:fontFamily="@font/roboto_bold"
-                    android:text="@string/set_your_account"
-                    android:textColor="@color/text"
-                    android:textSize="@dimen/team_text_size"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginBottom="@dimen/spacing_40" />
+                    android:layout_marginBottom="@dimen/spacing_40"
+                    android:fontFamily="@font/roboto_bold"
+                    android:text="@string/set_your_account"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/team_text_size" />
 
                 <com.google.android.material.button.MaterialButtonToggleGroup
                     android:id="@+id/register_TOGGLE_role"
@@ -45,8 +45,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/spacing_72"
                     app:checkedButton="@id/register_BTN_athlete_role"
-                    app:singleSelection="true"
-                    app:selectionRequired="true">
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/register_BTN_athlete_role"
@@ -57,10 +57,10 @@
                         android:fontFamily="@font/roboto_bold"
                         android:text="@string/athlete"
                         android:textAllCaps="false"
+                        android:textColor="@color/text"
                         android:textSize="@dimen/text_size_input_bigger"
                         app:strokeColor="@color/charcoal_black"
-                        app:strokeWidth="2dp"
-                        android:textColor="@color/text" />
+                        app:strokeWidth="2dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/register_BTN_coach_role"
@@ -71,10 +71,10 @@
                         android:fontFamily="@font/roboto_bold"
                         android:text="@string/coach"
                         android:textAllCaps="false"
+                        android:textColor="@color/text"
                         android:textSize="@dimen/text_size_input_bigger"
                         app:strokeColor="@color/charcoal_black"
-                        app:strokeWidth="2dp"
-                        android:textColor="@color/text" />
+                        app:strokeWidth="2dp" />
 
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
@@ -99,23 +99,29 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/register_TIL_age"
+                    android:id="@+id/register_TIL_birthDate"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/spacing_20"
+                    android:hint="Birth Date"
                     app:boxCornerRadiusBottomEnd="@dimen/spacing_16"
                     app:boxCornerRadiusBottomStart="@dimen/spacing_16"
                     app:boxCornerRadiusTopEnd="@dimen/spacing_16"
-                    app:boxCornerRadiusTopStart="@dimen/spacing_16">
+                    app:boxCornerRadiusTopStart="@dimen/spacing_16"
+                    app:endIconDrawable="@drawable/baseline_calendar_month_24"
+                    app:endIconMode="custom"
+                    app:endIconTint="@color/charcoal_black">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_age"
+                        android:id="@+id/register_ET_birthDate"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:cursorVisible="false"
+                        android:focusable="false"
                         android:fontFamily="@font/roboto_bold"
-                        android:hint="@string/age"
-                        android:inputType="number"
+                        android:inputType="none"
                         android:padding="@dimen/spacing_16" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -169,7 +175,8 @@
                     app:boxCornerRadiusBottomStart="@dimen/spacing_16"
                     app:boxCornerRadiusTopEnd="@dimen/spacing_16"
                     app:boxCornerRadiusTopStart="@dimen/spacing_16"
-                    app:passwordToggleEnabled="true">
+                    app:passwordToggleEnabled="true"
+                    app:passwordToggleTint="@color/charcoal_black">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/register_ET_password"

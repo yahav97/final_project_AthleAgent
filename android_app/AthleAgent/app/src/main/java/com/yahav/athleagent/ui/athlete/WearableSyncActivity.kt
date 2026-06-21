@@ -8,25 +8,7 @@ import androidx.core.graphics.toColorInt
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
-import androidx.health.connect.client.records.BasalMetabolicRateRecord
-import androidx.health.connect.client.records.BodyFatRecord
-import androidx.health.connect.client.records.DistanceRecord
-import androidx.health.connect.client.records.ElevationGainedRecord
-import androidx.health.connect.client.records.ExerciseSessionRecord
-import androidx.health.connect.client.records.FloorsClimbedRecord
-import androidx.health.connect.client.records.HeartRateRecord
-import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
-import androidx.health.connect.client.records.OxygenSaturationRecord
-import androidx.health.connect.client.records.RespiratoryRateRecord
-import androidx.health.connect.client.records.RestingHeartRateRecord
-import androidx.health.connect.client.records.SleepSessionRecord
-import androidx.health.connect.client.records.SpeedRecord
-import androidx.health.connect.client.records.StepsCadenceRecord
-import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
-import androidx.health.connect.client.records.Vo2MaxRecord
-import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -50,6 +32,7 @@ import java.util.Locale
 
 import com.yahav.athleagent.network.ApiClient
 import com.yahav.athleagent.network.ApiService
+import com.yahav.athleagent.observability.ClientEventReporter
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -58,6 +41,8 @@ import retrofit2.Response
 class WearableSyncActivity : AppCompatActivity() {
     private lateinit var binding: ActivityWearableSyncBinding
     private lateinit var healthConnectClient: HealthConnectClient
+
+    private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     private val permissions = setOf(
         HealthPermission.getReadPermission(SleepSessionRecord::class),
@@ -119,6 +104,7 @@ class WearableSyncActivity : AppCompatActivity() {
     }
 
     private fun startHealthSync() {
+        eventReporter.reportEvent("sync", "Started wearable data sync")
         Snackbar.make(binding.root, "Fetching advanced metrics...", Snackbar.LENGTH_SHORT).show()
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -274,21 +260,28 @@ class WearableSyncActivity : AppCompatActivity() {
 
         val checkinRef = db.collection("users").document(userId).collection("daily_checkins").document(today)
 
-        // השעון הרגע סונכרן בהצלחה, נבדוק רק אם הסקר היומי כבר מולא היום
         checkinRef.get().addOnSuccessListener { checkinDoc ->
             val hasSurvey = checkinDoc.exists() && checkinDoc.contains("energyLevel")
 
             if (hasSurvey) {
                 Log.d("ML_Trigger", "Watch synchronized and Survey is already present. Triggering core prediction.")
 
+                eventReporter.reportEvent("ml_trigger", "Triggering core prediction from WearableSync")
+
                 val requestData = ApiService.PredictionTriggerRequest(userId, today)
                 ApiClient.apiService.getDailyPrediction(requestData)
                     .enqueue(object : Callback<ApiService.PredictionResponse> {
                         override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
-                            if (response.isSuccessful) Log.d("ML_Trigger", "Core prediction triggered successfully!")
+                            if (response.isSuccessful) {
+                                Log.d("ML_Trigger", "Core prediction triggered successfully!")
+                                eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully")
+                            } else {
+                                eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
+                            }
                         }
                         override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
                             Log.e("ML_Trigger", "Failed to trigger prediction", t)
+                            eventReporter.reportEvent("error", "Prediction trigger failed: ${t.message}")
                         }
                     })
             } else {

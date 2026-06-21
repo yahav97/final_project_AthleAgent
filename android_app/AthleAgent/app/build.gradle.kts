@@ -70,4 +70,6 @@ dependencies {
     implementation(libs.mpandroidchart)
     implementation(libs.play.services.auth)
     implementation(libs.androidx.health.connect.client)
+    implementation(libs.okhttp)
+    implementation(libs.timber)
 }

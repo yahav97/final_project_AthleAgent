@@ -2,7 +2,6 @@ package com.yahav.athleagent.ui.athlete
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -16,10 +15,7 @@ import java.util.Locale
 import androidx.core.net.toUri
 
 import com.yahav.athleagent.network.ApiClient
-import com.yahav.athleagent.network.ApiService
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import com.yahav.athleagent.observability.ClientEventReporter
 
 class MealAnalysisActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMealAnalysisBinding
@@ -27,6 +23,8 @@ class MealAnalysisActivity : AppCompatActivity() {
     private val targetCalories = 2500
     private val targetProtein = 150
     private val targetCarbs = 300
+
+    private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,10 +88,10 @@ class MealAnalysisActivity : AppCompatActivity() {
                     .collection("daily_nutrition").document(today)
                     .set(dailyNutritionUpdates, SetOptions.merge())
                     .addOnSuccessListener {
+
+                        eventReporter.reportEvent("user_action", "Meal saved")
+
                         Toast.makeText(this, "Meal saved successfully!", Toast.LENGTH_SHORT).show()
-
-                        checkAndTriggerPredictionInBackground()
-
                         finish()
                     }
                     .addOnFailureListener {
@@ -105,40 +103,5 @@ class MealAnalysisActivity : AppCompatActivity() {
                 Toast.makeText(this, "Error saving meal: ${e.message}", Toast.LENGTH_SHORT).show()
                 binding.mealBTNSave.isEnabled = true
             }
-    }
-
-    private fun checkAndTriggerPredictionInBackground() {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val db = FirebaseFirestore.getInstance()
-
-        val healthRef = db.collection("users").document(userId).collection("daily_health").document(today)
-        val checkinRef = db.collection("users").document(userId).collection("daily_checkins").document(today)
-
-        // התזונה נשמרה, נבדוק ששני תנאי החובה (שעון + סקר) קיימים לפני שנריץ חיזוי מעודכן
-        healthRef.get().addOnSuccessListener { healthDoc ->
-            checkinRef.get().addOnSuccessListener { checkinDoc ->
-
-                val hasWatch = healthDoc.exists() && healthDoc.contains("steps")
-                val hasSurvey = checkinDoc.exists() && checkinDoc.contains("energyLevel")
-
-                if (hasWatch && hasSurvey) {
-                    Log.d("ML_Trigger", "Nutrition added, and both Watch and Survey are present. Triggering full prediction.")
-
-                    val requestData = ApiService.PredictionTriggerRequest(userId, today)
-                    ApiClient.apiService.getDailyPrediction(requestData)
-                        .enqueue(object : Callback<ApiService.PredictionResponse> {
-                            override fun onResponse(call: Call<ApiService.PredictionResponse>, response: Response<ApiService.PredictionResponse>) {
-                                if (response.isSuccessful) Log.d("ML_Trigger", "Full dynamic prediction updated successfully!")
-                            }
-                            override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
-                                Log.e("ML_Trigger", "Failed to trigger dynamic prediction", t)
-                            }
-                        })
-                } else {
-                    Log.d("ML_Trigger", "Nutrition saved, but core metrics (Watch/Survey) are missing. Skipping trigger.")
-                }
-            }
-        }
     }
 }
