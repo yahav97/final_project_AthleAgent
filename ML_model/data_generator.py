@@ -514,7 +514,7 @@ def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
     class_counts = df["injury_tomorrow"].value_counts().to_dict()
     injury_rate = float(df["injury_tomorrow"].mean())
     corr_cols = ["daily_distance_km", "sleep_hours", "stress_level", "muscle_soreness", "acwr_ratio", "hrv_drop"]
-    corr = df[corr_cols].corr()
+    corr = df.loc[:, corr_cols].corr()
     report = {
         "rows": int(len(df)),
         "columns": int(df.shape[1]),
