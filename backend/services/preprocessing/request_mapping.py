@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any, cast
 
 import pandas as pd
 
@@ -238,5 +239,6 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
             value = DEFAULT_FEATURE_VALUES[column]
         out[column] = float(value)
 
-    frame = pd.DataFrame([out], columns=MODEL_FEATURE_COLUMNS)
+    feature_columns = list(MODEL_FEATURE_COLUMNS)
+    frame = pd.DataFrame([out], columns=cast(Any, feature_columns))
     return frame.astype("float64").fillna(pd.Series(DEFAULT_FEATURE_VALUES))

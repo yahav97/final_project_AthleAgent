@@ -55,7 +55,15 @@ class TestHistoricalDerivedFeatures:
             }
             for i in range(1, 8)
         ]
-        monkeypatch.setattr(hs, "fetch_user_history", lambda *a, **k: rows)
+        def _fetch_user_history(
+            user_id: str,
+            date_key: str,
+            lookback_days: int = 7,
+            include_target_day: bool = True,
+        ) -> list[dict]:
+            return rows
+
+        monkeypatch.setattr(hs, "fetch_user_history", _fetch_user_history)
         ctx = hs.get_history_window_context("u1", "2026-05-07")
         assert ctx["confidence"] == "high"
         assert ctx["days_count"] == 7
@@ -70,7 +78,15 @@ class TestHistoricalDerivedFeatures:
             {"date_key": f"2026-05-{i:02d}", "distanceMeters": 5000, "sleepMinutes": 420}
             for i in range(1, day_count + 1)
         ]
-        monkeypatch.setattr(hs, "fetch_user_history", lambda *a, **k: rows)
+        def _fetch_user_history(
+            user_id: str,
+            date_key: str,
+            lookback_days: int = 7,
+            include_target_day: bool = True,
+        ) -> list[dict]:
+            return rows
+
+        monkeypatch.setattr(hs, "fetch_user_history", _fetch_user_history)
         ctx = hs.get_history_window_context("u1", "2026-05-09")
         assert ctx["confidence"] == expected_confidence
 

@@ -104,12 +104,18 @@ def _validate_manifest_for_live(manifest: dict[str, Any], model_path: Path) -> t
     if not winner:
         return False, ModelGateReason.MANIFEST_MISSING_WINNER
     metrics = manifest.get("winner_metrics") or {}
-    try:
-        recall = float(metrics.get("Recall@Threshold"))
-    except (TypeError, ValueError):
+    recall_raw = metrics.get("Recall@Threshold")
+    if recall_raw is None:
         return False, ModelGateReason.MANIFEST_INVALID_RECALL
     try:
-        auc = float(metrics.get("ROC-AUC"))
+        recall = float(recall_raw)
+    except (TypeError, ValueError):
+        return False, ModelGateReason.MANIFEST_INVALID_RECALL
+    auc_raw = metrics.get("ROC-AUC")
+    if auc_raw is None:
+        return False, ModelGateReason.MANIFEST_INVALID_AUC
+    try:
+        auc = float(auc_raw)
     except (TypeError, ValueError):
         return False, ModelGateReason.MANIFEST_INVALID_AUC
     if recall < settings.ML_MIN_RECALL_HARD:
@@ -271,14 +277,18 @@ def get_model_status() -> dict[str, Any]:
     auc_value = None
     recall_value = None
     if isinstance(_active_manifest, dict):
-        try:
-            auc_value = float(winner_metrics.get("ROC-AUC"))
-        except (TypeError, ValueError):
-            auc_value = None
-        try:
-            recall_value = float(winner_metrics.get("Recall@Threshold"))
-        except (TypeError, ValueError):
-            recall_value = None
+        auc_raw = winner_metrics.get("ROC-AUC")
+        if auc_raw is not None:
+            try:
+                auc_value = float(auc_raw)
+            except (TypeError, ValueError):
+                auc_value = None
+        recall_raw = winner_metrics.get("Recall@Threshold")
+        if recall_raw is not None:
+            try:
+                recall_value = float(recall_raw)
+            except (TypeError, ValueError):
+                recall_value = None
     degraded_auc_threshold = settings.ML_MIN_AUC_FOR_LIVE + settings.ML_DEGRADED_AUC_OFFSET
     degraded_rc = bool(_model_live and auc_value is not None and auc_value < degraded_auc_threshold)
     run_id = _active_manifest.get("run_id") if isinstance(_active_manifest, dict) else None

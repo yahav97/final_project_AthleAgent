@@ -59,7 +59,11 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
         trigger.date,
         result,
     )
-    return InjuryPredictionResponse(**result)
+    return InjuryPredictionResponse(
+        risk_level=result["risk_level"],
+        risk_score=result["risk_score"],
+        prediction_confidence=result["prediction_confidence"],
+    )
 
 
 @router.post("/predict/sklearn")

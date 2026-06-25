@@ -151,9 +151,9 @@ def main() -> int:
             row: dict[str, Any] = {
                 "athlete_id": athlete_id,
                 "date": date_key,
-                **feats,
                 "injury_tomorrow": label,
             }
+            row.update(feats)
             rows.append(row)
 
     if not rows:

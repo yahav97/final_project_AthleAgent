@@ -21,6 +21,11 @@ def _firestore_client():
     return history_service_module._get_firestore_client()
 
 
+def _sync_document_get(doc_ref: Any) -> Any:
+    """Sync Firestore document read (firebase_admin client, not async client)."""
+    return doc_ref.get()
+
+
 def stable_athlete_numeric_id(user_id: str) -> int:
     """Deterministic int id for ML CSV ``athlete_id`` (same uid → same id across runs)."""
     digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
@@ -41,11 +46,11 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
     try:
         next_key = (to_date_key(date_key) + timedelta(days=1)).strftime("%Y-%m-%d")
         user_ref = db.collection("users").document(user_id)
-        checkin_doc = user_ref.collection("daily_checkins").document(next_key).get()
+        checkin_doc = _sync_document_get(user_ref.collection("daily_checkins").document(next_key))
         if checkin_doc.exists:
             parsed = injured_yesterday_from_doc(checkin_doc.to_dict() or {})
             return 0 if parsed is None else parsed
-        health_doc = user_ref.collection("daily_health").document(next_key).get()
+        health_doc = _sync_document_get(user_ref.collection("daily_health").document(next_key))
     except Exception:
         logger.exception("fetch_injury_tomorrow_label failed user_id=%s date=%s", user_id, date_key)
         return None
@@ -84,11 +89,11 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
             checkin_ref.path,
             nutrition_yesterday_ref.path,
         )
-        user_doc = user_ref.get()
-        health_doc = health_ref.get()
-        health_yesterday_doc = health_yesterday_ref.get()
-        checkin_doc = checkin_ref.get()
-        nutrition_yesterday_doc = nutrition_yesterday_ref.get()
+        user_doc = _sync_document_get(user_ref)
+        health_doc = _sync_document_get(health_ref)
+        health_yesterday_doc = _sync_document_get(health_yesterday_ref)
+        checkin_doc = _sync_document_get(checkin_ref)
+        nutrition_yesterday_doc = _sync_document_get(nutrition_yesterday_ref)
     except Exception:
         return {}
 
@@ -103,7 +108,11 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
     }
 
 
-def merge_nutrition_with_history(user_id: str, date_key: str, primary: dict[str, Any]) -> dict[str, Any]:
+def merge_nutrition_with_history(
+    user_id: str,
+    date_key: str,
+    primary: dict[str, Any],
+) -> tuple[dict[str, Any], bool]:
     """
     Fill missing nutrition aggregates from population averages.
 
@@ -181,11 +190,11 @@ def fetch_user_history(
 
     merged_rows: list[dict[str, Any]] = []
     for key in date_keys_in_range(start_day, end_inclusive):
-        health_doc = health_ref.document(key).get()
+        health_doc = _sync_document_get(health_ref.document(key))
         if not health_doc.exists:
             continue
         row = dict(health_doc.to_dict() or {})
-        checkin_doc = checkin_ref.document(key).get()
+        checkin_doc = _sync_document_get(checkin_ref.document(key))
         if checkin_doc.exists:
             row.update(checkin_doc.to_dict() or {})
         row["date_key"] = key

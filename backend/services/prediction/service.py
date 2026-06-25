@@ -49,7 +49,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     frame = injury_request_to_model_dataframe(payload)
     frame, history_confidence = apply_history_confidence_fallback(frame, payload)
     quality = calculate_data_quality_score(payload)
-    quality_score = float(quality["score"])
+    score = quality["score"]
+    quality_score = float(score) if isinstance(score, (int, float)) else 0.0
     logger.info(
         "predict_data_quality userId=%s date=%s quality=%.3f sensitive_missing_fields=%s hard_missing=%s",
         payload.userId,

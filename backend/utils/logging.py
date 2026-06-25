@@ -26,8 +26,8 @@ class ContextFilter(logging.Filter):
         record.user_id = user_id_var.get()
         record.service = settings.PROJECT_NAME
         record.version = settings.VERSION
-        if not hasattr(record, "source") or record.source is None:
-            record.source = "backend"
+        if getattr(record, "source", None) is None:
+            setattr(record, "source", "backend")
         return True
 
 

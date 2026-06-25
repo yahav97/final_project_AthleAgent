@@ -117,7 +117,10 @@ class TestPredictDailyErrors:
 
         mock_firestore_snapshot()
         mock_model_gate(live=False, gate_reason="manifest_corrupted")
-        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", lambda *a, **k: None)
+        def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
+            return None
+
+        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
 
         response = api_client.post("/predict/daily", json={"userId": "u1", "date": "2026-04-30"})
 

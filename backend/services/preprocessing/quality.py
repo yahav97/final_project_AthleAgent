@@ -7,7 +7,9 @@ from services.preprocessing.constants import HARD_FIELDS, SENSITIVE_FIELDS
 from services.preprocessing.helpers import has_positive_load_signal, is_present
 
 
-def calculate_data_quality_score(payload: InjuryPredictionRequest) -> dict[str, object]:
+def calculate_data_quality_score(
+    payload: InjuryPredictionRequest,
+) -> dict[str, float | list[str] | bool]:
     """
     Score current-day payload completeness and report hard-missing conditions.
 

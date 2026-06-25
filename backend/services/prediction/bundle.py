@@ -57,6 +57,15 @@ def resolve_model_bundle(
             BundleResolutionMode.FALLBACK_DEMO.value,
             ModelGateReason.MISSING_FEATURE_COLUMNS.value,
         )
+    if threshold_raw is None:
+        return (
+            None,
+            None,
+            None,
+            None,
+            BundleResolutionMode.FALLBACK_DEMO.value,
+            ModelGateReason.INVALID_THRESHOLD.value,
+        )
     try:
         threshold = float(threshold_raw)
     except (TypeError, ValueError):

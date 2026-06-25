@@ -38,7 +38,10 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
             "daily_nutrition_yesterday": {},
         },
     )
-    monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", lambda *a, **k: None)
+    def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
+        return None
+
+    monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
 
     with TestClient(app) as client:
         r = client.post(

@@ -6,7 +6,7 @@ from config import settings
 
 pytestmark = pytest.mark.integration
 
-def _legacy_athlete_payload(**overrides: float | int) -> dict[str, float | int]:
+def _legacy_athlete_payload(overrides: dict[str, float | int] | None = None) -> dict[str, float | int]:
     """Full AthleteData body with optional field overrides for heuristic tests."""
     payload: dict[str, float | int] = {
         "bmi": 22.1,
@@ -32,7 +32,8 @@ def _legacy_athlete_payload(**overrides: float | int) -> dict[str, float | int]:
         "sleep_debt_3d": 1.0,
         "hrv_drop": -1.0,
     }
-    payload.update(overrides)
+    if overrides:
+        payload.update(overrides)
     return payload
 
 

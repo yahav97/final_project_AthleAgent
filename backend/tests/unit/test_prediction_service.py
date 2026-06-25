@@ -221,12 +221,16 @@ class TestPredictInjuryRisk:
 
         bundle = dict(mock_model_bundle)
         bundle["estimator"] = _Estimator(probability)
+        def _history_context(
+            user_id: str,
+            date_key: str,
+            lookback_days: int | None = None,
+            include_target_day: bool = True,
+        ) -> dict[str, object]:
+            return {"confidence": "medium", "features": {}}
+
         monkeypatch.setattr(ps, "get_model", lambda: bundle)
-        monkeypatch.setattr(
-            ps,
-            "get_history_window_context",
-            lambda *a, **k: {"confidence": "medium", "features": {}},
-        )
+        monkeypatch.setattr(ps, "get_history_window_context", _history_context)
         out = ps.predict_injury_risk(sample_prediction_request)
         assert out["risk_level"] == expected_level
         assert out["risk_score"] == pytest.approx(probability, abs=1e-4)
@@ -238,6 +242,9 @@ class TestPredictInjuryRisk:
             ps.predict_injury_risk_from_firestore("u1", "2026-05-09")
 
     def test_persist_raises_on_write_failure(self, monkeypatch):
-        monkeypatch.setattr(ps, "save_daily_prediction_result", lambda *a, **k: False)
+        def _save_failed(user_id: str, date_key: str, result: dict) -> bool:
+            return False
+
+        monkeypatch.setattr(ps, "save_daily_prediction_result", _save_failed)
         with pytest.raises(DatabaseError, match="Prediction persist failed"):
             ps.persist_prediction_result_or_raise("u1", "2026-05-09", {"risk_score": 0.3})

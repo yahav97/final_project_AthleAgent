@@ -43,7 +43,7 @@ def _evict_stale_entries(now: float) -> None:
     if len(_last_seen) <= max_keys:
         return
     overflow = len(_last_seen) - max_keys
-    oldest_keys = sorted(_last_seen, key=_last_seen.get)[:overflow]
+    oldest_keys = sorted(_last_seen, key=lambda key: _last_seen[key])[:overflow]
     for key in oldest_keys:
         _last_seen.pop(key, None)
 

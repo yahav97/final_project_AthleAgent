@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from services.field_transforms import (
@@ -54,7 +55,8 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
     frame["acute_load_7d"] = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
     weekly_mean = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
     weekly_std = frame["daily_distance_km"].rolling(7, min_periods=1).std().fillna(0.0)
-    frame["chronic_load_21d"] = (weekly_mean * 0.85 + weekly_std * 0.35 + 0.5).clip(lower=0.55)
+    chronic_load = weekly_mean * 0.85 + weekly_std * 0.35 + 0.5
+    frame["chronic_load_21d"] = np.maximum(chronic_load, 0.55)
     frame["acwr_ratio"] = frame["acute_load_7d"] / frame["chronic_load_21d"].replace(0, pd.NA)
     frame["acwr_ratio"] = frame["acwr_ratio"].fillna(1.0).clip(lower=0.35, upper=2.8)
 

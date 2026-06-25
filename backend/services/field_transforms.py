@@ -63,10 +63,12 @@ def parse_injured_yesterday_flag(raw: object) -> int | None:
         return 1
     if raw is False:
         return 0
-    try:
-        return 1 if int(raw) else 0
-    except (TypeError, ValueError):
-        return None
+    if isinstance(raw, (int, float, str)):
+        try:
+            return 1 if int(raw) else 0
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def injured_yesterday_for_request(raw: object) -> int | None:
@@ -77,10 +79,12 @@ def injured_yesterday_for_request(raw: object) -> int | None:
         return 1
     if raw is False:
         return 0
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(raw, (int, float, str)):
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def injured_yesterday_as_feature(raw: object) -> float:
