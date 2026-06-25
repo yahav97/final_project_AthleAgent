@@ -180,9 +180,9 @@ sequenceDiagram
 | מקור נתונים | Firestore path | שדות עיקריים |
 |-------------|----------------|--------------|
 | Sleep / recovery | `daily_health/{D}` | sleepMinutes, HRV (בוקר) |
-| Physical load | `daily_health/{D-1}` (fallback `{D}`) | steps, distance, calories, HR |
+| Physical load | `daily_health/{D-1}` בלבד | steps, distance, calories, HR (>0 ל-load signal) |
 | Survey | `daily_checkins/{D}` | energy, soreness, stress, injuredYesterday |
-| Nutrition | `daily_nutrition/{D-1}` + backfill | totalCalories, protein, carbs |
+| Nutrition | `daily_nutrition/{D-1}` + ממוצעים כלליים | totalCalories, protein, carbs; `nutritionImputed` → −0.12 confidence |
 | Profile | `users/{uid}` | age, historyInjuryCount |
 
 ---

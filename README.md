@@ -71,7 +71,7 @@ Android             → Firestore (read finalRiskScore for UI)
 ## 🧠 Design Philosophy
 
 * **Usability:** Minimal manual entry; wearable sync and photo-based nutrition.
-* **Reliability:** Missing-data defaults to defaults; model blocked if quality gates fail.
+* **Reliability:** Missing-data defaults; ML **manifest gates** block serving if Recall/AUC thresholds fail (HTTP 503).
 * **Supportability:** Separate repos/folders for Android, backend, and ML pipeline.
 * **Performance:** Stateless backend inference; Firestore as source of truth for UI.
 
@@ -151,7 +151,10 @@ Point the app Retrofit base URL at your backend host (see `ApiClient.kt` — emu
 |----------|---------|
 | [`docs/HLD_PROJECT.md`](docs/HLD_PROJECT.md) | High-level design |
 | [`docs/DOCKER.md`](docs/DOCKER.md) | Backend + ML via Docker |
+| [`docs/LLD_PROJECT.md`](docs/LLD_PROJECT.md) | Low-level design |
 | [`docs/NFR.md`](docs/NFR.md) | Non-functional requirements |
+| [`docs/LOGGING_HE.md`](docs/LOGGING_HE.md) | Unified logging + telemetry |
+| [`ML_model/README.md`](ML_model/README.md) | Training pipeline + artifacts |
 | [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline end-to-end |
 | [`backend/README.md`](backend/README.md) | Backend setup and API |
 

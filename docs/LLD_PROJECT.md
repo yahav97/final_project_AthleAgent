@@ -432,7 +432,7 @@ cd backend && python -m pytest tests/ -v
 
 | # | רכיב | פער | השפעה |
 |---|------|-----|--------|
-| 1 | Android sync | physical load נשמר ב-{D} במקום {D-1} | Backend fallback ל-{D} |
+| 1 | Android trigger | אין gate על `daily_health/{D-1}` load > 0 | חיזוי עלול לרוץ בלי עומס אתמול |
 | 2 | google_auth.py | לא מחובר ל-routes | API פתוח |
 | 3 | Android | אין ViewModel/Repository | קושי בבדיקות unit |
 

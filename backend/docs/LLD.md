@@ -190,10 +190,10 @@ All fields optional — service applies defaults.
 | Field category | Source function | Priority |
 |----------------|-----------------|----------|
 | Sleep | `_today_only()` | `daily_health/{D}` |
-| Physical | `_yesterday_then_today()` | `{D-1}` then `{D}` |
+| Physical | `_yesterday_only()` | `daily_health/{D-1}` בלבד |
 | Survey | direct from checkins | `daily_checkins/{D}` |
-| Nutrition | `merge_nutrition_with_history()` | `{D-1}` + backfill |
-| HR avg | `_firestore_doc_heartrate_avg()` | yesterday then today |
+| Nutrition | `merge_nutrition_with_history()` | `{D-1}` + `nutrition_defaults.py` |
+| HR avg | `_firestore_doc_heartrate_avg()` | `daily_health/{D-1}` בלבד |
 
 ---
 
@@ -206,7 +206,7 @@ All fields optional — service applies defaults.
 | `repository.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
 | `repository.save_daily_prediction_result` | Merge write to daily_health |
-| `repository.merge_nutrition_with_history` | Backfill missing nutrition |
+| `repository.merge_nutrition_with_history` | אתמול + ממוצעים כלליים; מחזיר `(doc, imputed)` |
 | `repository.fetch_injury_tomorrow_label` | Training label from D+1 checkin |
 | `repository.stable_athlete_numeric_id` | SHA256 → int for CSV export |
 
@@ -364,7 +364,8 @@ MIN_AUC_FOR_LIVE = 0.68
 ```
 
 **Sensitive fields:** `sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`  
-**Hard fields:** `userId`, `date` (+ derived load/recovery signal checks)
+**Imputation flag:** `nutritionImputed` → counts as `nutrition_imputed` (−0.12)  
+**Hard fields:** `userId`, `date` (+ load signal: steps/dist/activeCal **>0**; recovery signal)
 
 Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
@@ -477,7 +478,7 @@ flowchart TD
 |---|----------|-------|
 | 1 | `external/google_auth.py` | Not imported by any route |
 | 2 | `config.GEMINI_API_KEY` | Configured but no Gemini routes |
-| 3 | Android → Firestore | Physical load on {D} not {D-1}; backend has fallback |
+| 3 | Android trigger gate | אין בדיקת עומס `{D-1}` > 0 לפני `/predict/daily` | חיזוי עם load חלש אם לא ענדו שעון אתמול |
 
 ---
 
@@ -486,6 +487,7 @@ flowchart TD
 | Concern | File |
 |---------|------|
 | Feature names | `services/model_features.py` |
+| Nutrition defaults | `services/nutrition_defaults.py` |
 | API contract | `schemas/inference.py` |
 | Merge policy | `services/prediction_service.py` |
 | Firestore I/O | `services/history_service.py` |

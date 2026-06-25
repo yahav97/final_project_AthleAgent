@@ -25,10 +25,9 @@
 |---|---|---|
 | שעון / שינה | `daily_health/{D}` | שינה מהלילה שזה עתה נגמר (סנכרון בוקר) |
 | שעון / עומס | `daily_health/{D-1}` | צעדים, מרחק, קלוריות שרופות, דופק, HRV… (יום מלא אתמול) |
-| שעון / עומס (legacy) | `daily_health/{D}` | fallback אם מסמך אתמול חסר (סנכרון ישן משולב) |
 | סקר | `daily_checkins/{D}` | סטרס, כאב, אנרגיה, **`injuredYesterday`** (= פציעה ב-**D−1**) |
 | תזונה | `daily_nutrition/{D-1}` | צריכה אתמול |
-| תזונה (fallback) | `daily_nutrition/{D-2}…` | עד 14 ימים אחורה אם אתמול חסר |
+| תזונה (חסר) | ממוצעים כלליים (`nutrition_defaults.py`) | 2500 kcal, 125g protein, 290g carbs, 3 meals — `nutritionImputed` מוריד confidence |
 | היסטוריה | 7 ימים עד **D−1** | ACWR, חוב שינה, `hrv_drop` (rolling) |
 
 **מה יוצא:**
@@ -45,8 +44,7 @@
 
 ## משימות Android — סנכרון שעון (לשותף פרונט)
 
-> **סטטוס:** הבקאנד כבר מיישם את פיצול התאריכים (ראו למטה).  
-> **הקוד הנוכחי** ב-`WearableSyncActivity` עדיין שומר שינה + פיזי יחד ל-`daily_health/{D}` — **לא מיושם עדיין**.
+> **סטטוס:** `WearableSyncActivity` שומר שינה ל-`daily_health/{D}` ועומס פיזי ל-`daily_health/{D-1}`.
 
 ### מה הבקאנד קורא בבוקר (יום D)
 
@@ -84,6 +82,8 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 |---|---|
 | `WearableSyncActivity` | אחרי סנכרון — אם `energyLevel` קיים ב-`daily_checkins/{D}` |
 | `DailyCheckInActivity` | אחרי סקר — אם `sleepMinutes` קיים ב-`daily_health/{D}` |
+
+> **פער מומלץ (פרונט):** לפני trigger — לוודא `steps` / `distanceMeters` / `activeCalories` > 0 ב-`daily_health/{D-1}`; `sleepMinutes` > 0 (לא רק קיום השדה). הבקאנד לא חוסם HTTP — רק מוריד `prediction_confidence` כשאין load signal.
 
 `MealAnalysisActivity` **לא** מפעיל חיזוי — רק שומר תזונה ושולח telemetry (`user_action`).
 
@@ -146,7 +146,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | `mealsLoggedCount` | מספר ארוחות | fallback לאומדן קלוריות |
 | `totalCalories` | קלוריות **צריכה** (לא שריפה!) | `nutrition_intake_calories` |
 
-**Fallback:** אם היום חסר — חיפוש עד **14 ימים** אחורה באותה collection (`merge_nutrition_with_history`).
+**ממוצעים כלליים:** אם שדות חסרים ב-`daily_nutrition/{D-1}`, `merge_nutrition_with_history` ממלא מ-`nutrition_defaults.py` (לא סריקת 14 ימים). דגל פנימי `nutritionImputed` מוריד `quality_score` ב-**0.12** (~**4.8** נקודות confidence בהיסטוריה high).
 
 **הבחנה:** `daily_health.totalCalories` = **שריפה** (מקלוריות שעון). `daily_nutrition.totalCalories` = **צריכה** (ממזון).
 
@@ -306,7 +306,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | אין totalCalories, יש protein + carbs | `(protein × 4 + carbs × 4) × 1.2` |
 | אין כלום, יש `mealsLoggedCount` | `2500 × (0.6 + meals × 0.2)` |
 | אין כלום בכלל | **2500 קלוריות** (default) |
-| Fallback מימים קודמים | חיפוש עד 14 ימים אחורה ב-`daily_nutrition` |
+| אין `totalCalories` / מאקרו | ממוצעים מ-`nutrition_defaults.py` (125g P, 290g C, 3 meals, 2500 kcal) |
 
 ### ברירות מחדל לכל הפיצ'רים
 
@@ -376,17 +376,21 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 ### שדות קריטיים (חוסר בהם עשוי לחסום חיזוי)
 
-**אות עומס (Load)** — חובה אחד: `steps` או `distanceMeters`
+**אות עומס (Load)** — חובה אחד **> 0**: `steps`, `distanceMeters`, או `activeCalories`
 
 **אות התאוששות (Recovery)** — חובה אחד מ:
 - `sleepMinutes`, או
 - `stressLevel` + `muscleSoreness`
 
+חסר load/recovery signal → `hard_missing` → `quality_score` מקסימום **0.25** (לא חוסם HTTP).
+
 ### שדות רגישים (הורדת ציון איכות)
 
 `sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`
 
-כל חסר מוריד 0.12 מציון האיכות. ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי.
+בנוסף: `nutrition_imputed` (כשתזונת אתמול הושלמה ממוצעים) — **−0.12** כמו שדה רגיש אחד.
+
+כל חסר מוריד 0.12 מציון האיכות. ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי ב-HTTP.
 
 ### שדות סובלניים (לא מורידים ציון)
 

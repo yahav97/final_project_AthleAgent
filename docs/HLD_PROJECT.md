@@ -147,7 +147,7 @@ sequenceDiagram
 
     A->>HC: סנכרון בוקר (sleep + physical)
     HC-->>A: sleepMinutes, steps, HR, HRV...
-    A->>FS: daily_health/{today}
+    A->>FS: daily_health/{today} (+ עומס אתמול ל-{D-1} לפי מדיניות)
 
     A->>A: Check-in (energy, soreness, stress)
     A->>FS: daily_checkins/{today}
@@ -158,17 +158,26 @@ sequenceDiagram
         A->>FS: daily_nutrition/{today}
     end
 
-    Note over A,BE: כשיש steps + check-in
+    Note over A,BE: cross-trigger: סקר מחכה ל-sleepMinutes / סנכרון מחכה ל-energyLevel
     A->>BE: POST /predict/daily {userId, date}
     BE->>FS: read snapshot + history
     BE->>BE: XGBoost predict_proba
-    BE->>FS: merge finalRiskScore, riskLevel
-    BE-->>A: {risk_score, risk_level, prediction_confidence}
+    BE->>FS: merge finalRiskScore, riskLevel, predictionConfidence
+    BE-->>A: {risk_score, risk_level, prediction_confidence} (UI קורא מ-Firestore)
 
     A->>FS: read daily_health/{today}
     A->>G: המלצות טקסט לפי סיכון
     A->>A: AthleteDashboard
 ```
+
+**תנאי trigger (cross-trigger):**
+
+| מסך | מפעיל חיזוי כאשר |
+|-----|------------------|
+| `DailyCheckInActivity` | `sleepMinutes` קיים ב-`daily_health/{today}` |
+| `WearableSyncActivity` | `energyLevel` קיים ב-`daily_checkins/{today}` |
+
+`MealAnalysisActivity` שומר תזונה בלבד — לא קורא ל-`POST /predict/daily`.
 
 ### 5.2 מאמן — זרימה
 
@@ -209,6 +218,7 @@ erDiagram
         int steps
         float finalRiskScore
         string riskLevel
+        float predictionConfidence
     }
 
     DAILY_CHECKINS {
@@ -222,6 +232,7 @@ erDiagram
     TEAMS {
         string teamId PK
         string teamCode
+        string TeamName
         string coachId
         array athletes
     }
@@ -239,7 +250,7 @@ erDiagram
 | **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | כל הנתונים | Activities, `history_service.py` |
 | **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
 | **Gemini API** | Client → Google | meal vision, coaching text | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
-| **FastAPI Backend** | Client → Server | `POST /predict/daily` | `ApiClient.kt` |
+| **FastAPI Backend** | Client → Server | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/` |
 | **XGBoost** | Server (in-process) | injury probability | `prediction_service.py` |
 
 ### 7.1 הרצה מקומית (Backend + ML)
@@ -296,7 +307,8 @@ final_project_AthleAgent/
 ├── android_app/AthleAgent/     # אפליקציית Android
 ├── backend/                    # FastAPI inference service
 ├── ML_model/                   # Training pipeline + artifacts
-├── docs/                       # תיעוד פרויקט (HLD/LLD)
+├── docs/                       # תיעוד פרויקט (HLD/LLD/NFR)
+├── logs/                       # athleagent.log (gitignored, backend + Android telemetry)
 └── README.md
 ```
 
@@ -320,7 +332,8 @@ final_project_AthleAgent/
 | נושא | תיאור |
 |------|--------|
 | **ארכיטקטורת Android** | Activity-centric + View Binding; אין ViewModel/Repository (ראו README) |
-| **Date-split sync** | Backend מצפה sleep ב-{D} ועומס ב-{D-1}; Android כותב לעיתים שניהם ל-{D} |
+| **Date-split sync** | מיושם: שינה ב-`{D}`, עומס ב-`{D-1}`; **פער:** gate פרונט לא בודק עומס `{D-1}` > 0 |
+| **תזונה חסרה** | ממוצעים מ-`nutrition_defaults.py` (לא 14 ימים אחורה); `nutritionImputed` מוריד confidence |
 | **Backend auth** | לא מיושם ב-production routes |
 | **Gemini בבקאנד** | מפתח ב-config אך אין routes — Gemini רץ רק בלקוח |
 
@@ -330,7 +343,7 @@ final_project_AthleAgent/
 
 1. **Auth על API** — Firebase token middleware.
 2. **Repository layer ב-Android** — הפרדת Firestore מ-Activities.
-3. **Date-split sync** — יישום מלא ב-`WearableSyncActivity`.
+3. **Trigger gate בפרונט** — בדיקת `sleepMinutes>0` ועומס `{D-1}` לפני `/predict/daily`.
 4. **Cloud deployment** — Backend על Cloud Run / Render (image ניתן לבנות מ-`Dockerfile` הקיים).
 5. **Firestore Rules** — hardening לפני production.
 
@@ -346,4 +359,7 @@ final_project_AthleAgent/
 | [backend/docs/LLD.md](../backend/docs/LLD.md) | LLD בקאנד |
 | [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | ארכיטקטורת בקאנד (קיים) |
 | [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | חוזה נתונים production |
+| [docs/NFR.md](NFR.md) | דרישות לא-פונקציונליות (מדדים, gates, ביצועים) |
+| [docs/LOGGING_HE.md](LOGGING_HE.md) | לוגים מאוחדים + Android telemetry |
+| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | קונפיג ML production (gates, bands) |
 | [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | pipeline ציון סיכון E2E |

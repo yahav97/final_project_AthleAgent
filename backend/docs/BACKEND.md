@@ -228,8 +228,8 @@ Response + Persist to Firestore (merge write)
 | נושא | Android | Backend | דחיפות |
 |------|---------|---------|--------|
 | **DTO ישן** | `PredictionModels.kt` (לא בשימוש) | `InjuryPredictionResponse` | ניקוי תיעוד בלבד |
-| **תאריך עומס פיזי** | כותב sleep + עומס אתמול **שניהם** ל-`daily_health/{today}` | קורא עומס מ-`{D-1}` (fallback `{D}`) | תיאום סנכרון |
-| **Gate לפני trigger** | `DailyCheckIn`: `sleepMinutes` ב-`{D}`; `WearableSync`: `energyLevel` ב-`daily_checkins/{D}` | מדיניות עומס מ-`{D-1}`, שינה מ-`{D}` | cross-trigger בין סקר לשעון |
+| **תאריך עומס פיזי** | כותב שינה ל-`{D}`, עומס ל-`{D-1}` (`WearableSyncActivity`) | קורא עומס מ-`{D-1}` בלבד | מיושם |
+| **Gate לפני trigger** | `DailyCheckIn`: `sleepMinutes` ב-`{D}`; `WearableSync`: `energyLevel` ב-`daily_checkins/{D}` | אין חסימת HTTP על עומס חסר — רק `prediction_confidence` | **פער:** אין בדיקת `steps>0` ב-`{D-1}` בפרונט |
 | **Endpoints** | רק `POST /predict/daily` | גם `/health`, `/status/ml` — לא מחוברים | אין השפעה |
 
 ### Trigger (מהאפליקציה)
