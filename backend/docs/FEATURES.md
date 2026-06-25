@@ -78,17 +78,16 @@
 
 ### תנאי להפעלת חיזוי (`POST /predict/daily`)
 
-| מסך | יעד |
+Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
+
+| מסך | תנאי |
 |---|---|
-| `WearableSyncActivity` | אחרי סנכרון — אם יש סקר ב-`daily_checkins/{D}` |
-| `DailyCheckInActivity` | אם `sleepMinutes` ב-`daily_health/{D}` **ו**-`steps` ב-`daily_health/{D-1}` |
-| `MealAnalysisActivity` | אותם תנאי + סקר |
+| `WearableSyncActivity` | אחרי סנכרון — אם `energyLevel` קיים ב-`daily_checkins/{D}` |
+| `DailyCheckInActivity` | אחרי סקר — אם `sleepMinutes` קיים ב-`daily_health/{D}` |
 
-### קבצים לעדכון (פרונט)
+`MealAnalysisActivity` **לא** מפעיל חיזוי — רק שומר תזונה ושולח telemetry (`user_action`).
 
-- `WearableSyncActivity.kt` — פיצול שמירה + שליפה כפולה לפיזי
-- `DailyCheckInActivity.kt`, `MealAnalysisActivity.kt` — בדיקת `steps` ב-{D-1} (לא רק ב-{D})
-- `HomeAthleteActivity.kt` — "סונכרן שעון" = `sleepMinutes` ב-{D}
+**מימוש:** `WearableSyncActivity.kt`, `DailyCheckInActivity.kt`
 
 ---
 
@@ -373,7 +372,7 @@
 
 ---
 
-## 6. Data Quality & Blocking
+## 6. Data Quality & Confidence
 
 ### שדות קריטיים (חוסר בהם עשוי לחסום חיזוי)
 
@@ -385,9 +384,9 @@
 
 ### שדות רגישים (הורדת ציון איכות)
 
-`sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`
+`sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`
 
-כל חסר מוריד 0.12 מציון האיכות. מתחת ל-0.35 → חיזוי נחסם.
+כל חסר מוריד 0.12 מציון האיכות. ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי.
 
 ### שדות סובלניים (לא מורידים ציון)
 

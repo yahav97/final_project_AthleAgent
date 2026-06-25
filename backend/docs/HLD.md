@@ -91,7 +91,7 @@ flowchart TB
 |-------|-------|
 | **Single source of truth** | Firestore — לא מקבלים payload מלא מהלקוח |
 | **Minimal trigger contract** | `{userId, date}` בלבד |
-| **Fail closed on model** | אם gate נכשל → 500, לא demo fallback |
+| **Fail closed on model** | אם gate נכשל → 503, לא demo fallback |
 | **Merge write** | תוצאות חיזוי merge ל-`daily_health/{date}` |
 | **Defaults for sparse data** | `data/model_feature_contract.json` + `HistoryConfidence` enum |
 
@@ -432,31 +432,20 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 
 Predictions and daily snapshots = **state**. Unified log = **events** (no raw health payloads).
 
-### 11.4 Appendix — Android integration spec (required changes)
-
-> Kotlin not implemented in backend sprint. Wire these when updating the Android app.
+### 11.4 Appendix — Android integration (ממומש)
 
 **Dependencies:** `okhttp` 4.12, `timber` 5.0.1
 
-**New files:**
+**קבצים:**
 
 | File | Purpose |
 |------|---------|
-| `network/CorrelationIdInterceptor.kt` | Header `X-Request-ID` on all API calls |
-| `network/RequestIdHolder.kt` | Last request ID for error correlation |
-| `network/ObservabilityApi.kt` | `POST api/v1/observability/client-events` |
+| `observability/CorrelationIdInterceptor.kt` | Header `X-Request-ID` on all API calls |
+| `observability/RequestIdHolder.kt` | Last request ID for error correlation |
+| `observability/ObservabilityApi.kt` | `POST /api/v1/observability/client-events` |
 | `observability/ClientEventReporter.kt` | Fire-and-forget reporter (IO dispatcher) |
 
-**Modify:**
-
-| File | Change |
-|------|--------|
-| `ApiClient.kt` | OkHttp client + interceptor |
-| `App.kt` | Timber init (debug tree) |
-| Activity `onCreate` | `screen_view` for main screens |
-| ML Retrofit callbacks | `ml_trigger` + `error` on failure |
-| `WearableSyncActivity` | `sync` events |
-| Check-in / meal submit | `user_action` |
+**מחובר ב:** `ApiClient.kt`, `App.kt`, `WearableSyncActivity`, `DailyCheckInActivity`, `MealAnalysisActivity`, `AthleteDashboardActivity`
 
 **Events to emit (minimum for graduation demo):**
 
@@ -468,7 +457,6 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 | `DailyCheckInActivity` | `ml_trigger` | `ML_Trigger` | `predict_daily_started` |
 | `DailyCheckInActivity` | `error` | `ML_Trigger` | `onFailure: ...` |
 | `WearableSyncActivity` | `sync` | `Sync` | `health_connect_sync_completed` |
-| `MealAnalysisActivity` | `ml_trigger` | `ML_Trigger` | `predict_daily_started` |
 
 **Client rules:**
 
@@ -484,11 +472,11 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 
 | סוג | קבצים |
 |-----|-------|
-| Unit | `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py` |
-| Integration | `tests/integration/test_inference_edge_cases.py`, `tests/unit/test_history_service.py` |
-| Contract | `test_train_serve_parity.py`, `test_prediction_model_columns.py` |
-| Gates | `test_model_loader_gate.py` |
-| Error paths | `test_predict_error_mode.py` |
+| Unit | `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py`, `tests/unit/test_history_service.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_exceptions.py` |
+| Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py`, `tests/integration/test_openapi_contract.py` |
+| Contract | `tests/unit/test_train_serve_parity.py`, `tests/integration/test_prediction_model_columns.py` |
+| Gates | `tests/unit/test_model_loader.py` |
+| Error paths | `tests/integration/test_routes_predict_daily.py`, `tests/unit/test_exceptions.py` |
 
 ---
 

@@ -66,7 +66,7 @@
 
 ### 3.1 מדדי איכות ML (offline)
 
-מודל production: **XGBoostDeep**, סף High Risk: **0.18**, 36 פיצ'רים.
+מודל production: **XGBoostDeep**, **36 פיצ'רים**. סף החלטה במודל (manifest): **0.18**; רמות UI/API: Low ≤20%, Medium 21–70%, High >70%.
 
 
 | מדד                 | יעד (gate)      | Baseline (holdout) | מקור                                                   |
@@ -104,7 +104,7 @@
 | **מדידה offline** | `ML_model/validate_metrics.py` + `run_manifest.json`             |
 | **מדידה runtime** | `GET /status/ml` → `winner_metrics.Recall@Threshold`             |
 | **Gate בקוד**     | `backend/ml/model_loader.py` — `MIN_RECALL_HARD = 0.80`          |
-| **ראיה**          | manifest + screenshot `/status/ml` + `test_model_loader_gate.py` |
+| **ראיה**          | manifest + screenshot `/status/ml` + `tests/unit/test_model_loader.py` |
 
 
 ---
@@ -161,10 +161,10 @@
 | ---------------- | ----------------------------------------------------------------------- |
 | **תיאור**        | אם המודל לא עובר gates — inference חסום; אין demo fallback ב-production |
 | **מדד**          | `model_live` status                                                     |
-| **יעד**          | `live: true` רק כש-manifest תקין; אחרת `Blocked` + HTTP 500             |
+| **יעד**          | `live: true` רק כש-manifest תקין; אחרת `Blocked` + HTTP **503**             |
 | **מדידה**        | `GET /status/ml`, לוג `predict_blocked`                                 |
 | **Gate reasons** | `manifest_recall_below_hard_gate`, `manifest_auc_too_low`, …            |
-| **ראיה**         | `test_predict_error_mode.py`, `test_model_loader_gate.py`               |
+| **ראיה**         | `tests/integration/test_routes_predict_daily.py`, `tests/unit/test_model_loader.py`               |
 
 
 ---
@@ -179,7 +179,7 @@
 | **תיאור**          | זמן תגובה לחיזוי יומי — חוויית בוקר                   |
 | **מדד**            | `duration_ms` — percentile 95                         |
 | **יעד**            | < 2,000 ms                                            |
-| **Endpoint**       | `POST /api/v1/predict/daily`                          |
+| **Endpoint**       | `POST /predict/daily`                          |
 | **מדידה**          | `logs/athleagent.log`, event `http_request_completed` |
 | **Threshold בקוד** | `SLOW_MS = 2000` ב-`request_logging.py` → WARNING     |
 | **ראיה**           | פלט jq (ראו [§10](#10-נספח-פקודות-מדידה))             |
@@ -440,10 +440,10 @@
 
 | סוג         | דוגמאות                                                        |
 | ----------- | -------------------------------------------------------------- |
-| Unit        | `test_preprocessing.py`, `test_prediction_service.py`          |
-| Integration | `test_routes_predict_daily.py`, `test_inference_edge_cases.py` |
-| Gates       | `test_model_loader_gate.py`                                    |
-| Contract    | `test_train_serve_parity.py`, `test_openapi_contract.py`       |
+| Unit        | `tests/unit/test_preprocessing.py`, `tests/unit/test_prediction_service.py`          |
+| Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py` |
+| Gates       | `tests/unit/test_model_loader.py`                                    |
+| Contract    | `tests/unit/test_train_serve_parity.py`, `tests/integration/test_openapi_contract.py`       |
 
 
 ---
@@ -456,7 +456,7 @@
 | **תיאור** | Response schema קבוע ל-Android                                 |
 | **מדד**   | 3 שדות: `risk_score`, `risk_level`, `prediction_confidence`    |
 | **יעד**   | 100% התאמה ל-OpenAPI + Firestore mapping                       |
-| **מדידה** | `test_prediction_model_columns.py`, `test_openapi_contract.py` |
+| **מדידה** | `tests/integration/test_prediction_model_columns.py`, `tests/integration/test_openapi_contract.py` |
 | **ראיה**  | pytest                                                         |
 
 

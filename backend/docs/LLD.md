@@ -110,7 +110,7 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
     return InjuryPredictionResponse(**result)
 ```
 
-**Error handling:** any exception → HTTP 500 `"Prediction unavailable: {exc}"`
+**Error handling:** domain exceptions via `register_exception_handlers()` — `MLModelError` / `DatabaseError` → **503**, `ValidationError` → **422** (structured `detail` + optional `code`).
 
 **Client contract:** Android treats this endpoint as a **trigger** (`isSuccessful` only). UI reads `finalRiskScore` / `riskLevel` / `predictionConfidence` from Firestore after the merge write — not from the HTTP response body.
 
@@ -357,14 +357,14 @@ MIN_AUC_FOR_LIVE = 0.68
 ```python
 {
     "score": 0.0-1.0,
-    "status": "good|fair|poor",
-    "sensitive_missing": [...],  # subjective fields
-    "hard_missing": [...]        # objective fields
+    "sensitive_missing": [...],
+    "hard_missing": [...],
+    "has_hard_blocker": bool
 }
 ```
 
-**Sensitive fields:** energyLevel, muscleSoreness, stressLevel, sleepMinutes, steps  
-**Hard fields:** heartRateAvg, hrvRmssd, daily_distance proxy
+**Sensitive fields:** `sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`  
+**Hard fields:** `userId`, `date` (+ derived load/recovery signal checks)
 
 Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
@@ -374,9 +374,9 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
 | Error | Source | HTTP | When |
 |-------|--------|------|------|
-| `firestore_snapshot_unavailable` | history_service | 500 | Firestore client None or read fail |
-| `model_not_live:*` | prediction_service | 500 | Gate failed or model not loaded |
-| `prediction_persist_failed` | history_service | 500 | Write returned False |
+| `firestore_snapshot_unavailable` | history_service | 503 | Firestore client None or read fail |
+| `model_not_live:*` | prediction_service | 503 | Gate failed or model not loaded |
+| `prediction_persist_failed` | history_service | 503 | Write returned False |
 | `Legacy endpoint disabled` | predict.py | 410 | `/predict/sklearn` with flag off |
 
 ---
@@ -396,15 +396,16 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
 | Test file | Covers |
 |-----------|--------|
-| `test_inference.py` | End-to-end predict path |
-| `test_inference_edge_cases.py` | Sparse payloads, missing fields |
-| `test_history_service.py` | Snapshot fetch, rolling features, persist |
-| `test_preprocessing.py` | DataFrame building, quality score |
-| `test_feature_engineering.py` | Derived features |
-| `test_model_loader_gate.py` | Manifest validation |
-| `test_train_serve_parity.py` | Training CSV ↔ serving alignment |
-| `test_prediction_model_columns.py` | 36-column contract |
-| `test_predict_error_mode.py` | Blocked model, persist failure |
+| `tests/integration/test_routes_predict_daily.py` | Production predict route, error paths |
+| `tests/integration/test_inference_edge_cases.py` | Sparse payloads, missing fields |
+| `tests/unit/test_history_service.py` | Snapshot fetch, rolling features, persist |
+| `tests/unit/test_preprocessing.py` | DataFrame building, quality score |
+| `tests/unit/test_feature_engineering.py` | Derived features |
+| `tests/unit/test_model_loader.py` | Manifest validation, gates |
+| `tests/unit/test_train_serve_parity.py` | Training CSV ↔ serving alignment |
+| `tests/integration/test_prediction_model_columns.py` | 36-column contract |
+| `tests/unit/test_exceptions.py` | Domain exception status codes |
+| `tests/integration/test_openapi_contract.py` | OpenAPI path coverage |
 
 ---
 
@@ -477,7 +478,6 @@ flowchart TD
 | 1 | `external/google_auth.py` | Not imported by any route |
 | 2 | `config.GEMINI_API_KEY` | Configured but no Gemini routes |
 | 3 | Android → Firestore | Physical load on {D} not {D-1}; backend has fallback |
-| 4 | `MODEL.md` vs `model_loader.py` | Doc says Recall ≥ 0.85; code uses 0.80 |
 
 ---
 

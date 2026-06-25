@@ -180,23 +180,23 @@ sequenceDiagram
 | 1. שליפה | `fetch_daily_firestore_snapshot` | `history_service.py` |
 | 2. בניית בקשה | `injury_prediction_request_from_firestore_snapshot` | `prediction_service.py` |
 | 3. מיזוג תזונה | `merge_nutrition_with_history` | `history_service.py` |
-| 4. DataFrame | `injury_request_to_model_dataframe` | `preprocessing.py` |
-| 5. היסטוריה | `_apply_history_confidence_fallback` | `prediction_service.py` |
-| 6. איכות | `calculate_data_quality_score` | `preprocessing.py` |
-| 7. ולידציה | `validate_feature_vector_for_model` | `preprocessing.py` |
-| 8. חיזוי | `model.predict_proba` | `prediction_service.py` |
+| 4. DataFrame | `injury_request_to_model_dataframe` | `preprocessing/` |
+| 5. היסטוריה | `_apply_history_confidence_fallback` | `prediction/` |
+| 6. איכות | `calculate_data_quality_score` | `preprocessing/quality.py` |
+| 7. ולידציה | `validate_feature_vector_for_model` | `preprocessing/` |
+| 8. חיזוי | `model.predict_proba` | `prediction/` |
 | 9. שמירה | `save_daily_prediction_result` | `history_service.py` |
 
 ### מתי האפליקציה מפעילה חיזוי?
 
-> **קוד נוכחי (פרונט):** בודק `steps` ב-`daily_health/{D}` בלבד.  
-> **יעד (אחרי עדכון פרונט):** ראו [FEATURES.md — משימות Android](FEATURES.md#משימות-android--סנכרון-שעון-לשותף-פרונט).
+Cross-trigger בין סקר לשעון — כל מסך ממתין לנתון מהמקור המשלים:
 
-| מסך Android | תנאי (יעד) |
+| מסך Android | תנאי |
 |-------------|------------|
-| `WearableSyncActivity` | אחרי סנכרון + סקר קיים |
-| `DailyCheckInActivity` | `sleepMinutes` ב-`{D}` ו-`steps` ב-`{D-1}` |
-| `MealAnalysisActivity` | כמו למעלה + סקר |
+| `WearableSyncActivity` | אחרי סנכרון + `energyLevel` ב-`daily_checkins/{D}` |
+| `DailyCheckInActivity` | אחרי סקר + `sleepMinutes` ב-`daily_health/{D}` |
+
+`MealAnalysisActivity` **לא** מפעיל חיזוי.
 
 האפליקציה **לא מציגה** את תגובת ה-API ישירות — היא קוראת מ-Firestore אחרי שהשרת שמר.
 
@@ -326,7 +326,7 @@ resting_hr         = restingHeartRate  →  heartRateMin  →  heartRateAvg
 
 ### 7.2 פיצ'רים נגזרים — יום בודד (לפני היסטוריה)
 
-מ־`feature_engineering.compute_derived_features` + `preprocessing.py`:
+מ־`feature_engineering.compute_derived_features` + `preprocessing/`:
 
 | פיצ'ר | נוסחה | טווח / הערה |
 |--------|--------|-------------|
@@ -506,7 +506,7 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 | `Recall@Threshold` | ≥ 0.80 | לא לפרוס מודל שלא תופס פציעות |
 | `ROC-AUC` | ≥ 0.68 | הפרדה סטטיסטית מינימלית |
 
-אם השער נכשל → `POST /predict/daily` מחזיר **HTTP 500**.
+אם השער נכשל → `POST /predict/daily` מחזיר **HTTP 503**.
 
 ---
 
@@ -836,12 +836,11 @@ Provide a short 1-sentence recommendation for training today.
 
 | מסך | מתי קורא | משתמש בתגובה? |
 |-----|----------|---------------|
-| `WearableSyncActivity` | אחרי סנכרון שעון | ❌ רק לוג הצלחה |
-| `DailyCheckInActivity` | אחרי סקר + יש steps | ❌ רק לוג |
-| `MealAnalysisActivity` | אחרי רישום ארוחה | ❌ רק לוג |
+| `WearableSyncActivity` | אחרי סנכרון שעון (אם יש סקר) | ❌ רק לוג הצלחה |
+| `DailyCheckInActivity` | אחרי סקר (אם יש שינה משעון) | ❌ רק לוג הצלחה |
 
 האפליקציה מסתמכת על **קריאה מ-Firestore** (`finalRiskScore`, `riskLevel`, `predictionConfidence`) — **לא** על body של תגובת `POST /predict/daily`.  
-בכל שלושת מסכי ה-trigger נבדק רק `response.isSuccessful`.
+בכל שני מסכי ה-trigger נבדק רק `response.isSuccessful`.
 
 מחלקת Retrofit (`ApiService.kt`):
 
@@ -1020,8 +1019,7 @@ prediction_confidence = round((0.6 × history_score + 0.4 × quality_score) × 1
 **אות עומס (Load signal):** חובה `steps` **או** `distanceMeters`  
 **אות התאוששות (Recovery signal):** חובה `sleepMinutes` **או** (`stressLevel` **ו**-`muscleSoreness`)
 
-> **חשוב:** `has_hard_blocker` מחושב ונרשם בלוג, אך **לא חוסם** את החיזוי בקוד הנוכחי — רק מוריד `prediction_confidence`.  
-> (ב-`FEATURES.md` מופיע "חיזוי נחסם מתחת ל-0.35" — זה **לא מיושם** ב-`predict_injury_risk` היום.)
+> **חשוב:** `has_hard_blocker` מחושב ונרשם בלוג, אך **לא חוסם** את החיזוי בקוד הנוכחי — רק מוריד `prediction_confidence`.
 
 ---
 

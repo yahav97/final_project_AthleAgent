@@ -23,10 +23,15 @@ final_project_AthleAgent/
 │   │   ├── AthleteItem.kt
 │   │   ├── AthleteRequest.kt
 │   │   ├── AlertItem.kt
-│   │   └── PredictionModels.kt         # DailyPredictionRequest/Response
+│   │   └── PredictionModels.kt         # legacy mock DTO (/test_predict) — לא בשימוש
 │   ├── network/
 │   │   ├── ApiClient.kt                # Retrofit singleton, base URL
 │   │   └── ApiService.kt               # POST /predict/daily
+│   ├── observability/
+│   │   ├── ClientEventReporter.kt      # Android → POST /api/v1/observability/client-events
+│   │   ├── ObservabilityApi.kt
+│   │   ├── CorrelationIdInterceptor.kt
+│   │   └── RequestIdHolder.kt
 │   ├── ui/
 │   │   ├── auth/                       # Login, Register, Main
 │   │   ├── athlete/                    # 8 Activities
@@ -100,12 +105,6 @@ final_project_AthleAgent/
 - Base URL: `http://10.0.2.2:8000/` (emulator → localhost)
 - Gson converter, logging interceptor
 
-**`ApiService.kt`**
-```kotlin
-@POST("predict/daily")
-fun getDailyPrediction(@Body request: DailyPredictionRequest): Call<DailyPredictionResponse>
-```
-
 **`ApiService.kt`** (מקור אמת לחוזה HTTP):
 ```kotlin
 @POST("/predict/daily")
@@ -118,22 +117,23 @@ data class PredictionResponse(
 )
 ```
 
-> **`PredictionModels.kt`** — DTO ישן ולא בשימוש; ניתן למחוק.  
+> **`PredictionModels.kt`** — DTO legacy ל-`/test_predict` (mock); לא בשימוש בפרודקשן.  
 > **תצוגת ציון סיכון:** תמיד מ-`daily_health/{date}.finalRiskScore` (0–100) ב-Firestore, לא מ-body של POST.
 
-### 2.4 Trigger לחיזוי — לוגיקה משותפת
+### 2.4 Trigger לחיזוי — cross-trigger
 
 Activities הבאות קוראות ל-`checkAndTriggerPredictionInBackground()` לאחר שמירה:
 
 | Activity | תנאי trigger |
 |----------|--------------|
-| `DailyCheckInActivity` | `daily_health/{today}` מכיל `steps` |
-| `WearableSyncActivity` | `daily_checkins/{today}` קיים |
-| `MealAnalysisActivity` | watch + survey קיימים |
+| `DailyCheckInActivity` | `daily_health/{today}` מכיל `sleepMinutes` |
+| `WearableSyncActivity` | `daily_checkins/{today}` מכיל `energyLevel` |
+
+`MealAnalysisActivity` **לא** מפעיל חיזוי.
 
 ```mermaid
 flowchart TD
-    Save[שמירה ל-Firestore] --> Check{steps + check-in?}
+    Save[שמירה ל-Firestore] --> Check{נתון משלים קיים?}
     Check -->|כן| API[POST /predict/daily]
     Check -->|לא| Wait[ממתין לנתון חסר]
     API --> FS[Backend כותב ל-daily_health]
@@ -233,9 +233,10 @@ flowchart TD
 | Method | Path | Handler | Response |
 |--------|------|---------|----------|
 | GET | `/` | `health.py` | metadata |
-| GET | `/health` | `health.py` | `{status: ok}` |
+| GET | `/health` | `health.py` | `{status: "healthy"}` |
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
+| POST | `/api/v1/observability/client-events` | `observability.py` | 202 Accepted |
 | POST | `/test_predict` | `predict.py` | mock |
 | POST | `/predict/sklearn` | `predict.py` | legacy (disabled) |
 
@@ -370,16 +371,16 @@ sequenceDiagram
 | מצב | התנהגות |
 |-----|---------|
 | Firestore offline | Snackbar / retry |
-| Backend 500 | Toast "prediction unavailable" |
+| Backend 503 | Toast "prediction unavailable" |
 | Missing Health Connect | redirect to PrivacyPolicy / permissions |
 | Gemini failure | fallback message, manual entry option |
 
 ### 6.2 Backend
 | מצב | HTTP | Detail |
 |-----|------|--------|
-| Model blocked | 500 | `model_not_live:*` |
-| Firestore unavailable | 500 | `firestore_snapshot_unavailable` |
-| Persist failed | 500 | `prediction_persist_failed` |
+| Model blocked | 503 | `model_not_live:*` |
+| Firestore unavailable | 503 | `firestore_snapshot_unavailable` |
+| Persist failed | 503 | `prediction_persist_failed` |
 
 ---
 
@@ -393,7 +394,7 @@ GEMINI_API_KEY=...
 ### 7.2 Backend (`.env` / env vars)
 | Variable | Default |
 |----------|---------|
-| `MODEL_PATH` | `ML_model/artifacts/20260512_075115/injury_model.pkl` |
+| `MODEL_PATH` | `None` → resolves via `promoted.json`, then `backend/injury_model.pkl` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` |
 | `ENABLE_LEGACY_SKLEARN_ENDPOINT` | `false` |
 | `CORS_ORIGINS` | localhost ports |
@@ -417,7 +418,7 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. An
 
 | שכבה | Framework | קבצים עיקריים |
 |------|-----------|---------------|
-| Backend | pytest | `test_inference.py`, `test_history_service.py`, `test_preprocessing.py`, `test_model_loader_gate.py`, `test_train_serve_parity.py` |
+| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_service.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
 | Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
 
 **הרצה:**
@@ -434,7 +435,6 @@ cd backend && python -m pytest tests/ -v
 | 1 | Android sync | physical load נשמר ב-{D} במקום {D-1} | Backend fallback ל-{D} |
 | 2 | google_auth.py | לא מחובר ל-routes | API פתוח |
 | 3 | Android | אין ViewModel/Repository | קושי בבדיקות unit |
-| 4 | model_loader vs MODEL.md | Recall gate 0.80 vs doc 0.85 | doc drift |
 
 ---
 
@@ -448,7 +448,7 @@ cd backend && python -m pytest tests/ -v
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
 | Inference | — | `prediction_service.py` |
-| Features | — | `preprocessing.py`, `feature_engineering.py`, `model_features.py` |
+| Features | — | `preprocessing/`, `feature_engineering.py`, `model_features.py` |
 | Persist | — | `history_service.save_daily_prediction_result` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |

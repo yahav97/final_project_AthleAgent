@@ -19,8 +19,10 @@
 
 Model is **Blocked** (no `/predict/daily`) unless manifest passes:
 
-- `Recall@Threshold` ≥ **0.85**
-- `ROC-AUC` ≥ **0.60**
+- `Recall@Threshold` ≥ **0.80** (`MIN_RECALL_HARD`)
+- `ROC-AUC` ≥ **0.68** (`MIN_AUC_FOR_LIVE`)
+
+> Manifest `policy.recall_min: 0.85` is a **training/promotion policy** value — not the runtime hard gate in `model_loader.py`.
 
 Pointer: `ML_model/artifacts/promoted.json` → `run_manifest.json`, `injury_model.pkl`.
 

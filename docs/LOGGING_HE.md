@@ -170,7 +170,7 @@ POST /api/v1/observability/client-events → 202
 
 **לא לשלוח:** כל click, PHI, stack traces, הודעות > 500 תווים.
 
-**היום:** Logcat בלבד. **אחרי חיבור:** `ClientEventReporter` → אותו קובץ לוג.
+**מימוש:** `ClientEventReporter` מחובר ב-`WearableSyncActivity`, `DailyCheckInActivity`, `MealAnalysisActivity` — שולח ל-`POST /api/v1/observability/client-events`. Logcat/Timber נשאר לדיבוג מקומי.
 
 ---
 
@@ -221,13 +221,13 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 
 ---
 
-## 9. Android — מה ליישם (לא מומש עדיין)
+## 9. Android — telemetry (ממומש)
 
 **Dependencies:** okhttp 4.12, timber 5.0.1
 
-**קבצים חדשים:** `CorrelationIdInterceptor.kt`, `RequestIdHolder.kt`, `ObservabilityApi.kt`, `ClientEventReporter.kt`
+**קבצים:** `observability/CorrelationIdInterceptor.kt`, `RequestIdHolder.kt`, `ObservabilityApi.kt`, `ClientEventReporter.kt`
 
-**לעדכן:** `ApiClient.kt`, `App.kt`, Activities (Dashboard, DailyCheckIn, WearableSync, MealAnalysis)
+**מחובר ב:** `ApiClient.kt`, `App.kt`, Activities (Dashboard, DailyCheckIn, WearableSync, MealAnalysis)
 
 **Payload:**
 

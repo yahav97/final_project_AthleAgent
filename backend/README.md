@@ -5,7 +5,7 @@
 FastAPI backend for injury-risk inference. This service is treated as mission-critical:
 
 - If model gate checks pass, `POST /predict/daily` returns a model-based response.
-- If gate checks fail or input is invalid, `POST /predict/daily` returns HTTP 500 with a clear error.
+- If gate checks fail or persistence is unavailable, `POST /predict/daily` returns HTTP **503** with a clear error (validation issues → **422**).
 
 ## API Structure
 
@@ -41,12 +41,12 @@ At startup, the backend loads the promoted artifact set from:
 - `ML_model/artifacts/promoted.json`
 
 Then it validates `run_manifest.json` before marking model as live:
-- Recall hard gate: `Recall@Threshold >= 0.85`
-- AUC live sanity gate (RC1): `ROC-AUC >= 0.60`
+- Recall hard gate: `Recall@Threshold >= 0.80`
+- AUC live sanity gate (RC1): `ROC-AUC >= 0.68`
 
 If gate validation fails:
 - model status becomes `Blocked`
-- `POST /predict/daily` returns HTTP 500 (no fallback predictions)
+- `POST /predict/daily` returns HTTP 503 (no fallback predictions)
 
 ## Before You Run (for reviewers)
 

@@ -10,7 +10,8 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 ┌─────────────────┐
 │  Android App    │  (Kotlin)
 └────────┬────────┘
-         │ HTTP/REST + Firebase Auth
+         │ HTTP/REST (predict trigger; no auth)
+         │ Firebase Auth + Firestore SDK (client-side)
          ▼
 ┌─────────────────┐
 │  FastAPI Backend│  (Python)
@@ -77,7 +78,7 @@ backend/
 - קבצים מעל ~250 שורות פוצלו לחבילות (`preprocessing/`, `history/`, `prediction/`).
 - `model_feature_contract.json` נשמר על הדיסק; `model_features.py` טוען פעם אחת (לא רשימות כבדות בקוד).
 - `schemas/enums.py` מחליף מחרוזות קבועות (`HistoryConfidence`, `ModelGateReason`, `ModelLiveStatus`).
-- תיקיית `external/` (Google OAuth שלא היה בשימוש) הוסרה.
+- `external/google_auth.py` קיים אך **לא מחובר** ל-routes (OAuth לא בשימוש).
 
 ---
 
@@ -142,7 +143,7 @@ Endpoint ישן שמקבל payload מלא של `AthleteData` ומריץ sklearn 
 | `users/{uid}/daily_checkins/{date}` | דיווח עצמי (סטרס, כאב, אנרגיה) |
 | `users/{uid}/daily_nutrition/{date}` | אגרגציית תזונה יומית |
 | `users/{uid}/daily_nutrition/{date}/meals/{id}` | פירוט ארוחות (לא נטען בבקאנד) |
-| `teams/{teamId}` | קבוצה: TeamCode, TeamName, coachId, athletes[] |
+| `teams/{teamId}` | קבוצה: `teamCode`, `TeamName`, `coachId`, `athletes[]` |
 | `teams/{teamId}/requests/{uid}` | בקשות הצטרפות |
 
 ### שדות `daily_health/{date}`
@@ -156,7 +157,7 @@ Endpoint ישן שמקבל payload מלא של `AthleteData` ומריץ sklearn 
 > פירוט מלא: [FEATURES.md — משימות Android](FEATURES.md#משימות-android--סנכרון-שעון-לשותף-פרונט)
 
 **מהבקאנד (אחרי חיזוי):**
-`finalRiskScore`, `riskLevel`, `backendRecommendation`, `dataQualityScore`, `dataQualityStatus`, `predictionUpdatedAt`
+`finalRiskScore`, `riskLevel`, `predictionConfidence`, `predictionUpdatedAt`
 
 ### Retention Policy
 
@@ -192,8 +193,8 @@ History Enrichment (7 days):
     │
     ▼
 Data Quality Check:
-    • quality_score < 0.35? → BLOCK
-    • hard_missing? → BLOCK (unless history softens)
+    • quality_score מוריד prediction_confidence (לא חוסם חיזוי)
+    • hard_missing מקסימום score 0.25 — נרשם בלוג בלבד
     │
     ▼
 Model Inference (XGBoostDeep):
@@ -228,7 +229,7 @@ Response + Persist to Firestore (merge write)
 |------|---------|---------|--------|
 | **DTO ישן** | `PredictionModels.kt` (לא בשימוש) | `InjuryPredictionResponse` | ניקוי תיעוד בלבד |
 | **תאריך עומס פיזי** | כותב sleep + עומס אתמול **שניהם** ל-`daily_health/{today}` | קורא עומס מ-`{D-1}` (fallback `{D}`) | תיאום סנכרון |
-| **Gate לפני trigger** | בודק `steps` ב-`daily_health/{today}` | מדיניות: עומס מ-`{D-1}`, שינה מ-`{D}` | תיאום סנכרון |
+| **Gate לפני trigger** | `DailyCheckIn`: `sleepMinutes` ב-`{D}`; `WearableSync`: `energyLevel` ב-`daily_checkins/{D}` | מדיניות עומס מ-`{D-1}`, שינה מ-`{D}` | cross-trigger בין סקר לשעון |
 | **Endpoints** | רק `POST /predict/daily` | גם `/health`, `/status/ml` — לא מחוברים | אין השפעה |
 
 ### Trigger (מהאפליקציה)
@@ -244,10 +245,8 @@ Response + Persist to Firestore (merge write)
 
 ### Recommendation Text
 
-- שדה `recommendation` ב-API = `backendRecommendation` ב-Firestore
-- נוצר **בבקאנד בלבד** — תבניות טקסט קבועות לפי הסתברות + ACWR + confidence
-- דטרמיניסטי — אפשר לשחזר מאותם קלטים
-- **נפרד** מהמלצת Gemini באפליקציה (`aiRecommendation`)
+- המלצת טקסט למשתמש נוצרת **באפליקציה** דרך Gemini → נשמרת כ-`aiRecommendation` ב-Firestore
+- הבקאנד **לא** מחזיר שדה `recommendation` ולא כותב `backendRecommendation`
 
 ### הבחנה חשובה: קלוריות
 
