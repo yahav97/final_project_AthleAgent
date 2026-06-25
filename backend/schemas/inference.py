@@ -5,34 +5,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 from schemas.types import RiskLevel, validate_date_key
 
 
-# --- Legacy payloads (test_predict mock, optional /predict/sklearn) ---
-
-
-class AthleteData(BaseModel):
-    """Legacy engineered row for optional /predict/sklearn (subset merged with defaults)."""
-
-    bmi: float
-    age: float = 28.0
-    history_injury_count: float = 0.0
-    injured_yesterday: float = 0.0
-    daily_distance_km: float
-    workout_intensity_minutes: int
-    avg_cadence: int
-    sleep_hours: float
-    hrv_score: int
-    resting_hr: int
-    nutrition_intake_calories: float = 2500.0
-    daily_calories: int
-    total_calories_burned: int
-    calorie_balance: int
-    stress_level: int
-    muscle_soreness: int
-    energy_level: float = 5.0
-    acute_load_7d: float
-    chronic_load_21d: float
-    acwr_ratio: float
-    sleep_debt_3d: float
-    hrv_drop: float
+# --- Test mock payload (/test_predict) ---
 
 
 class SimpleData(BaseModel):

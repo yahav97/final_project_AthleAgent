@@ -9,7 +9,6 @@ DOCUMENTED_PATHS = {
     "/health",
     "/test_predict",
     "/predict/daily",
-    "/predict/sklearn",
     "/status/ml",
 }
 

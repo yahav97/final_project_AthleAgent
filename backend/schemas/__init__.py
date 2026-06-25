@@ -1,7 +1,6 @@
 """Pydantic schemas for API requests and responses."""
 
 from .inference import (
-    AthleteData,
     DailyPredictionTriggerRequest,
     InjuryPredictionRequest,
     InjuryPredictionResponse,
@@ -9,7 +8,6 @@ from .inference import (
 )
 
 __all__ = [
-    "AthleteData",
     "DailyPredictionTriggerRequest",
     "InjuryPredictionRequest",
     "InjuryPredictionResponse",

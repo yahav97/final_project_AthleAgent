@@ -45,7 +45,6 @@ class TestDomainDefaults:
 
     def test_feature_flags_default_off(self):
         s = Settings()
-        assert s.ENABLE_LEGACY_SKLEARN_ENDPOINT is False
         assert s.ENABLE_TEST_PREDICT_ENDPOINT is False
 
     def test_confidence_blend_weights_sum_to_one(self):

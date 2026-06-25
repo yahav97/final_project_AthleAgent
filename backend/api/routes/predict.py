@@ -1,13 +1,10 @@
 """Injury risk prediction HTTP routes."""
 
 from fastapi import APIRouter, HTTPException
-import pandas as pd
 
 from config import settings
-from ml.model_loader import get_model, get_model_status
-from services.model_features import DEFAULT_FEATURE_VALUES
+from ml.model_loader import get_model_status
 from schemas.inference import (
-    AthleteData,
     DailyPredictionTriggerRequest,
     InjuryPredictionResponse,
     SimpleData,
@@ -15,9 +12,7 @@ from schemas.inference import (
 from services.prediction_service import (
     persist_prediction_result_or_raise,
     predict_injury_risk_from_firestore,
-    resolve_model_bundle,
 )
-from services.risk_levels import classify_risk_level
 from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
@@ -64,43 +59,6 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
         risk_score=result["risk_score"],
         prediction_confidence=result["prediction_confidence"],
     )
-
-
-@router.post("/predict/sklearn")
-def predict_injury_sklearn(data: AthleteData):
-    """Run legacy sklearn endpoint guarded behind explicit feature flag.
-
-    Args:
-        data: Legacy engineered feature row.
-
-    Returns:
-        dict: Legacy risk percentage response.
-    """
-    if not settings.ENABLE_LEGACY_SKLEARN_ENDPOINT:
-        raise HTTPException(
-            status_code=410,
-            detail="Legacy endpoint disabled. Use POST /predict/daily.",
-        )
-    loaded = get_model()
-    estimator, bundle_cols, *_rest = resolve_model_bundle(loaded)
-    if estimator is None or not bundle_cols:
-        return {"error": "Model not loaded"}
-
-    merged = dict(DEFAULT_FEATURE_VALUES)
-    for key, val in data.model_dump().items():
-        if val is not None:
-            merged[key] = float(val)
-    input_df = pd.DataFrame({col: [merged[col]] for col in bundle_cols})
-    risk_probability = estimator.predict_proba(input_df)[0][1]
-
-    return {
-        "risk_percentage": round(risk_probability * 100, 1),
-        "risk_level": classify_risk_level(
-            risk_probability,
-            high=settings.LEGACY_SKLEARN_HIGH_CUTOFF,
-            medium=settings.LEGACY_SKLEARN_MEDIUM_CUTOFF,
-        ),
-    }
 
 
 @router.get("/status/ml")

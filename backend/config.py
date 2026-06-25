@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Feature flags
     # -------------------------------------------------------------------------
-    ENABLE_LEGACY_SKLEARN_ENDPOINT: bool = False
     ENABLE_TEST_PREDICT_ENDPOINT: bool = False
 
     # -------------------------------------------------------------------------
@@ -65,8 +64,6 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     RISK_HIGH_CUTOFF: float = 0.70
     RISK_MEDIUM_CUTOFF: float = 0.20
-    LEGACY_SKLEARN_HIGH_CUTOFF: float = 0.60
-    LEGACY_SKLEARN_MEDIUM_CUTOFF: float = 0.30
 
     # -------------------------------------------------------------------------
     # Firestore history window & confidence policy
