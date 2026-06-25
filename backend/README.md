@@ -149,6 +149,8 @@ python -m pytest tests/ -v -m integration
 
 Shared fixtures live in `tests/conftest.py`. Unit tests are under `tests/unit/`.
 
+**CI:** On push/PR to `main` (when `backend/` or promoted ML artifacts change), GitHub Actions runs the same suite — see `.github/workflows/backend-tests.yml`.
+
 ## Data storage
 
 - Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.

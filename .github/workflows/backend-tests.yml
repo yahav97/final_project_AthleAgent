@@ -1,0 +1,40 @@
+name: Backend tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "ML_model/artifacts/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "ML_model/artifacts/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          ATHLEAGENT_DISABLE_FILE_LOGGING: "1"
+        run: python -m pytest tests/ -v --tb=short
