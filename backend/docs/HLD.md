@@ -107,12 +107,11 @@ flowchart TB
 | `/health` | GET | Liveness probe | None |
 | `/status/ml` | GET | Model operational status | None |
 
-### 4.2 Development / Legacy Endpoints
+### 4.2 Development Endpoints
 
 | Endpoint | Method | תפקיד |
 |----------|--------|-------|
-| `/test_predict` | POST | Mock response ל-UI tests |
-| `/predict/sklearn` | POST | Full payload (disabled by default) |
+| `/test_predict` | POST | Mock response ל-UI tests (מאחורי `ENABLE_TEST_PREDICT_ENDPOINT`) |
 
 ### 4.3 Production Contract
 
@@ -265,7 +264,7 @@ flowchart LR
 |---------|--------|---------|
 | `MODEL_PATH` | env | `ML_model/artifacts/20260512_075115/injury_model.pkl` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | env / file | `backend/firebase-key.json` |
-| `ENABLE_LEGACY_SKLEARN_ENDPOINT` | env | `false` |
+| `ENABLE_TEST_PREDICT_ENDPOINT` | env | `false` |
 | `CORS_ORIGINS` | config | localhost ports |
 | `VERSION` | config | `1.0.0` |
 

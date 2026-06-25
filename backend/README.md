@@ -11,7 +11,7 @@ FastAPI backend for injury-risk inference. This service is treated as mission-cr
 
 All tunable backend behaviour is centralized in [`config.py`](config.py). Copy [`backend/.env.example`](.env.example) to `backend/.env` to override defaults without editing code.
 
-Key groups: ML gates, risk bands (must match Android), history window, prediction confidence weights, logging, and feature flags (`ENABLE_LEGACY_SKLEARN_ENDPOINT`, `ENABLE_TEST_PREDICT_ENDPOINT`).
+Key groups: ML gates, risk bands (must match Android), history window, prediction confidence weights, logging, and feature flags (`ENABLE_TEST_PREDICT_ENDPOINT`).
 
 ## API Structure
 

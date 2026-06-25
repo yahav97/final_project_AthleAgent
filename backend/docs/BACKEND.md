@@ -122,11 +122,7 @@ backend/
 
 ### `POST /test_predict` (mock — לא ייצור)
 
-מחזיר תשובה קבועה ל-smoke tests של UI/API (`risk_percentage: 72.5`, `risk_level: High`).
-
-### `POST /predict/sklearn` (legacy — כבוי כברירת מחדל)
-
-Endpoint ישן שמקבל payload מלא של `AthleteData` ומריץ sklearn ישירות. דורש `ENABLE_LEGACY_SKLEARN_ENDPOINT=true`; אחרת מחזיר `410 Gone`.
+מחזיר תשובה קבועה ל-smoke tests של UI/API (`risk_percentage: 72.5`, `risk_level: High`). דורש `ENABLE_TEST_PREDICT_ENDPOINT=true`; אחרת מחזיר `404`.
 
 ### `GET /status/ml` (סטטוס תפעולי)
 
@@ -308,7 +304,6 @@ FIREBASE_SERVICE_ACCOUNT_KEY=backend/firebase-key.json
 LOG_LEVEL=INFO
 
 # דגלי פיצ'ר
-ENABLE_LEGACY_SKLEARN_ENDPOINT=false
 ENABLE_TEST_PREDICT_ENDPOINT=false
 
 # שערי ML (staging יכול להרחיב)

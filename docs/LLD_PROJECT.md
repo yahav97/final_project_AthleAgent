@@ -237,8 +237,7 @@ flowchart TD
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
 | POST | `/api/v1/observability/client-events` | `observability.py` | 202 Accepted |
-| POST | `/test_predict` | `predict.py` | mock |
-| POST | `/predict/sklearn` | `predict.py` | legacy (disabled) |
+| POST | `/test_predict` | `predict.py` | mock (behind `ENABLE_TEST_PREDICT_ENDPOINT`) |
 
 ### 3.2 Prediction Pipeline (Backend)
 
@@ -396,7 +395,7 @@ GEMINI_API_KEY=...
 |----------|---------|
 | `MODEL_PATH` | `None` → resolves via `promoted.json`, then `backend/injury_model.pkl` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` |
-| `ENABLE_LEGACY_SKLEARN_ENDPOINT` | `false` |
+| `ENABLE_TEST_PREDICT_ENDPOINT` | `false` |
 | `CORS_ORIGINS` | localhost ports |
 
 ### 7.3 Emulator Networking

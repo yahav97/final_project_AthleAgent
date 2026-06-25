@@ -79,7 +79,7 @@ async def startup_event():
 
 ```python
 class Settings(BaseSettings):
-    ENABLE_LEGACY_SKLEARN_ENDPOINT: bool = False
+    ENABLE_TEST_PREDICT_ENDPOINT: bool = False
     MODEL_PATH: str = "ML_model/artifacts/20260512_075115/injury_model.pkl"
     FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str]  # default: backend/firebase-key.json
     GEMINI_API_KEY: Optional[str]                 # unused in routes
@@ -127,6 +127,10 @@ Returns from `get_model_status()`:
   "degraded_rc": false
 }
 ```
+
+#### `POST /test_predict` (Development)
+
+Mock response for UI/API smoke tests. Disabled by default (`ENABLE_TEST_PREDICT_ENDPOINT=false` → HTTP 404).
 
 ---
 
@@ -378,7 +382,6 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `firestore_snapshot_unavailable` | history_service | 503 | Firestore client None or read fail |
 | `model_not_live:*` | prediction_service | 503 | Gate failed or model not loaded |
 | `prediction_persist_failed` | history_service | 503 | Write returned False |
-| `Legacy endpoint disabled` | predict.py | 410 | `/predict/sklearn` with flag off |
 
 ---
 
