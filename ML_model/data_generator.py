@@ -323,12 +323,12 @@ def generate_synthetic_data(
             hrv_drop = refs["hrv_drop"]
             if len(sleep_history) >= 5:
                 recent_sleep = sleep_history[-5:]
-                sleep_trend_5d = float(np.polyfit(np.arange(5), recent_sleep, 1)[0])
+                sleep_trend_5d = float(np.polyfit(np.arange(5), recent_sleep, 1, full=False)[0])
             else:
                 sleep_trend_5d = 0.0
             if len(distance_history) >= 5:
                 recent_load = distance_history[-5:]
-                load_trend_5d = float(np.polyfit(np.arange(5), recent_load, 1)[0])
+                load_trend_5d = float(np.polyfit(np.arange(5), recent_load, 1, full=False)[0])
             else:
                 load_trend_5d = 0.0
 
