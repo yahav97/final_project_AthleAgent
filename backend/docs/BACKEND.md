@@ -119,7 +119,13 @@ backend/
 - `predictionConfidence`
 - `predictionUpdatedAt`
 
-### `POST /demo_predict` (legacy/דמו — לא ייצור)
+### `POST /test_predict` (mock — לא ייצור)
+
+מחזיר תשובה קבועה ל-smoke tests של UI/API (`risk_percentage: 72.5`, `risk_level: High`).
+
+### `POST /predict/sklearn` (legacy — כבוי כברירת מחדל)
+
+Endpoint ישן שמקבל payload מלא של `AthleteData` ומריץ sklearn ישירות. דורש `ENABLE_LEGACY_SKLEARN_ENDPOINT=true`; אחרת מחזיר `410 Gone`.
 
 ### `GET /status/ml` (סטטוס תפעולי)
 

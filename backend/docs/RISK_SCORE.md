@@ -62,7 +62,7 @@ risk_score = model.predict_proba(X)[0, 1]
 
 | מיתוס | מציאות |
 |-------|--------|
-| "יש נוסחה: שינה×2 + סטרס×3…" | **לא בפרודקשן.** יש endpoint דמו ישן (`/demo_predict`) עם היוריסטיקה כזו — לא ML |
+| "יש נוסחה: שינה×2 + סטרס×3…" | **לא.** אין נוסחה ידנית ב-API — הציון מגיע רק ממודל XGBoost דרך `POST /predict/daily` |
 | "המשקלים בקוד קובעים את הציון" | המשקלים הם **בתוך עצי XGBoost** (נלמדו באימון), לא קבועים ב-Python |
 | "prediction_confidence = הסיכון" | **לא.** זה ביטחון באיכות הקלט (היסטוריה + שלמות נתונים) |
 | "finalRiskScore שונה מהמודל" | **אותו מספר** — רק מוכפל ב-100 לתצוגה |
@@ -1091,13 +1091,13 @@ risk_score = 0.2341
 
 כן — דרך `nutrition_intake_calories`, `daily_calories`, `calorie_balance`. חשיבות יחסית נמוכה (~1.4%) לעומת HRV/סטרס/ACWR.
 
-### מה ההבדל בין `/demo_predict` ל-`/predict/daily`?
+### מה ההבדל בין `/test_predict` ל-`/predict/daily`?
 
-| | `/demo_predict` | `/predict/daily` |
+| | `/test_predict` | `/predict/daily` |
 |---|-----------------|------------------|
-| מודל | היוריסטיקה ידנית | XGBoost |
-| קלט | payload מלא מהאפליקציה | רק userId+date, שאר מ-Firestore |
-| פרודקשן | לא | כן |
+| מודל | Mock קבוע (לא ML) | XGBoost |
+| קלט | `user_id` בלבד | `userId` + `date`; שאר הנתונים מ-Firestore |
+| פרודקשן | לא (smoke tests) | כן |
 
 ---
 

@@ -112,7 +112,6 @@ flowchart TB
 | Endpoint | Method | תפקיד |
 |----------|--------|-------|
 | `/test_predict` | POST | Mock response ל-UI tests |
-| `/demo_predict` | POST | Heuristic score (legacy) |
 | `/predict/sklearn` | POST | Full payload (disabled by default) |
 
 ### 4.3 Production Contract

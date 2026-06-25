@@ -1,11 +1,13 @@
 # AthleAgent — מדריך לוגים
 
-| שדה | ערך |
-|-----|-----|
-| **גרסה** | 1.1 |
-| **תאריך** | 2026-06-20 |
-| **קהל יעד** | מפתחי Backend, Android, בוחני פרויקט גמר |
+
+| שדה               | ערך                                                        |
+| ----------------- | ---------------------------------------------------------- |
+| **גרסה**          | 1.1                                                        |
+| **תאריך**         | 2026-06-20                                                 |
+| **קהל יעד**       | מפתחי Backend, Android, בוחני פרויקט גמר                   |
 | **מסמכים קשורים** | [HLD §11](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
+
 
 ---
 
@@ -27,10 +29,12 @@
 
 ## 2. Events לעומת State
 
-| סוג | דוגמה | איפה |
-|-----|--------|------|
-| **Event** | בקשת חיזוי, שגיאה, מסך נפתח | `logs/athleagent.log` |
-| **State** | snapshot יומי, תוצאת prediction | Firestore (לא לוג) |
+
+| סוג       | דוגמה                           | איפה                  |
+| --------- | ------------------------------- | --------------------- |
+| **Event** | בקשת חיזוי, שגיאה, מסך נפתח     | `logs/athleagent.log` |
+| **State** | snapshot יומי, תוצאת prediction | Firestore (לא לוג)    |
+
 
 ---
 
@@ -49,10 +53,14 @@ flowchart LR
     Android -.-> Logcat[Logcat dev only]
 ```
 
-| `source` | מי כותב |
-|----------|---------|
-| `backend` | middleware, services, startup |
+
+
+
+| `source`  | מי כותב                                    |
+| --------- | ------------------------------------------ |
+| `backend` | middleware, services, startup              |
 | `android` | `POST /api/v1/observability/client-events` |
+
 
 **Docker:** `docker-compose.yml` ממפה `./logs` → `/app/logs` — אותו קובץ על ה-host (`logs/athleagent.log`).
 
@@ -66,13 +74,15 @@ flowchart LR
 
 ### שדות נפוצים
 
-| שדה | תיאור |
-|-----|--------|
-| `timestamp`, `level`, `message` | בסיס |
-| `source` | `backend` / `android` |
-| `event` | סוג לסינון (`http_request_completed`, `client_event`, …) |
-| `request_id` | מעקב E2E (UUID) |
-| `user_id` | Firebase UID |
+
+| שדה                             | תיאור                                                    |
+| ------------------------------- | -------------------------------------------------------- |
+| `timestamp`, `level`, `message` | בסיס                                                     |
+| `source`                        | `backend` / `android`                                    |
+| `event`                         | סוג לסינון (`http_request_completed`, `client_event`, …) |
+| `request_id`                    | מעקב E2E (UUID)                                          |
+| `user_id`                       | Firebase UID                                             |
+
 
 ### דוגמה — Backend
 
@@ -109,30 +119,36 @@ flowchart LR
 
 קובץ middleware: `backend/middleware/request_logging.py`
 
-| Path | נרשם? |
-|------|--------|
-| `POST /predict/daily` | כן (+ `duration_ms`) |
-| `POST /api/v1/observability/client-events` | כן |
-| `/health`, `/`, `/docs`, `/status/ml` | לא |
 
-| תנאי | רמה |
-|------|-----|
-| 2xx | INFO |
-| 4xx | WARNING |
-| 5xx | ERROR |
+| Path                                       | נרשם?                |
+| ------------------------------------------ | -------------------- |
+| `POST /predict/daily`                      | כן (+ `duration_ms`) |
+| `POST /api/v1/observability/client-events` | כן                   |
+| `/health`, `/`, `/docs`, `/status/ml`      | לא                   |
+
+
+
+| תנאי                 | רמה     |
+| -------------------- | ------- |
+| 2xx                  | INFO    |
+| 4xx                  | WARNING |
+| 5xx                  | ERROR   |
 | `duration_ms` > 2000 | WARNING |
+
 
 **אירועי domain:**
 
-| `event` | מתי |
-|---------|-----|
-| `server_startup` / `server_shutdown` | עלייה / כיבוי |
-| `model_loaded` | טעינת מודל (+ `run_id`) |
-| `predict_data_quality` / `predict_confidence_summary` | לפני/אחרי inference |
-| `predict_blocked` | מודל לא live |
-| `domain_error` | 422 / 503 |
 
-**`X-Request-ID`:** הקליינט שולח, או הבקאנד יוצר UUID ומחזיר ב-response.
+| `event`                                               | מתי                     |
+| ----------------------------------------------------- | ----------------------- |
+| `server_startup` / `server_shutdown`                  | עלייה / כיבוי           |
+| `model_loaded`                                        | טעינת מודל (+ `run_id`) |
+| `predict_data_quality` / `predict_confidence_summary` | לפני/אחרי inference     |
+| `predict_blocked`                                     | מודל לא live            |
+| `domain_error`                                        | 422 / 503               |
+
+
+`**X-Request-ID`:** הקליינט שולח, או הבקאנד יוצר UUID ומחזיר ב-response.
 
 ---
 
@@ -142,13 +158,15 @@ flowchart LR
 POST /api/v1/observability/client-events → 202
 ```
 
-| `event_type` | מתי | Rate limit |
-|--------------|-----|------------|
-| `error` | כשל API / Firestore / Gemini | אין |
-| `screen_view` | מסך מרכזי נפתח | 30s |
-| `user_action` | submit check-in, meal | 10s |
-| `ml_trigger` | לפני/אחרי חיזוי | 5s |
-| `sync` | sync שעון | 15s |
+
+| `event_type`  | מתי                          | Rate limit |
+| ------------- | ---------------------------- | ---------- |
+| `error`       | כשל API / Firestore / Gemini | אין        |
+| `screen_view` | מסך מרכזי נפתח               | 30s        |
+| `user_action` | submit check-in, meal        | 10s        |
+| `ml_trigger`  | לפני/אחרי חיזוי              | 5s         |
+| `sync`        | sync שעון                    | 15s        |
+
 
 **לא לשלוח:** כל click, PHI, stack traces, הודעות > 500 תווים.
 
@@ -188,12 +206,14 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 
 ## 8. הגדרות
 
-| משתנה | ברירת מחדל |
-|--------|------------|
-| `LOG_DIR` | `<repo>/logs` |
+
+| משתנה           | ברירת מחדל       |
+| --------------- | ---------------- |
+| `LOG_DIR`       | `<repo>/logs`    |
 | `LOG_FILE_NAME` | `athleagent.log` |
-| `LOG_FORMAT` | `json` |
-| `LOG_LEVEL` | `INFO` |
+| `LOG_FORMAT`    | `json`           |
+| `LOG_LEVEL`     | `INFO`           |
+
 
 קבצי קוד: `backend/config.py`, `utils/logging.py`, `utils/client_event_limiter.py`.
 
@@ -242,17 +262,19 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 
 ## 11. מפת קבצים (לוגים בלבד)
 
-| קובץ | תפקיד |
-|------|--------|
-| `logs/athleagent.log` | לוג מאוחד |
-| `backend/utils/logging.py` | הגדרת logger |
-| `backend/utils/request_context.py` | request_id / user_id |
-| `backend/middleware/request_logging.py` | HTTP + duration |
-| `backend/api/routes/observability.py` | קליטת Android |
-| `backend/schemas/observability.py` | סכמת payload |
-| `backend/utils/client_event_limiter.py` | rate limit |
-| `backend/scripts/trace_request.sh` | חיפוש |
-| `clean_logs.py` | ניקוי גיבויים |
+
+| קובץ                                    | תפקיד                |
+| --------------------------------------- | -------------------- |
+| `logs/athleagent.log`                   | לוג מאוחד            |
+| `backend/utils/logging.py`              | הגדרת logger         |
+| `backend/utils/request_context.py`      | request_id / user_id |
+| `backend/middleware/request_logging.py` | HTTP + duration      |
+| `backend/api/routes/observability.py`   | קליטת Android        |
+| `backend/schemas/observability.py`      | סכמת payload         |
+| `backend/utils/client_event_limiter.py` | rate limit           |
+| `backend/scripts/trace_request.sh`      | חיפוש                |
+| `clean_logs.py`                         | ניקוי גיבויים        |
+
 
 ---
 

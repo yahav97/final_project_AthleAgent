@@ -237,7 +237,6 @@ flowchart TD
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
 | POST | `/test_predict` | `predict.py` | mock |
-| POST | `/demo_predict` | `predict.py` | heuristic |
 | POST | `/predict/sklearn` | `predict.py` | legacy (disabled) |
 
 ### 3.2 Prediction Pipeline (Backend)
