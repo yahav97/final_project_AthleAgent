@@ -20,8 +20,6 @@ Based on research-validated risk factors:
 - Low SpO2 + high load: Overtraining/altitude signal
 - Elevated respiratory rate at rest: Recovery stress
 - High elevation + distance: Amplified training load
-
-Author: AthleAgent Project
 """
 
 import argparse

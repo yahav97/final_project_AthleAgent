@@ -7,6 +7,7 @@ Supports plain text (legacy) and JSON Lines (production default).
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -16,6 +17,18 @@ from utils.request_context import request_id_var, user_id_var
 
 LOG_DIR = settings.LOG_DIR
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+_DISABLE_FILE_LOGGING_ENV = "ATHLEAGENT_DISABLE_FILE_LOGGING"
+
+
+def _file_logging_enabled(log_to_file: bool | None) -> bool:
+    if log_to_file is not None:
+        return log_to_file
+    return os.environ.get(_DISABLE_FILE_LOGGING_ENV, "").lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 class ContextFilter(logging.Filter):
@@ -51,12 +64,13 @@ def setup_logging(
     log_dir: Path | None = None,
     level: str | None = None,
     log_format: str | None = None,
+    log_to_file: bool | None = None,
 ) -> logging.Logger:
-    """Configure the athleagent logger with file rotation and stdout output."""
+    """Configure the athleagent logger with optional file rotation and stdout output."""
     resolved_dir = log_dir or settings.LOG_DIR
-    resolved_dir.mkdir(parents=True, exist_ok=True)
     resolved_level = (level or settings.LOG_LEVEL).upper()
     resolved_format = (log_format or settings.LOG_FORMAT).lower()
+    write_to_file = _file_logging_enabled(log_to_file)
 
     root = logging.getLogger("athleagent")
     root.setLevel(resolved_level)
@@ -71,20 +85,22 @@ def setup_logging(
 
     context_filter = ContextFilter()
 
-    file_handler = RotatingFileHandler(
-        resolved_dir / settings.LOG_FILE_NAME,
-        maxBytes=settings.LOG_MAX_BYTES,
-        backupCount=settings.LOG_BACKUP_COUNT,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.addFilter(context_filter)
+    if write_to_file:
+        resolved_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            resolved_dir / settings.LOG_FILE_NAME,
+            maxBytes=settings.LOG_MAX_BYTES,
+            backupCount=settings.LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        file_handler.addFilter(context_filter)
+        root.addHandler(file_handler)
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
     stream_handler.addFilter(context_filter)
 
-    root.addHandler(file_handler)
     root.addHandler(stream_handler)
 
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

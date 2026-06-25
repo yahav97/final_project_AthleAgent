@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
+# Keep pytest output on stdout only — do not append to logs/athleagent.log.
+os.environ["ATHLEAGENT_DISABLE_FILE_LOGGING"] = "1"
+
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -172,3 +177,10 @@ def mock_model_bundle() -> dict[str, Any]:
 def model_feature_row() -> pd.DataFrame:
     """Single valid model row with population-default values."""
     return pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
+
+
+def pytest_configure(config) -> None:
+    """Re-apply logging without file handler if modules imported before conftest."""
+    from utils.logging import setup_logging
+
+    setup_logging()
