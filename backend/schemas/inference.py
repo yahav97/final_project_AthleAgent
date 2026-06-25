@@ -149,6 +149,10 @@ class InjuryPredictionRequest(BaseModel):
         validation_alias=AliasChoices("nutritionTotalCalories", "nutrition_total_calories"),
         description="Meal-logged kcal sum that day (Firestore totalCalories on nutrition doc); not Health burn.",
     )
+    nutritionImputed: bool = Field(
+        default=False,
+        description="Set by backend when yesterday nutrition used population averages.",
+    )
 
     @field_validator("date", mode="before")
     @classmethod

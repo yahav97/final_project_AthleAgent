@@ -129,8 +129,9 @@ class TestFetchUserHistory:
 
 
 class TestMergeNutritionWithHistory:
-    def test_empty_primary_gets_population_defaults(self):
-        out = hs.merge_nutrition_with_history("u1", "2026-06-16", {})
+    def test_empty_primary_gets_population_defaults_and_imputed_flag(self):
+        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", {})
+        assert imputed is True
         assert out["totalProtein"] == 125
         assert out["totalCarbs"] == 290
         assert out["mealsLoggedCount"] == 3
@@ -138,12 +139,14 @@ class TestMergeNutritionWithHistory:
 
     def test_yesterday_values_preserved_when_present(self):
         primary = {"totalProtein": 140, "totalCarbs": 310, "mealsLoggedCount": 4, "totalCalories": 2700}
-        out = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        assert imputed is False
         assert out == primary
 
-    def test_partial_yesterday_fills_only_missing_fields(self):
+    def test_partial_yesterday_sets_imputed_flag(self):
         primary = {"totalProtein": 150, "totalCalories": 2600}
-        out = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        assert imputed is True
         assert out["totalProtein"] == 150
         assert out["totalCalories"] == 2600
         assert out["totalCarbs"] == 290

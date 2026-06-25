@@ -61,7 +61,7 @@ def injury_prediction_request_from_firestore_snapshot(
     checkins = snapshot.get("daily_checkins") or {}
     nutrition_raw = snapshot.get("daily_nutrition_yesterday") or {}
     yesterday_key = (_to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
-    nutrition = merge_nutrition_with_history(user_id, yesterday_key, nutrition_raw)
+    nutrition, nutrition_imputed = merge_nutrition_with_history(user_id, yesterday_key, nutrition_raw)
 
     hist_profile = profile.get("historyInjuryCount")
     if hist_profile is None:
@@ -119,4 +119,5 @@ def injury_prediction_request_from_firestore_snapshot(
         totalCarbs=nutrition.get("totalCarbs"),
         mealsLoggedCount=nutrition.get("mealsLoggedCount"),
         nutritionTotalCalories=nutrition.get("totalCalories"),
+        nutritionImputed=nutrition_imputed,
     )

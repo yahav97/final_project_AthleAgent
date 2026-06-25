@@ -169,6 +169,17 @@ class TestFirestoreSnapshotMapping:
         assert req.distanceMeters == 0
         assert req.heartRateAvg is None
 
+    def test_nutrition_imputed_when_yesterday_meals_missing(self, firestore_snapshot):
+        snap = dict(firestore_snapshot)
+        snap["daily_nutrition_yesterday"] = {}
+        req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        assert req.nutritionImputed is True
+        assert req.totalProtein == 125
+
+    def test_nutrition_not_imputed_when_yesterday_logged(self, firestore_snapshot):
+        req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", firestore_snapshot)
+        assert req.nutritionImputed is False
+
 
 class TestPredictInjuryRisk:
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):

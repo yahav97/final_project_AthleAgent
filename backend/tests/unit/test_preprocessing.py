@@ -103,6 +103,27 @@ class TestDataQualityScore:
         q = calculate_data_quality_score(req)
         assert "load_signal" not in q["hard_missing"]
 
+    def test_nutrition_imputed_reduces_quality_score(self):
+        base = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=8000,
+            distanceMeters=6000,
+            heartRateAvg=58,
+            stressLevel=30,
+            muscleSoreness=3,
+            hrvRmssd=65.0,
+            restingHeartRate=52,
+        )
+        without = calculate_data_quality_score(base)
+        with_imputed = calculate_data_quality_score(
+            base.model_copy(update={"nutritionImputed": True})
+        )
+        assert without["score"] == pytest.approx(1.0)
+        assert with_imputed["score"] == pytest.approx(0.88)
+        assert "nutrition_imputed" in with_imputed["sensitive_missing"]
+
     def test_sensitive_missing_reduces_score(self):
         req = InjuryPredictionRequest(
             userId="u1",

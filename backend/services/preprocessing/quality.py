@@ -21,6 +21,8 @@ def calculate_data_quality_score(payload: InjuryPredictionRequest) -> dict[str, 
     sensitive_missing = [
         field for field in SENSITIVE_FIELDS if not is_present(payload_dict.get(field))
     ]
+    if payload_dict.get("nutritionImputed"):
+        sensitive_missing.append("nutrition_imputed")
 
     has_load_signal = has_positive_load_signal(payload_dict)
     has_recovery_signal = is_present(payload_dict.get("sleepMinutes")) or (

@@ -111,6 +111,9 @@ def merge_nutrition_with_history(user_id: str, date_key: str, primary: dict[str,
     not imputed from empty or unrelated prior days.
 
     ``user_id`` and ``date_key`` are kept for call-site compatibility.
+
+    Returns ``(merged_nutrition, imputed)`` — ``imputed`` is True when population
+    averages replaced missing yesterday fields.
     """
     from services.nutrition_defaults import apply_nutrition_population_defaults
 

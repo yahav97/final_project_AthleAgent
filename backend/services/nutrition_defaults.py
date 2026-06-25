@@ -17,10 +17,17 @@ NUTRITION_POPULATION_DEFAULTS: dict[str, int | float] = {
 NUTRITION_FIELD_KEYS: tuple[str, ...] = tuple(NUTRITION_POPULATION_DEFAULTS.keys())
 
 
-def apply_nutrition_population_defaults(primary: dict[str, Any] | None) -> dict[str, Any]:
-    """Fill missing nutrition aggregates from population averages (no history scan)."""
-    out = dict(primary or {})
+def apply_nutrition_population_defaults(primary: dict[str, Any] | None) -> tuple[dict[str, Any], bool]:
+    """
+    Fill missing nutrition aggregates from population averages (no history scan).
+
+    Returns ``(merged_doc, imputed)`` where ``imputed`` is True when any field was
+    missing from ``primary`` (yesterday had no complete meal log).
+    """
+    source = dict(primary or {})
+    imputed = any(source.get(key) is None for key in NUTRITION_FIELD_KEYS)
+    out = dict(source)
     for key in NUTRITION_FIELD_KEYS:
         if out.get(key) is None:
             out[key] = NUTRITION_POPULATION_DEFAULTS[key]
-    return out
+    return out, imputed
