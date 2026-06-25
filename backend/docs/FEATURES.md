@@ -95,7 +95,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 | Collection | Document | תפקיד | טווח זמן |
 |---|---|---|---|
-| `users/{uid}` | פרופיל | רישום: `age`, `historyInjuryCount` | קבוע |
+| `users/{uid}` | פרופיל | רישום: `birth_date`, `historyInjuryCount` | קבוע |
 | `users/{uid}/daily_health/{date}` | בריאות + פלט חיזוי | שינה ב-`{D}`; עומס ב-`{D-1}`; אחרי `/predict/daily`: `finalRiskScore`… | **יום קימה** + **אתמול** |
 | `users/{uid}/daily_health/{date-6}…{date}` | היסטוריה | rolling features (מרחק, שינה, HRV) | **7 ימים** |
 | `users/{uid}/daily_checkins/{date}` | דיווח עצמי | stress, soreness, energy | **יום נוכחי** |
@@ -108,7 +108,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | # | מקור | Collection | שדות עיקריים | פיצ'רי מודל (דוגמה) |
 |---|---|---|---|---|
 | 1 | **שעון** | `daily_health` | שינה, צעדים, דופק, HRV… | `sleep_hours`, `hrv_score`, `daily_distance_km` |
-| 2 | **רישום** | `users/{uid}` | `age`, `historyInjuryCount` | `age`, `history_injury_count` |
+| 2 | **רישום** | `users/{uid}` | `birth_date`, `historyInjuryCount` | `age` (נגזר), `history_injury_count` |
 | 3 | **סקר יומי** | `daily_checkins/{date}` | `stressLevel`, `muscleSoreness`, `energyLevel`, **`injuredYesterday`** | `stress_level`, `muscle_soreness`, `energy_level`, `injured_yesterday` |
 | 4 | **תזונה** | `daily_nutrition/{date}` | `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `totalCalories` | `nutrition_intake_calories`, `daily_calories`, `calorie_balance` |
 | — | **פלט חיזוי** | `daily_health` (אחרי API) | `finalRiskScore`, `riskLevel`, … | לא קלט — תוצאה |
@@ -121,7 +121,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 | שדה | מקור |
 |---|---|
-| `age` | טופס הרשמה / פרופיל |
+| `birth_date` | טופס הרשמה / פרופיל (`yyyy-MM-dd`) → הבקאנד מחשב `age` לפי תאריך החיזוי |
 | `historyInjuryCount` | טופס הרשמה / פרופיל |
 
 #### 3. סקר יומי (`users/{uid}/daily_checkins/{date}`)
@@ -352,7 +352,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 | Firestore source | Field | Model feature |
 |---|---|---|
-| `users/{uid}` | `age` | `age` |
+| `users/{uid}` | `birth_date` | `age` (נגזר; `age_from_profile`) |
 | `users/{uid}` | `historyInjuryCount` | `history_injury_count` |
 | `daily_health` | `sleepMinutes` | `sleep_hours` |
 | `daily_health` | `steps` | `daily_distance_km` fallback, `avg_cadence` |

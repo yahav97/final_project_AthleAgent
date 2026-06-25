@@ -176,7 +176,7 @@ flowchart TD
   "fullName": "string",
   "email": "string",
   "role": "athlete|coach",
-  "age": 25,
+  "birth_date": "1995-01-01",
   "historyInjuryCount": 0,
   "teamId": "string|null"
 }
@@ -272,7 +272,7 @@ POST /predict/daily {userId, date}
 
 | קטגוריה | Features |
 |---------|----------|
-| Profile | bmi, age, body_fat_pct, vo2_max, history_injury_count |
+| Profile | bmi, age (מ-`birth_date`), body_fat_pct, vo2_max, history_injury_count |
 | Load | daily_distance_km, workout_intensity_minutes, avg_cadence, elevation, floors, speed, power, active_calories_burned |
 | Recovery | sleep_hours, hrv_score, resting_hr, respiratory_rate, spo2 |
 | Nutrition | nutrition_intake_calories, daily_calories, total_calories_burned, calorie_balance |

@@ -144,7 +144,7 @@ Returns from `get_model_status()`:
 
 | Group | Fields |
 |-------|--------|
-| Profile | `age`, `historyInjuryCount` |
+| Profile | `age` (נגזר מ-`birth_date` בפרופיל Firestore), `historyInjuryCount` |
 | Health Connect | `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `totalCalories`, `heartRate*`, `hrvRmssd`, `restingHeartRate`, `bodyFatPct`, `vo2Max`, `elevationGainedMeters`, `floorsClimbed`, `avgSpeed`, `maxSpeed`, `avgPower`, `avgCadence`, `respiratoryRate`, `oxygenSaturation`, `weightKg`, `heightCm`, `bmrCalories` |
 | Check-in | `energyLevel`, `muscleSoreness`, `stressLevel`, `injuredYesterday` |
 | Nutrition | `totalProtein`, `totalCarbs`, `mealsLoggedCount`, `nutritionTotalCalories` |

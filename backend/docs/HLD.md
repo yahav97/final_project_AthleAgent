@@ -183,7 +183,7 @@ sequenceDiagram
 | Physical load | `daily_health/{D-1}` בלבד | steps, distance, calories, HR (>0 ל-load signal) |
 | Survey | `daily_checkins/{D}` | energy, soreness, stress, injuredYesterday |
 | Nutrition | `daily_nutrition/{D-1}` + ממוצעים כלליים | totalCalories, protein, carbs; `nutritionImputed` → −0.12 confidence |
-| Profile | `users/{uid}` | age, historyInjuryCount |
+| Profile | `users/{uid}` | `birth_date`, historyInjuryCount → מודל: `age` (נגזר) |
 
 ---
 
@@ -197,7 +197,7 @@ erDiagram
 
     USERS {
         string uid PK
-        int age
+        string birth_date "yyyy-MM-dd"
         int historyInjuryCount
     }
 
@@ -224,6 +224,8 @@ erDiagram
         int totalCarbs
     }
 ```
+
+> **גיל במודל:** Firestore שומר `birth_date` (מחרוזת `yyyy-MM-dd`). הבקאנד מחשב את פיצ'ר המודל `age` ב-`age_from_profile()` לפי תאריך החיזוי (`D`), עם חסימה לטווח 12–90. אם `birth_date` חסר או לא תקין — נכנס default 28.
 
 > חוזה מלא: [FEATURES.md](FEATURES.md)
 

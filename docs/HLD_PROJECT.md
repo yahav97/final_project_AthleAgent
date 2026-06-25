@@ -208,7 +208,7 @@ erDiagram
         string uid PK
         string role "athlete|coach"
         string teamId
-        int age
+        string birth_date "yyyy-MM-dd"
         int historyInjuryCount
     }
 
