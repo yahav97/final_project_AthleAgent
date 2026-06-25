@@ -86,7 +86,7 @@ def predict_injury_sklearn(data: AthleteData):
     for key, val in data.model_dump().items():
         if val is not None:
             merged[key] = float(val)
-    input_df = pd.DataFrame([[merged[c] for c in bundle_cols]], columns=bundle_cols)
+    input_df = pd.DataFrame({col: [merged[col]] for col in bundle_cols})
     risk_probability = estimator.predict_proba(input_df)[0][1]
 
     return {
