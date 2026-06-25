@@ -10,6 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -20,11 +21,14 @@ import com.yahav.athleagent.ui.coach.HomeCoachActivity
 import com.yahav.athleagent.databinding.ActivityLoginBinding
 import com.yahav.athleagent.logic.LoginManager
 import com.yahav.athleagent.utilities.SignalManager
+import java.text.SimpleDateFormat
+import java.util.*
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var loginManager: LoginManager
+    private var googleSelectedBirthDate: String = "1995-01-01"
 
     private val signInLauncher = registerForActivityResult(
         FirebaseAuthUIActivityResultContract(),
@@ -47,17 +51,12 @@ class LoginActivity : AppCompatActivity() {
 
         loginManager = LoginManager()
 
-        // Check if the user is already logged in when the screen loads
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser != null) {
-            // User is logged in!
-            // Hide the login inputs and show the central loading screen
             binding.loginLayoutContent.visibility = View.GONE
             binding.loginLayoutLoading.visibility = View.VISIBLE
-
             checkUserRoleAndNavigate(currentUser.uid)
         } else {
-            // User is not logged in - show the standard login inputs
             initViews()
         }
     }
@@ -72,7 +71,6 @@ class LoginActivity : AppCompatActivity() {
                 SignalManager.getInstance().snackbar(binding.root, message)
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
-                    // Show loading screen and hide buttons while transitioning to home screen
                     binding.loginLayoutContent.visibility = View.GONE
                     binding.loginLayoutLoading.visibility = View.VISIBLE
                     checkUserRoleAndNavigate(uid)
@@ -81,7 +79,6 @@ class LoginActivity : AppCompatActivity() {
 
             override fun onFailure(error: String) {
                 SignalManager.getInstance().snackbar(binding.root, error)
-                // In case of error - restore the normal view
                 binding.loginLayoutContent.visibility = View.VISIBLE
                 binding.loginLayoutLoading.visibility = View.GONE
             }
@@ -94,7 +91,6 @@ class LoginActivity : AppCompatActivity() {
                 SignalManager.getInstance().snackbar(binding.root, "Please enter email and password")
                 return@setOnClickListener
             }
-            // Show loading screen while login requests are sent to Firebase
             binding.loginLayoutContent.visibility = View.GONE
             binding.loginLayoutLoading.visibility = View.VISIBLE
             loginManager.login(email, password, callback)
@@ -115,7 +111,6 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun signInWithGoogle() {
-        // Start Google sign-in process, show loading UI
         binding.loginLayoutContent.visibility = View.GONE
         binding.loginLayoutLoading.visibility = View.VISIBLE
 
@@ -134,24 +129,20 @@ class LoginActivity : AppCompatActivity() {
                 val db = FirebaseFirestore.getInstance()
                 db.collection("users").document(user.uid).get().addOnSuccessListener { document ->
                     if (!document.exists()) {
-                        // If it's a new user and needs to select a role, restore the normal view (so the dialog pops up over it)
                         binding.loginLayoutLoading.visibility = View.GONE
                         binding.loginLayoutContent.visibility = View.VISIBLE
                         showRoleSelectionDialog(user)
                     } else {
-                        // Retrieve the stored role and navigate accordingly
                         val role = document.getString("role") ?: "Athlete"
                         navigateToDashboard(role)
                     }
                 }.addOnFailureListener {
-                    // In case of a database error
                     binding.loginLayoutLoading.visibility = View.GONE
                     binding.loginLayoutContent.visibility = View.VISIBLE
                     SignalManager.getInstance().snackbar(binding.root, "Failed to load user profile")
                 }
             }
         } else {
-            // Google sign-in failed  - restore the normal view
             binding.loginLayoutLoading.visibility = View.GONE
             binding.loginLayoutContent.visibility = View.VISIBLE
         }
@@ -161,8 +152,8 @@ class LoginActivity : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_google_profile, null)
 
         val toggleGroup = dialogView.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.google_TOGGLE_role)
-        val tilAge = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.google_TIL_age)
-        val etAge = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.google_ET_age)
+        val tilBirthDate = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.google_TIL_birthDate)
+        val etBirthDate = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.google_ET_birthDate)
         val tilInjury = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.google_TIL_injury_history)
         val etInjury = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.google_ET_injury_history)
         val btnSave = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.google_BTN_save)
@@ -170,10 +161,10 @@ class LoginActivity : AppCompatActivity() {
         toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 if (checkedId == R.id.google_BTN_coach_role) {
-                    tilAge.visibility = View.GONE
+                    tilBirthDate.visibility = View.GONE
                     tilInjury.visibility = View.GONE
                 } else {
-                    tilAge.visibility = View.VISIBLE
+                    tilBirthDate.visibility = View.VISIBLE
                     tilInjury.visibility = View.VISIBLE
                 }
             }
@@ -184,26 +175,42 @@ class LoginActivity : AppCompatActivity() {
             .setCancelable(false)
             .create()
 
+        val openPickerListener = View.OnClickListener {
+            val datePicker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText("Select Birth Date")
+                .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
+                .build()
+
+            datePicker.addOnPositiveButtonClickListener { selection ->
+                val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                calendar.timeInMillis = selection
+                val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                googleSelectedBirthDate = format.format(calendar.time)
+                etBirthDate.setText(googleSelectedBirthDate)
+            }
+            datePicker.show(supportFragmentManager, "GOOGLE_BIRTH_DATE_PICKER")
+        }
+
+        tilBirthDate.setEndIconOnClickListener(openPickerListener)
+        etBirthDate.setOnClickListener(openPickerListener)
+
         btnSave.setOnClickListener {
             val isAthlete = toggleGroup.checkedButtonId == R.id.google_BTN_athlete_role
             val selectedRole = if (isAthlete) "Athlete" else "Coach"
 
-            val ageStr = etAge.text.toString().trim()
             val injuryStr = etInjury.text.toString().trim()
-            val age = if (ageStr.isNotEmpty()) ageStr.toInt() else 25
             val injuries = if (injuryStr.isNotEmpty()) injuryStr.toInt() else 0
+            val birthDate = if (googleSelectedBirthDate.isNotEmpty()) googleSelectedBirthDate else "1995-01-01"
 
             dialog.dismiss()
             binding.loginLayoutContent.visibility = View.GONE
             binding.loginLayoutLoading.visibility = View.VISIBLE
 
-            saveUserToFirestore(user, selectedRole, age, injuries)
+            saveUserToFirestore(user, selectedRole, birthDate, injuries)
         }
 
-        // Show the dialog first
         dialog.show()
 
-        // TRICK: Force the dialog window to stretch to full screen AFTER it's shown
         dialog.window?.setLayout(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
             android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -211,7 +218,7 @@ class LoginActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 
-    private fun saveUserToFirestore(user: FirebaseUser, role: String, age: Int = 25, injuries: Int = 0) {
+    private fun saveUserToFirestore(user: FirebaseUser, role: String, birthDate: String = "1995-01-01", injuries: Int = 0) {
         val userData = hashMapOf<String, Any>(
             "fullName" to (user.displayName ?: "User"),
             "email" to (user.email ?: ""),
@@ -219,9 +226,8 @@ class LoginActivity : AppCompatActivity() {
             "teamId" to ""
         )
 
-        // Only attach ML specifics if they are an Athlete
         if (role == "Athlete") {
-            userData["age"] = age
+            userData["birth_date"] = birthDate
             userData["historyInjuryCount"] = injuries
         }
 

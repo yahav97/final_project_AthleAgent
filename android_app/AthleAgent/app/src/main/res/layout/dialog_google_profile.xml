@@ -75,23 +75,29 @@
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/google_TIL_age"
+                    android:id="@+id/google_TIL_birthDate"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/spacing_20"
+                    android:hint="Birth Date"
                     app:boxCornerRadiusBottomEnd="@dimen/spacing_16"
                     app:boxCornerRadiusBottomStart="@dimen/spacing_16"
                     app:boxCornerRadiusTopEnd="@dimen/spacing_16"
-                    app:boxCornerRadiusTopStart="@dimen/spacing_16">
+                    app:boxCornerRadiusTopStart="@dimen/spacing_16"
+                    app:endIconDrawable="@drawable/baseline_calendar_month_24"
+                    app:endIconMode="custom"
+                    app:endIconTint="@color/charcoal_black">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/google_ET_age"
+                        android:id="@+id/google_ET_birthDate"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:cursorVisible="false"
+                        android:focusable="false"
                         android:fontFamily="@font/roboto_bold"
-                        android:hint="@string/age"
-                        android:inputType="number"
+                        android:inputType="none"
                         android:padding="@dimen/spacing_16" />
                 </com.google.android.material.textfield.TextInputLayout>
 

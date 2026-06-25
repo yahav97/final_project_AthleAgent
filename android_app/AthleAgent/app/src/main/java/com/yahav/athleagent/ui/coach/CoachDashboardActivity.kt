@@ -5,19 +5,26 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import com.google.ai.client.generativeai.GenerativeModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.yahav.athleagent.databinding.ActivityCoachDashboardBinding
 import com.yahav.athleagent.ui.athlete.AthleteAdapter
 import androidx.core.content.ContextCompat
 import com.yahav.athleagent.R
 import androidx.core.graphics.toColorInt
+import com.yahav.athleagent.BuildConfig
 import com.yahav.athleagent.model.AthleteItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,6 +42,7 @@ class CoachDashboardActivity : AppCompatActivity() {
     private lateinit var adapter: AthleteAdapter
 
     private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
+    private val geminiApiKey = BuildConfig.GEMINI_API_KEY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +110,6 @@ class CoachDashboardActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun loadAthleteHealthData(athleteUid: String) {
-        // Find today's specific document first to ensure the coach sees the latest ML prediction
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
         db.collection("users").document(athleteUid)
@@ -111,19 +118,76 @@ class CoachDashboardActivity : AppCompatActivity() {
             .addOnSuccessListener { todayDoc ->
                 if (todayDoc.exists() && todayDoc.contains("finalRiskScore")) {
                     val currentRisk = todayDoc.getDouble("finalRiskScore")?.toInt() ?: 0
-                    val aiRec = todayDoc.getString("aiRecommendation") ?: "Recommendation generated today."
-                    updateRiskUI(currentRisk, aiRec)
+                    val aiRec = todayDoc.getString("aiRecommendation")
+
+                    if (!aiRec.isNullOrEmpty()) {
+                        updateRiskUI(currentRisk, aiRec)
+                    } else {
+                        // פתרון פער ה-aiRecommendation: מחוללים אותו דינמית דרך המאמן
+                        binding.coachDashTXTAiRecommendation.text = "Generating AI Recommendation..."
+                        db.collection("users").document(athleteUid).collection("daily_checkins").document(today).get()
+                            .addOnSuccessListener { checkInDoc ->
+                                val riskLevel = todayDoc.getString("riskLevel") ?: "Low"
+                                val confidence = todayDoc.getDouble("predictionConfidence")?.toFloat() ?: 0f
+                                val sleepMinutes = todayDoc.getLong("sleepMinutes") ?: 480L
+                                val soreness = checkInDoc.getLong("muscleSoreness")?.toInt() ?: 1
+                                val stress = checkInDoc.getLong("stressLevel")?.toInt() ?: 20
+
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    fetchAIRecommendationForCoach(
+                                        athleteUid, today, currentRisk, riskLevel, confidence, sleepMinutes, soreness, stress
+                                    )
+                                }
+                            }
+                    }
                 } else {
-                    // fallback to latest available if today is not synced yet
                     binding.coachDashTXTAiRecommendation.text = "Athlete has not synced data for today yet."
                 }
-
-                // Then load history for the chart
                 loadHistoricalChartData(athleteUid)
             }
             .addOnFailureListener {
                 binding.coachDashTXTAiRecommendation.text = "Error loading data."
             }
+    }
+
+    private suspend fun fetchAIRecommendationForCoach(
+        athleteUid: String,
+        dateKey: String,
+        riskScore: Int,
+        riskLevel: String,
+        confidence: Float,
+        sleepMins: Long,
+        soreness: Int,
+        stress: Int
+    ) {
+        try {
+            val generativeModel = GenerativeModel(modelName = "gemini-2.5-flash", apiKey = geminiApiKey)
+            val prompt = """
+                You are a senior sports medicine doctor. 
+                ML Injury Risk Score: $riskScore% (Risk Level: $riskLevel, AI Confidence: $confidence%).
+                Sleep: ${sleepMins / 60}h ${sleepMins % 60}m, Soreness: $soreness/5, Stress: $stress/100.
+                Provide a short 1-sentence recommendation for training today.
+                be realistic they are pro athletes who wants to play as much as they can.
+            """.trimIndent()
+
+            val response = generativeModel.generateContent(prompt)
+            val aiText = response.text ?: "No recommendation available."
+
+            withContext(Dispatchers.Main) {
+                updateRiskUI(riskScore, aiText)
+            }
+
+            // שמירת ההמלצה בחזרה לתוך מסמך האתלט
+            db.collection("users").document(athleteUid)
+                .collection("daily_health").document(dateKey)
+                .set(mapOf("aiRecommendation" to aiText), SetOptions.merge())
+
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                binding.coachDashTXTAiRecommendation.text = "AI Doctor is offline."
+            }
+
+        }
     }
 
     private fun loadHistoricalChartData(athleteUid: String) {
