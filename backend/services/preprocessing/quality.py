@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from schemas.inference import InjuryPredictionRequest
 from services.preprocessing.constants import HARD_FIELDS, SENSITIVE_FIELDS
-from services.preprocessing.helpers import is_present
+from services.preprocessing.helpers import has_positive_load_signal, is_present
 
 
 def calculate_data_quality_score(payload: InjuryPredictionRequest) -> dict[str, object]:
@@ -22,9 +22,7 @@ def calculate_data_quality_score(payload: InjuryPredictionRequest) -> dict[str, 
         field for field in SENSITIVE_FIELDS if not is_present(payload_dict.get(field))
     ]
 
-    has_load_signal = is_present(payload_dict.get("steps")) or is_present(
-        payload_dict.get("distanceMeters")
-    )
+    has_load_signal = has_positive_load_signal(payload_dict)
     has_recovery_signal = is_present(payload_dict.get("sleepMinutes")) or (
         is_present(payload_dict.get("stressLevel")) and is_present(payload_dict.get("muscleSoreness"))
     )

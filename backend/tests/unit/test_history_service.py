@@ -126,3 +126,25 @@ class TestFetchUserHistory:
         assert get_calls
         assert all(call[0] in ("daily_health", "daily_checkins") for call in get_calls)
         assert ("daily_health", "2026-05-03") in get_calls
+
+
+class TestMergeNutritionWithHistory:
+    def test_empty_primary_gets_population_defaults(self):
+        out = hs.merge_nutrition_with_history("u1", "2026-06-16", {})
+        assert out["totalProtein"] == 125
+        assert out["totalCarbs"] == 290
+        assert out["mealsLoggedCount"] == 3
+        assert out["totalCalories"] == 2500
+
+    def test_yesterday_values_preserved_when_present(self):
+        primary = {"totalProtein": 140, "totalCarbs": 310, "mealsLoggedCount": 4, "totalCalories": 2700}
+        out = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        assert out == primary
+
+    def test_partial_yesterday_fills_only_missing_fields(self):
+        primary = {"totalProtein": 150, "totalCalories": 2600}
+        out = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        assert out["totalProtein"] == 150
+        assert out["totalCalories"] == 2600
+        assert out["totalCarbs"] == 290
+        assert out["mealsLoggedCount"] == 3

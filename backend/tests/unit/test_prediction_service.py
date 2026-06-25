@@ -154,6 +154,21 @@ class TestFirestoreSnapshotMapping:
         req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
         assert req.injuredYesterday == 1
 
+    def test_physical_load_ignores_today_doc(self, firestore_snapshot):
+        snap = dict(firestore_snapshot)
+        snap["daily_health_yesterday"] = {}
+        snap["daily_health"] = {
+            "sleepMinutes": 480,
+            "steps": 5000,
+            "distanceMeters": 4000,
+            "heartRateAvg": 72,
+        }
+        req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        assert req.sleepMinutes == 480
+        assert req.steps == 0
+        assert req.distanceMeters == 0
+        assert req.heartRateAvg is None
+
 
 class TestPredictInjuryRisk:
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):

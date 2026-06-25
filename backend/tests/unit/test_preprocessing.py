@@ -82,6 +82,27 @@ class TestDataQualityScore:
         q = calculate_data_quality_score(req)
         assert "recovery_signal" not in q["hard_missing"]
 
+    def test_zero_steps_without_distance_triggers_load_signal(self):
+        req = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=0,
+        )
+        q = calculate_data_quality_score(req)
+        assert "load_signal" in q["hard_missing"]
+
+    def test_active_calories_count_as_load_signal(self):
+        req = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=0,
+            activeCalories=350,
+        )
+        q = calculate_data_quality_score(req)
+        assert "load_signal" not in q["hard_missing"]
+
     def test_sensitive_missing_reduces_score(self):
         req = InjuryPredictionRequest(
             userId="u1",

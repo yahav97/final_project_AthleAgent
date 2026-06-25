@@ -51,9 +51,9 @@ def injury_prediction_request_from_firestore_snapshot(
 
     Morning prediction merge policy (API date = wake-up day ``D``):
     - Sleep / recovery: ``daily_health/{D}`` only (last night ending this morning).
-    - Physical load: ``daily_health/{D-1}`` first, fallback ``{D}`` (legacy combined sync).
+    - Physical load: ``daily_health/{D-1}`` only (Android sync writes load to prior day).
     - Survey: ``daily_checkins/{D}``.
-    - Nutrition: ``daily_nutrition/{D-1}`` + backfill from earlier days.
+    - Nutrition: ``daily_nutrition/{D-1}`` + population defaults for missing fields.
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
@@ -78,12 +78,10 @@ def injury_prediction_request_from_firestore_snapshot(
     def today_only(field_options: list[str]) -> Any:
         return field_from_docs(health_today, {}, field_options, prefer_primary=True)
 
-    def yesterday_then_today(field_options: list[str]) -> Any:
-        return field_from_docs(health_yesterday, health_today, field_options, prefer_primary=True)
+    def yesterday_only(field_options: list[str]) -> Any:
+        return field_from_docs(health_yesterday, {}, field_options, prefer_primary=True)
 
     hr_avg = firestore_doc_heartrate_avg(health_yesterday)
-    if hr_avg is None:
-        hr_avg = firestore_doc_heartrate_avg(health_today)
 
     return InjuryPredictionRequest(
         userId=user_id,
@@ -92,28 +90,28 @@ def injury_prediction_request_from_firestore_snapshot(
         historyInjuryCount=hist_profile,
         injuredYesterday=injured_yesterday_for_request(injured_raw),
         sleepMinutes=today_only(["sleepMinutes", "sleep_minutes"]),
-        steps=yesterday_then_today(["steps", "daily_steps"]),
-        distanceMeters=yesterday_then_today(["distanceMeters", "distance_meters", "daily_distance_meters"]),
-        activeCalories=yesterday_then_today(["activeCalories", "active_calories", "active_calories_burned"]),
-        totalCalories=yesterday_then_today(["totalCalories", "total_calories", "daily_calories"]),
+        steps=yesterday_only(["steps", "daily_steps"]),
+        distanceMeters=yesterday_only(["distanceMeters", "distance_meters", "daily_distance_meters"]),
+        activeCalories=yesterday_only(["activeCalories", "active_calories", "active_calories_burned"]),
+        totalCalories=yesterday_only(["totalCalories", "total_calories", "daily_calories"]),
         heartRateAvg=hr_avg,
-        heartRateMax=yesterday_then_today(["heartRateMax", "heart_rate_max"]),
-        heartRateMin=yesterday_then_today(["heartRateMin", "heart_rate_min"]),
-        weightKg=yesterday_then_today(["weightKg", "weight_kg"]),
-        heightCm=yesterday_then_today(["heightCm", "height_cm"]),
-        bmrCalories=yesterday_then_today(["bmrCalories", "bmr_calories"]),
-        hrvRmssd=yesterday_then_today(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
-        restingHeartRate=yesterday_then_today(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
-        bodyFatPct=yesterday_then_today(["bodyFatPct", "body_fat_pct"]),
-        vo2Max=yesterday_then_today(["vo2Max", "vo2_max"]),
-        elevationGainedMeters=yesterday_then_today(["elevationGainedMeters", "elevation_gained_meters"]),
-        floorsClimbed=yesterday_then_today(["floorsClimbed", "floors_climbed"]),
-        avgSpeed=yesterday_then_today(["avgSpeed", "avg_speed"]),
-        maxSpeed=yesterday_then_today(["maxSpeed", "max_speed"]),
-        avgPower=yesterday_then_today(["avgPower", "avg_power"]),
-        avgCadence=yesterday_then_today(["avgCadence", "avg_cadence"]),
-        respiratoryRate=yesterday_then_today(["respiratoryRate", "respiratory_rate"]),
-        oxygenSaturation=yesterday_then_today(["oxygenSaturation", "oxygen_saturation", "spo2"]),
+        heartRateMax=yesterday_only(["heartRateMax", "heart_rate_max"]),
+        heartRateMin=yesterday_only(["heartRateMin", "heart_rate_min"]),
+        weightKg=yesterday_only(["weightKg", "weight_kg"]),
+        heightCm=yesterday_only(["heightCm", "height_cm"]),
+        bmrCalories=yesterday_only(["bmrCalories", "bmr_calories"]),
+        hrvRmssd=yesterday_only(["hrvRmssd", "hrv_rmssd", "hrv_score"]),
+        restingHeartRate=yesterday_only(["restingHeartRate", "resting_heart_rate", "resting_hr"]),
+        bodyFatPct=yesterday_only(["bodyFatPct", "body_fat_pct"]),
+        vo2Max=yesterday_only(["vo2Max", "vo2_max"]),
+        elevationGainedMeters=yesterday_only(["elevationGainedMeters", "elevation_gained_meters"]),
+        floorsClimbed=yesterday_only(["floorsClimbed", "floors_climbed"]),
+        avgSpeed=yesterday_only(["avgSpeed", "avg_speed"]),
+        maxSpeed=yesterday_only(["maxSpeed", "max_speed"]),
+        avgPower=yesterday_only(["avgPower", "avg_power"]),
+        avgCadence=yesterday_only(["avgCadence", "avg_cadence"]),
+        respiratoryRate=yesterday_only(["respiratoryRate", "respiratory_rate"]),
+        oxygenSaturation=yesterday_only(["oxygenSaturation", "oxygen_saturation", "spo2"]),
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),

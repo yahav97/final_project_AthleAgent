@@ -104,40 +104,19 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
 
 def merge_nutrition_with_history(user_id: str, date_key: str, primary: dict[str, Any]) -> dict[str, Any]:
     """
-    Fill missing nutrition aggregates from recent prior days (same user).
+    Fill missing nutrition aggregates from population averages.
 
-    For morning prediction on wake-up day ``D``, pass ``primary`` from ``daily_nutrition/{D-1}``
-    and ``date_key=D`` so backfill scans ``D-2``, ``D-3``, … when yesterday is incomplete.
+    Uses ``primary`` from ``daily_nutrition/{D-1}`` when present. Missing fields get
+    stable baseline values (not a multi-day Firestore backfill), so new athletes are
+    not imputed from empty or unrelated prior days.
+
+    ``user_id`` and ``date_key`` are kept for call-site compatibility.
     """
-    out = dict(primary or {})
-    keys = ("totalProtein", "totalCarbs", "mealsLoggedCount", "totalCalories")
+    from services.nutrition_defaults import apply_nutrition_population_defaults
 
-    def field_missing(key: str) -> bool:
-        return out.get(key) is None
-
-    if not any(field_missing(key) for key in keys):
-        return out
-
-    db = _firestore_client()
-    if db is None:
-        return out
-    try:
-        base = to_date_key(date_key)
-        user_ref = db.collection("users").document(user_id)
-        for offset in range(1, 15):
-            day_key = (base - timedelta(days=offset)).strftime("%Y-%m-%d")
-            doc = user_ref.collection("daily_nutrition").document(day_key).get()
-            if not doc.exists:
-                continue
-            previous = doc.to_dict() or {}
-            for key in keys:
-                if field_missing(key) and previous.get(key) is not None:
-                    out[key] = previous[key]
-            if not any(field_missing(key) for key in keys):
-                break
-    except Exception:
-        logger.exception("merge_nutrition_with_history failed user_id=%s date=%s", user_id, date_key)
-    return out
+    _ = user_id
+    _ = date_key
+    return apply_nutrition_population_defaults(primary)
 
 
 def save_daily_prediction_result(

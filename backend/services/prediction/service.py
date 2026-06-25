@@ -41,8 +41,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     If ``injury_model.pkl`` is not present on the server, returns a conservative demo
     response so local development and CI still behave predictably.
 
-    Client is expected to avoid calling until required inputs exist; we do not reject
-    on sparse payloads here (nutrition may still be backfilled server-side for Firestore path).
+    Client is expected to avoid calling until required inputs exist; missing load is
+    surfaced via ``load_signal`` in data quality (confidence only, not HTTP rejection).
     """
     import services.prediction_service as prediction_service_module
 
@@ -114,9 +114,9 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
 
     Merge policy (wake-up day ``D``):
     - Sleep: ``daily_health/{D}``.
-    - Physical load: ``daily_health/{D-1}`` (fallback ``{D}`` for legacy docs).
+    - Physical load: ``daily_health/{D-1}`` only.
     - Survey: ``daily_checkins/{D}``.
-    - Nutrition: ``daily_nutrition/{D-1}`` + ``merge_nutrition_with_history``.
+    - Nutrition: ``daily_nutrition/{D-1}`` + population defaults for missing fields.
     """
     import services.prediction_service as prediction_service_module
 
