@@ -10,8 +10,14 @@ from schemas.observability import ClientEventIn, ClientEventType
 
 _lock = Lock()
 _last_seen: dict[str, float] = {}
-_MAX_TRACKED_KEYS = 10_000
-_STALE_ENTRY_SECONDS = 86_400
+
+
+def _max_tracked_keys() -> int:
+    return settings.CLIENT_EVENT_MAX_TRACKED_KEYS
+
+
+def _stale_entry_seconds() -> int:
+    return settings.CLIENT_EVENT_STALE_ENTRY_SECONDS
 
 
 def _rate_limit_seconds(event_type: ClientEventType) -> int:
@@ -29,13 +35,14 @@ def _rate_limit_seconds(event_type: ClientEventType) -> int:
 
 
 def _evict_stale_entries(now: float) -> None:
-    stale_before = now - _STALE_ENTRY_SECONDS
+    stale_before = now - _stale_entry_seconds()
     stale_keys = [key for key, seen_at in _last_seen.items() if seen_at < stale_before]
     for key in stale_keys:
         _last_seen.pop(key, None)
-    if len(_last_seen) <= _MAX_TRACKED_KEYS:
+    max_keys = _max_tracked_keys()
+    if len(_last_seen) <= max_keys:
         return
-    overflow = len(_last_seen) - _MAX_TRACKED_KEYS
+    overflow = len(_last_seen) - max_keys
     oldest_keys = sorted(_last_seen, key=_last_seen.get)[:overflow]
     for key in oldest_keys:
         _last_seen.pop(key, None)

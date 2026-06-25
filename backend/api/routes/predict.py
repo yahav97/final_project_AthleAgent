@@ -17,7 +17,7 @@ from services.prediction_service import (
     predict_injury_risk_from_firestore,
     resolve_model_bundle,
 )
-from services.risk_levels import LEGACY_SKLEARN_HIGH, LEGACY_SKLEARN_MEDIUM, classify_risk_level
+from services.risk_levels import classify_risk_level
 from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
@@ -33,9 +33,14 @@ def test_predict_injury(data: SimpleData):
     Returns:
         dict: Stable mock inference payload.
     """
+    if not settings.ENABLE_TEST_PREDICT_ENDPOINT:
+        raise HTTPException(
+            status_code=404,
+            detail="Test endpoint disabled. Set ENABLE_TEST_PREDICT_ENDPOINT=true.",
+        )
     return {
         "user_id": data.user_id,
-        "risk_percentage": 72.5,
+        "risk_percentage": settings.TEST_PREDICT_MOCK_RISK_PERCENTAGE,
         "risk_level": "High",
         "message": "This is a mock response for Android UI testing",
     }
@@ -88,8 +93,8 @@ def predict_injury_sklearn(data: AthleteData):
         "risk_percentage": round(risk_probability * 100, 1),
         "risk_level": classify_risk_level(
             risk_probability,
-            high=LEGACY_SKLEARN_HIGH,
-            medium=LEGACY_SKLEARN_MEDIUM,
+            high=settings.LEGACY_SKLEARN_HIGH_CUTOFF,
+            medium=settings.LEGACY_SKLEARN_MEDIUM_CUTOFF,
         ),
     }
 

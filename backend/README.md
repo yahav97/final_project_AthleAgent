@@ -7,6 +7,12 @@ FastAPI backend for injury-risk inference. This service is treated as mission-cr
 - If model gate checks pass, `POST /predict/daily` returns a model-based response.
 - If gate checks fail or persistence is unavailable, `POST /predict/daily` returns HTTP **503** with a clear error (validation issues → **422**).
 
+## Configuration
+
+All tunable backend behaviour is centralized in [`config.py`](config.py). Copy [`backend/.env.example`](.env.example) to `backend/.env` to override defaults without editing code.
+
+Key groups: ML gates, risk bands (must match Android), history window, prediction confidence weights, logging, and feature flags (`ENABLE_LEGACY_SKLEARN_ENDPOINT`, `ENABLE_TEST_PREDICT_ENDPOINT`).
+
 ## API Structure
 
 ### `POST /predict/daily`

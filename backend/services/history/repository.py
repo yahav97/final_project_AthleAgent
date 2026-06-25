@@ -6,6 +6,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from config import settings
 from schemas.enums import HistoryConfidence
 from services.history.date_utils import date_keys_in_range, to_date_key
 from services.field_transforms import injured_yesterday_from_doc
@@ -210,30 +211,33 @@ def fetch_historical_derived_features(
 def get_history_window_context(
     user_id: str,
     date_key: str,
-    lookback_days: int = 7,
+    lookback_days: int | None = None,
     include_target_day: bool = True,
 ) -> dict[str, Any]:
     """
     Return historical feature context with quality metadata for fallback decisions.
 
-    confidence policy:
-    - high: 7 days
-    - medium: 4-6 days
-    - low: 0-3 days
+    confidence policy (see config.settings):
+    - high:   HISTORY_CONFIDENCE_HIGH_MIN_DAYS+ days
+    - medium: HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS .. high-1 days
+    - low:    below medium threshold
     """
+    resolved_lookback = (
+        settings.HISTORY_LOOKBACK_DAYS if lookback_days is None else lookback_days
+    )
     import services.history_service as history_service_module
 
     rows = history_service_module.fetch_user_history(
         user_id,
         date_key,
-        lookback_days=lookback_days,
+        lookback_days=resolved_lookback,
         include_target_day=include_target_day,
     )
     days_count = len(rows)
     features = compute_historical_derived_features(rows)
-    if days_count >= 7:
+    if days_count >= settings.HISTORY_CONFIDENCE_HIGH_MIN_DAYS:
         confidence = HistoryConfidence.HIGH
-    elif days_count >= 4:
+    elif days_count >= settings.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS:
         confidence = HistoryConfidence.MEDIUM
     else:
         confidence = HistoryConfidence.LOW

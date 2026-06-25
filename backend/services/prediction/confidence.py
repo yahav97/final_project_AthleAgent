@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from config import settings
 from schemas.enums import HistoryConfidence
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import DEFAULT_FEATURE_VALUES
@@ -39,7 +40,7 @@ def apply_history_confidence_fallback(
     context = prediction_service_module.get_history_window_context(
         payload.userId,
         payload.date,
-        lookback_days=7,
+        lookback_days=settings.HISTORY_LOOKBACK_DAYS,
         include_target_day=False,
     )
     confidence_raw = context.get("confidence") or HistoryConfidence.LOW.value
@@ -63,16 +64,19 @@ def apply_history_confidence_fallback(
 
 def history_score_from_confidence(confidence: HistoryConfidence) -> float:
     if confidence == HistoryConfidence.HIGH:
-        return 0.95
+        return settings.CONFIDENCE_SCORE_HIGH
     if confidence == HistoryConfidence.MEDIUM:
-        return 0.7
-    return 0.45
+        return settings.CONFIDENCE_SCORE_MEDIUM
+    return settings.CONFIDENCE_SCORE_LOW
 
 
 def prediction_confidence_0_100(confidence: HistoryConfidence, quality_score: float) -> float:
     """Blend history-window confidence with same-day input completeness (0–1) → 0–100."""
     history_score = history_score_from_confidence(confidence)
-    combined = 0.6 * history_score + 0.4 * float(quality_score)
+    combined = (
+        settings.CONFIDENCE_HISTORY_WEIGHT * history_score
+        + settings.CONFIDENCE_QUALITY_WEIGHT * float(quality_score)
+    )
     return round(min(100.0, max(0.0, combined * 100.0)), 2)
 
 

@@ -300,15 +300,27 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ### Environment Variables
 
+כל ההגדרות הניתנות לשינוי מרוכזות ב-`config.py` (pydantic-settings). תבנית מלאה: `backend/.env.example`.
+
 ```env
-# Local Python
-FIREBASE_SERVICE_ACCOUNT_KEY=/path/to/service-account.json
+# העתק ל-backend/.env
+FIREBASE_SERVICE_ACCOUNT_KEY=backend/firebase-key.json
+LOG_LEVEL=INFO
 
-# Docker (set automatically in docker-compose.yml)
-# FIREBASE_SERVICE_ACCOUNT_KEY=/app/backend/firebase-key.json
+# דגלי פיצ'ר
+ENABLE_LEGACY_SKLEARN_ENDPOINT=false
+ENABLE_TEST_PREDICT_ENDPOINT=false
 
-GEMINI_API_KEY=your-gemini-api-key           # אופציונלי — בשימוש בלקוח בלבד
+# שערי ML (staging יכול להרחיב)
+ML_MIN_RECALL_HARD=0.80
+ML_MIN_AUC_FOR_LIVE=0.68
+
+# ספי סיכון (חייבים להתאים לאנדרואיד)
+RISK_HIGH_CUTOFF=0.70
+RISK_MEDIUM_CUTOFF=0.20
 ```
+
+קבוצות נוספות: חלון היסטוריה, משקלי confidence, imputation תזונה, rate limits — ראה `config.py`.
 
 ---
 
@@ -326,6 +338,7 @@ GEMINI_API_KEY=your-gemini-api-key           # אופציונלי — בשימו
 
 | קובץ | תפקיד |
 |------|--------|
+| `config.py` | כל ההגדרות והקבועים הניתנים ל-override |
 | `api/routes/predict.py` | נתיבי API |
 | `services/prediction/` | לוגיקת חיזוי (service, bundle, confidence) |
 | `services/preprocessing/` | הנדסת פיצ'רים + איכות נתונים |

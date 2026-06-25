@@ -9,18 +9,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from config import settings
 from utils.logging import logger
 from utils.request_context import clear_request_context, get_or_create_request_id
 
-SKIP_PATHS = {"/health", "/", "/docs", "/openapi.json", "/redoc", "/status/ml"}
-SLOW_MS = 2000
+_SKIP_PATHS = frozenset(settings.REQUEST_LOG_SKIP_PATHS)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log completed HTTP requests with smart filtering and X-Request-ID propagation."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path in SKIP_PATHS:
+        if request.url.path in _SKIP_PATHS:
             return await call_next(request)
 
         request_id = get_or_create_request_id(request.headers.get("X-Request-ID"))
@@ -49,7 +49,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             level = logging.INFO
             if status_code >= 500:
                 level = logging.ERROR
-            elif status_code >= 400 or duration_ms >= SLOW_MS:
+            elif status_code >= 400 or duration_ms >= settings.SLOW_REQUEST_MS:
                 level = logging.WARNING
 
             logger.log(

@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 import joblib
 
+from config import settings
 from schemas.enums import ModelGateReason, ModelLiveStatus
 from utils.logging import logger
 
@@ -16,9 +17,6 @@ _model_gate_reason: str = ModelGateReason.MODEL_NOT_LOADED.value
 _model_live: bool = False
 _active_manifest: dict[str, Any] = {}
 _active_promoted: dict[str, Any] = {}
-
-MIN_RECALL_HARD = 0.80
-MIN_AUC_FOR_LIVE = 0.68
 
 PathLike = Path | str
 
@@ -114,9 +112,9 @@ def _validate_manifest_for_live(manifest: dict[str, Any], model_path: Path) -> t
         auc = float(metrics.get("ROC-AUC"))
     except (TypeError, ValueError):
         return False, ModelGateReason.MANIFEST_INVALID_AUC
-    if recall < MIN_RECALL_HARD:
+    if recall < settings.ML_MIN_RECALL_HARD:
         return False, ModelGateReason.MANIFEST_RECALL_BELOW_HARD_GATE
-    if auc < MIN_AUC_FOR_LIVE:
+    if auc < settings.ML_MIN_AUC_FOR_LIVE:
         return False, ModelGateReason.MANIFEST_AUC_TOO_LOW
 
     policy = manifest.get("policy") or {}
@@ -281,7 +279,7 @@ def get_model_status() -> dict[str, Any]:
             recall_value = float(winner_metrics.get("Recall@Threshold"))
         except (TypeError, ValueError):
             recall_value = None
-    degraded_auc_threshold = MIN_AUC_FOR_LIVE + 0.02
+    degraded_auc_threshold = settings.ML_MIN_AUC_FOR_LIVE + settings.ML_DEGRADED_AUC_OFFSET
     degraded_rc = bool(_model_live and auc_value is not None and auc_value < degraded_auc_threshold)
     run_id = _active_manifest.get("run_id") if isinstance(_active_manifest, dict) else None
     if not run_id and isinstance(_active_promoted, dict):
