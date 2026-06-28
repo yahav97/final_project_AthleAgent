@@ -33,7 +33,7 @@ class DailyCheckInActivity : AppCompatActivity() {
     private var stressLevel: Float = 30f
     private var injuredYesterday: Int = 0
 
-    // מדווח האירועים
+    // Event reporter
     private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,14 +157,15 @@ class DailyCheckInActivity : AppCompatActivity() {
             yesterdayHealthRef.get().addOnSuccessListener { yesterdayHealthDoc ->
                 todayCheckinRef.get().addOnSuccessListener { todayCheckinDoc ->
 
-                    // בדיקת התנאים המפוצלים החדשה לפי דרישות צוף
-                    val hasTodaySleep = todayHealthDoc.exists() && todayHealthDoc.contains("sleepMinutes")
-                    val hasYesterdayPhysical = yesterdayHealthDoc.exists() && yesterdayHealthDoc.contains("steps")
+                    // Fetching the values themselves for validation
+                    val todaySleep = todayHealthDoc.getLong("sleepMinutes") ?: 0L
+                    val yesterdaySteps = yesterdayHealthDoc.getLong("steps") ?: 0L
                     val hasTodaySurvey = todayCheckinDoc.exists() && todayCheckinDoc.contains("energyLevel")
 
-                    if (hasTodaySleep && hasYesterdayPhysical && hasTodaySurvey) {
-                        Log.d("ML_Trigger", "All parameters verified (Today Sleep + Yesterday Physical + Survey). Triggering prediction.")
-                        eventReporter.reportEvent("ml_trigger", "Triggering core prediction with full cross-day context")
+                    // New fix: ensure data is greater than 0 and not empty/misleading
+                    if (todaySleep > 0L && yesterdaySteps > 0L && hasTodaySurvey) {
+                        Log.d("ML_Trigger", "All parameters verified with valid data. Triggering prediction.")
+                        eventReporter.reportEvent("ml_trigger", "Triggering core prediction with verified non-zero data")
 
                         val startTime = System.currentTimeMillis()
                         val requestData = ApiService.PredictionTriggerRequest(userId, today)
@@ -191,7 +192,7 @@ class DailyCheckInActivity : AppCompatActivity() {
                                 }
                             })
                     } else {
-                        Log.d("ML_Trigger", "Skipping trigger due to missing variables. TodaySleep=$hasTodaySleep, YesterdayPhysical=$hasYesterdayPhysical, TodaySurvey=$hasTodaySurvey")
+                        Log.d("ML_Trigger", "Skipping trigger: Data contains zero values or missing survey. TodaySleep=$todaySleep, YesterdaySteps=$yesterdaySteps, TodaySurvey=$hasTodaySurvey")
                     }
                 }
             }

@@ -25,7 +25,7 @@ object ApiClient {
         retrofit.create(ApiService::class.java)
     }
 
-    // הוספנו את החשיפה של ה-API החדש כאן!
+    // We added the new API exposure here!
     val observabilityApi: ObservabilityApi by lazy {
         retrofit.create(ObservabilityApi::class.java)
     }

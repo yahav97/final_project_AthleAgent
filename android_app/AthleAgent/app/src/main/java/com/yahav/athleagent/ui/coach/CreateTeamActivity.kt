@@ -36,15 +36,15 @@ class CreateTeamActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         setLoading(true)
 
-        // שלב 1: בודקים אם קוד הקבוצה כבר קיים ב-Firestore
+        // Step 1: Check if the team code already exists in Firestore
         db.collection("teams").whereEqualTo("teamCode", teamCode).get()
             .addOnSuccessListener { querySnapshot ->
                 if (!querySnapshot.isEmpty) {
-                    // הקוד כבר תפוס
+                    // Code is already taken
                     setLoading(false)
                     binding.createTeamTILTeamCode.error = "This code already exists. Choose another."
                 } else {
-                    // הקוד פנוי, ממשיכים לשלב 2: יצירת הקבוצה
+                    // Code is available, proceeding to step 2: Team creation
                     binding.createTeamTILTeamCode.error = null
                     createTeamRecord(uid, teamName, teamCode)
                 }
@@ -67,7 +67,7 @@ class CreateTeamActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 setLoading(false)
                 Toast.makeText(this, "Team Created Successfully!", Toast.LENGTH_SHORT).show()
-                // סוגרים את המסך וחוזרים אוטומטית למסך הבית
+                // Close the screen and automatically return to the home screen
                 finish()
             }
             .addOnFailureListener {

@@ -38,13 +38,11 @@ class AthleteDashboardActivity : AppCompatActivity() {
         binding = ActivityAthleteDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // הגרף ההיסטורי נטען פעם אחת ביצירת המסך
         loadHistoricalData()
     }
 
     override fun onResume() {
         super.onResume()
-        // בכל פעם שהמשתמש חוזר למסך הזה, נבדוק אם יש חיזוי חדש בפיירבייס
         loadTodayPredictionFromFirestore()
     }
 
@@ -57,23 +55,23 @@ class AthleteDashboardActivity : AppCompatActivity() {
         healthRef.get().addOnSuccessListener { healthDoc ->
             checkinRef.get().addOnSuccessListener { checkInDoc ->
 
-                // האם המודל ברקע כבר רץ ושמר את התוצאה?
+                // Check if the background ML model has already run and saved the result
                 if (healthDoc.exists() && healthDoc.contains("finalRiskScore")) {
 
-                    // 1. חילוץ התוצאות שהמודל השאיר לנו
+                    // 1. Extract the prediction results left by the ML model
                     val riskScore = healthDoc.getDouble("finalRiskScore")?.toInt() ?: 0
                     val riskLevel = healthDoc.getString("riskLevel") ?: "Low"
                     val confidence = healthDoc.getDouble("predictionConfidence")?.toFloat() ?: 0f
 
-                    // 2. עדכון חוגת האחוזים ב-UI
+                    // 2. Update the progress dial UI
                     updateUIWithScore(riskScore)
 
-                    // 3. חילוץ נתונים קיימים כדי לתת קונטקסט ל-Gemini
+                    // 3. Extract existing data to provide context for Gemini
                     val sleepMinutes = healthDoc.getLong("sleepMinutes") ?: 480L
                     val soreness = checkInDoc.getLong("muscleSoreness")?.toInt() ?: 1
                     val stress = checkInDoc.getLong("stressLevel")?.toInt() ?: 20
 
-                    // 4. קריאה לג'מיני לייצור המלצה מילולית
+                    // 4. Call Gemini to generate a verbal recommendation
                     lifecycleScope.launch(Dispatchers.IO) {
                         fetchAIRecommendation(
                             riskScore,
@@ -85,8 +83,21 @@ class AthleteDashboardActivity : AppCompatActivity() {
                         )
                     }
                 } else {
-                    // המשתמש עדיין לא ביצע סנכרון שעון או סקר היום
-                    updateUIWithMissingDataState()
+                    // The model hasn't run. Check if it's due to missing data or zero/empty data
+                    val sleepMinutes = healthDoc.getLong("sleepMinutes") ?: 0L
+                    val hasSurvey = checkInDoc.exists() && checkInDoc.contains("energyLevel")
+
+                    runOnUiThread {
+                        binding.dashboardPRGRiskScore.progress = 0
+                        binding.dashboardTXTScore.text = "--%"
+                        binding.dashboardTXTScore.setTextColor("#9E9E9E".toColorInt())
+
+                        if (sleepMinutes == 0L && hasSurvey) {
+                            binding.dashboardTXTAiRecommendation.text = "Pending: Your watch sync returned 0 sleep minutes. Wearable data must be tracking properly to compute injury risk."
+                        } else {
+                            binding.dashboardTXTAiRecommendation.text = "Pending: Please complete today's Stress Survey and Watch Sync to generate your Injury Risk Score."
+                        }
+                    }
                 }
             }
         }.addOnFailureListener { e ->

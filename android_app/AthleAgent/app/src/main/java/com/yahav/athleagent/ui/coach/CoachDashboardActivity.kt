@@ -123,7 +123,7 @@ class CoachDashboardActivity : AppCompatActivity() {
                     if (!aiRec.isNullOrEmpty()) {
                         updateRiskUI(currentRisk, aiRec)
                     } else {
-                        // פתרון פער ה-aiRecommendation: מחוללים אותו דינמית דרך המאמן
+                        // aiRecommendation gap solution: generating it dynamically via the coach
                         binding.coachDashTXTAiRecommendation.text = "Generating AI Recommendation..."
                         db.collection("users").document(athleteUid).collection("daily_checkins").document(today).get()
                             .addOnSuccessListener { checkInDoc ->
@@ -177,7 +177,7 @@ class CoachDashboardActivity : AppCompatActivity() {
                 updateRiskUI(riskScore, aiText)
             }
 
-            // שמירת ההמלצה בחזרה לתוך מסמך האתלט
+            // Save the recommendation back into the athlete's document
             db.collection("users").document(athleteUid)
                 .collection("daily_health").document(dateKey)
                 .set(mapOf("aiRecommendation" to aiText), SetOptions.merge())

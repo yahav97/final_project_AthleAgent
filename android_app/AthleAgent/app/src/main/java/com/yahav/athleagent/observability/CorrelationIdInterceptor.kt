@@ -8,7 +8,7 @@ class CorrelationIdInterceptor : Interceptor {
         val originalRequest = chain.request()
         val requestId = RequestIdHolder.getRequestId()
 
-        // משכפלים את הבקשה המקורית ומוסיפים לה את ההדר שצוף ביקשה
+        // Clones the original request and adds the header requested by Tzuf
         val newRequest = originalRequest.newBuilder()
             .header("X-Request-ID", requestId)
             .build()

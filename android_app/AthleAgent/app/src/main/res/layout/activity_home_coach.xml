@@ -112,7 +112,7 @@
                 android:textColor="@color/brand_button_dark_muted"
                 android:textSize="@dimen/login_text_size" />
 
-            <!-- אזור הפעולות כשיש קבוצה (דאשבורד וניהול) -->
+            <!-- Action area when there is a team (dashboard and management) -->
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:id="@+id/coachHome_LAYOUT_existingTeamActions"
                 android:visibility="gone"
@@ -196,7 +196,7 @@
                 </com.google.android.material.card.MaterialCardView>
             </androidx.appcompat.widget.LinearLayoutCompat>
 
-            <!-- הכרטיסייה החדשה של יצירת קבוצה כשהמאמן ללא קבוצה -->
+            <!-- New team creation card when the coach has no team -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/coachHome_CARD_createTeamAction"
                 android:visibility="gone"

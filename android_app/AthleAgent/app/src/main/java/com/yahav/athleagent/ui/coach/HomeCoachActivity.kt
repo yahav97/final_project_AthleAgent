@@ -39,7 +39,7 @@ class HomeCoachActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // מרעננים נתונים כשחוזרים ממסך יצירת הקבוצה
+        // Refresh data when returning from the team creation screen
         loadCoachData()
         listenForPendingRequests()
     }
@@ -54,7 +54,7 @@ class HomeCoachActivity : AppCompatActivity() {
         binding.coachHomeBTNDashboard.setOnClickListener {
             startActivity(Intent(this, CoachDashboardActivity::class.java))
         }
-        // המעבר למסך יצירת הקבוצה החדש!
+        // Transition to the new team creation screen!
         binding.coachHomeCARDCreateTeamAction.setOnClickListener {
             startActivity(Intent(this, CreateTeamActivity::class.java))
         }
@@ -66,7 +66,7 @@ class HomeCoachActivity : AppCompatActivity() {
     private fun loadCoachData() {
         val uid = auth.currentUser?.uid ?: return
 
-        // טעינת שם המאמן
+        // Load coach name
         db.collection("users").document(uid).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
@@ -75,7 +75,7 @@ class HomeCoachActivity : AppCompatActivity() {
                 }
             }
 
-        // בדיקה האם יש קבוצה ועדכון התצוגה של הכרטיסיות
+        // Check if there is a team and update the tab display
         db.collection("teams").whereEqualTo("coachId", uid).get()
             .addOnSuccessListener { teams ->
                 if (!teams.isEmpty) {
@@ -83,11 +83,11 @@ class HomeCoachActivity : AppCompatActivity() {
                     binding.coachHomeLBLTeamName.text = teamName
                     binding.coachHomeLBLTeamName.visibility = View.VISIBLE
 
-                    // יש קבוצה: מציגים דאשבורד וניהול, מסתירים את יצירת הקבוצה
+                    // Has team: show dashboard and management, hide team creation
                     binding.coachHomeLAYOUTExistingTeamActions.visibility = View.VISIBLE
                     binding.coachHomeCARDCreateTeamAction.visibility = View.GONE
                 } else {
-                    // אין קבוצה: מסתירים את שם הקבוצה, דאשבורד וניהול, מציגים את כרטיסיית היצירה
+                    // No team: hide team name, dashboard, and management, show creation card
                     binding.coachHomeLBLTeamName.visibility = View.GONE
                     binding.coachHomeLAYOUTExistingTeamActions.visibility = View.GONE
                     binding.coachHomeCARDCreateTeamAction.visibility = View.VISIBLE

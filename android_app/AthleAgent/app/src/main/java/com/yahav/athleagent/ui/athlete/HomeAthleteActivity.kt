@@ -39,7 +39,7 @@ class HomeAthleteActivity : AppCompatActivity() {
 
     private var imageUri: Uri? = null
 
-    // אתחול מערכת הלוגים החדשה
+    // Initialize the new logging system
     private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
 
     private val getContentLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -63,7 +63,7 @@ class HomeAthleteActivity : AppCompatActivity() {
         binding = ActivityHomeAthleteBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // דיווח כניסה למסך לשרת הלוגים
+        // Report screen entry to the log server
         eventReporter.reportEvent("screen_view", "HomeAthleteActivity opened")
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
@@ -175,6 +175,7 @@ class HomeAthleteActivity : AppCompatActivity() {
         var hasWearableSync = false
         var hasCheckIn = false
         var hasMeal = false
+        var isDataZero = false
 
         val wearableTask = db.collection("users").document(userId)
             .collection("daily_health").document(today).get()
@@ -188,18 +189,51 @@ class HomeAthleteActivity : AppCompatActivity() {
         Tasks.whenAllComplete(wearableTask, checkinTask, mealTask)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    // תיקון: מוודאים שקיימת שינה של היום, ולא רק מסמך ריק
-                    if (wearableTask.isSuccessful && wearableTask.result.exists() && wearableTask.result.contains("sleepMinutes")) {
-                        hasWearableSync = true
+                    if (wearableTask.isSuccessful && wearableTask.result.exists()) {
+                        val sleep = wearableTask.result.getLong("sleepMinutes") ?: 0L
+                        if (sleep > 0L) {
+                            hasWearableSync = true
+                        } else {
+                            isDataZero = true
+                        }
                     }
                     if (checkinTask.isSuccessful && checkinTask.result.exists()) hasCheckIn = true
                     if (mealTask.isSuccessful && mealTask.result.exists()) hasMeal = true
 
-                    updateAlertUI(hasWearableSync, hasCheckIn, hasMeal)
+
+                    if (isDataZero && hasCheckIn) {
+                        updateAlertUIWithZeroDataState(hasMeal)
+                    } else {
+                        updateAlertUI(hasWearableSync, hasCheckIn, hasMeal)
+                    }
                 } else {
                     updateAlertUI(false, false, false)
                 }
             }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun updateAlertUIWithZeroDataState(hasMeal: Boolean) {
+        val alertItems = mutableListOf<AlertItem>()
+
+        alertItems.add(AlertItem(
+            "Sync complete, but 0 sleep minutes detected.\nCheck your wearable placement.",
+            android.R.drawable.ic_dialog_alert,
+            "#FFEBEE", "#EF5350", "#C62828", "#EF5350"
+        ) { startActivity(Intent(this@HomeAthleteActivity, WearableSyncActivity::class.java)) })
+
+        if (!hasMeal) {
+            alertItems.add(AlertItem(
+                "Missing Meal Analysis.\nTap to upload.",
+                R.drawable.baseline_add_a_photo_24,
+                "#FFF3E0", "#FFB74D", "#E65100", "#F57C00"
+            ) { showImageSourceDialog() })
+        }
+
+        val adapter = AlertsAdapter(alertItems)
+        binding.athleteHomeVPAlerts.adapter = adapter
+        TabLayoutMediator(binding.athleteHomeTABAlerts, binding.athleteHomeVPAlerts) { _, _ -> }.attach()
+        binding.athleteHomeTABAlerts.visibility = if (alertItems.size <= 1) View.GONE else View.VISIBLE
     }
 
     @SuppressLint("SetTextI18n")

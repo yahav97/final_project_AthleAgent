@@ -123,7 +123,7 @@ class WearableSyncActivity : AppCompatActivity() {
 
                 val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user"
 
-                // חישוב מפתחות התאריכים (היום ואתמול)
+                // Calculate date keys (today and yesterday)
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 val todayKey = dateFormat.format(Date())
 
@@ -131,26 +131,26 @@ class WearableSyncActivity : AppCompatActivity() {
                 cal.add(Calendar.DATE, -1)
                 val yesterdayKey = dateFormat.format(cal.time)
 
-                // 1. נתוני שינה להיום בלבד
+                // 1. Sleep data for today only
                 val sleepDataToSave = mapOf(
                     "sleepMinutes" to sleepMinutes,
                     "lastSync" to FieldValue.serverTimestamp()
                 )
 
-                // 2. נתונים פיזיים של אתמול
+                // 2. Physical data for yesterday
                 val physicalDataToSave = physicalData.toMutableMap().apply {
                     put("lastSync", FieldValue.serverTimestamp())
                 }
 
                 val db = FirebaseFirestore.getInstance()
 
-                // ביצוע שמירה מפוצלת ב-Firestore
+                // Perform split saving in Firestore
                 db.collection("users").document(userId)
                     .collection("daily_health").document(todayKey)
                     .set(sleepDataToSave, SetOptions.merge())
                     .addOnSuccessListener {
 
-                        // שמירת נתוני אתמול מתבצעת מיד לאחר הצלחת הראשונה
+                        // Saving yesterday's data occurs immediately after the first success
                         db.collection("users").document(userId)
                             .collection("daily_health").document(yesterdayKey)
                             .set(physicalDataToSave, SetOptions.merge())
@@ -295,14 +295,15 @@ class WearableSyncActivity : AppCompatActivity() {
             yesterdayHealthRef.get().addOnSuccessListener { yesterdayHealthDoc ->
                 todayCheckinRef.get().addOnSuccessListener { todayCheckinDoc ->
 
-                    // בדיקת התנאים המפוצלים החדשה לפי דרישות צוף
-                    val hasTodaySleep = todayHealthDoc.exists() && todayHealthDoc.contains("sleepMinutes")
-                    val hasYesterdayPhysical = yesterdayHealthDoc.exists() && yesterdayHealthDoc.contains("steps")
+                    // Fetching the values themselves for validation
+                    val todaySleep = todayHealthDoc.getLong("sleepMinutes") ?: 0L
+                    val yesterdaySteps = yesterdayHealthDoc.getLong("steps") ?: 0L
                     val hasTodaySurvey = todayCheckinDoc.exists() && todayCheckinDoc.contains("energyLevel")
 
-                    if (hasTodaySleep && hasYesterdayPhysical && hasTodaySurvey) {
-                        Log.d("ML_Trigger", "All parameters verified (Today Sleep + Yesterday Physical + Survey). Triggering prediction.")
-                        eventReporter.reportEvent("ml_trigger", "Triggering core prediction with full cross-day context")
+                    // New fix: ensure data is greater than 0 and not empty/misleading
+                    if (todaySleep > 0L && yesterdaySteps > 0L && hasTodaySurvey) {
+                        Log.d("ML_Trigger", "All parameters verified with valid data. Triggering prediction.")
+                        eventReporter.reportEvent("ml_trigger", "Triggering core prediction with verified non-zero data")
 
                         val startTime = System.currentTimeMillis()
                         val requestData = ApiService.PredictionTriggerRequest(userId, today)
@@ -329,7 +330,7 @@ class WearableSyncActivity : AppCompatActivity() {
                                 }
                             })
                     } else {
-                        Log.d("ML_Trigger", "Skipping trigger due to missing variables. TodaySleep=$hasTodaySleep, YesterdayPhysical=$hasYesterdayPhysical, TodaySurvey=$hasTodaySurvey")
+                        Log.d("ML_Trigger", "Skipping trigger: Data contains zero values or missing survey. TodaySleep=$todaySleep, YesterdaySteps=$yesterdaySteps, TodaySurvey=$hasTodaySurvey")
                     }
                 }
             }

@@ -9,7 +9,7 @@ object RequestIdHolder {
         return currentRequestId
     }
 
-    // אפשר לקרוא לפונקציה הזו כשמתחילים סשן חדש (למשל בכניסה לאפליקציה)
+    // This function can be called when starting a new session (e.g., when entering the app)
     fun generateNewId(): String {
         currentRequestId = UUID.randomUUID().toString()
         return currentRequestId
