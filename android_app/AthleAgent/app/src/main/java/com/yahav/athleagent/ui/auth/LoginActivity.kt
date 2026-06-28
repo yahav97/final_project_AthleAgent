@@ -3,6 +3,8 @@ package com.yahav.athleagent.ui.auth
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.view.animation.AnimationUtils
+import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -42,6 +44,9 @@ class LoginActivity : AppCompatActivity() {
 
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        findViewById<LinearLayoutCompat>(R.id.login_form_container).startAnimation(entranceAnim)
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.loginRoot) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())

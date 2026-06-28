@@ -24,6 +24,8 @@ import com.yahav.athleagent.observability.ClientEventReporter
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import android.view.animation.AnimationUtils
+import androidx.appcompat.widget.LinearLayoutCompat
 
 class DailyCheckInActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDailyCheckInBinding
@@ -40,6 +42,9 @@ class DailyCheckInActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityDailyCheckInBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        findViewById<LinearLayoutCompat>(R.id.checkin_form_container).startAnimation(entranceAnim)
 
         eventReporter.reportEvent("screen_view", "DailyCheckInActivity opened")
 

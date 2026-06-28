@@ -14,6 +14,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.yahav.athleagent.databinding.ActivityHomeCoachBinding
 import com.yahav.athleagent.ui.auth.LoginActivity
+import com.yahav.athleagent.R
+import android.view.animation.AnimationUtils
+import androidx.appcompat.widget.LinearLayoutCompat
 
 class HomeCoachActivity : AppCompatActivity() {
 
@@ -27,6 +30,9 @@ class HomeCoachActivity : AppCompatActivity() {
 
         binding = ActivityHomeCoachBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        findViewById<LinearLayoutCompat>(R.id.coach_home_container).startAnimation(entranceAnim)
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())

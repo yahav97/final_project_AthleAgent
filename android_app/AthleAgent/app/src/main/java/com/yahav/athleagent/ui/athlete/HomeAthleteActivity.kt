@@ -27,6 +27,8 @@ import com.yahav.athleagent.network.ApiClient
 import com.yahav.athleagent.observability.ClientEventReporter
 import java.text.SimpleDateFormat
 import java.util.Date
+import android.view.animation.AnimationUtils
+import androidx.appcompat.widget.LinearLayoutCompat
 import java.util.Locale
 
 class HomeAthleteActivity : AppCompatActivity() {
@@ -62,6 +64,9 @@ class HomeAthleteActivity : AppCompatActivity() {
 
         binding = ActivityHomeAthleteBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        findViewById<LinearLayoutCompat>(R.id.athlete_home_container).startAnimation(entranceAnim)
 
         // Report screen entry to the log server
         eventReporter.reportEvent("screen_view", "HomeAthleteActivity opened")

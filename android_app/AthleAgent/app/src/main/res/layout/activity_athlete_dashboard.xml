@@ -2,6 +2,7 @@
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/dashboard_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_dash"
@@ -12,29 +13,33 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/athlete_dashboard_headline"
-        android:textSize="@dimen/headline_text_size"
+        android:textSize="26sp"
         android:fontFamily="@font/roboto_bold"
         android:textColor="@color/text"
-        android:layout_marginBottom="@dimen/spacing_16"/>
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="20dp"
+        android:layout_marginStart="8dp"/>
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/dashboard_CARD_risk"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginBottom="@dimen/spacing_12"
-        app:cardBackgroundColor="@color/background_white_snow"
-        app:cardCornerRadius="@dimen/spacing_24"
-        app:cardElevation="2dp">
+        android:layout_weight="1.2"
+        android:layout_marginBottom="16dp"
+        app:cardBackgroundColor="@color/white"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="8dp"
+        app:strokeWidth="0dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="@dimen/spacing_24"
+            android:padding="28dp"
             android:gravity="center">
 
             <RelativeLayout
-                android:layout_width="@dimen/new_button_width"
+                android:layout_width="220dp"
                 android:layout_height="0dp"
                 android:layout_weight="1">
 
@@ -59,18 +64,18 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/daily_risk_score"
-                        android:textSize="@dimen/text_size_input"
+                        android:textSize="14sp"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/text"/>
+                        android:textColor="@color/lm_text_muted"/>
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/dashboard_TXT_score"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/pers"
-                        android:textSize="@dimen/text_score"
+                        android:text="--%"
+                        android:textSize="48sp"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/orange_red"/>
+                        android:textColor="@color/brand_button_dark_muted"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </RelativeLayout>
 
@@ -79,67 +84,60 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/analyzing_data"
-                android:textSize="@dimen/text_size_body"
+                android:textSize="16sp"
                 android:textColor="@color/text"
                 android:textAlignment="center"
-                android:fontFamily="@font/roboto_bold"
-                android:lineSpacingExtra="@dimen/spacing_4"
-                android:layout_marginTop="@dimen/spacing_16"/>
+                android:fontFamily="@font/roboto_regular"
+                android:lineSpacingExtra="4dp"
+                android:layout_marginTop="20dp"/>
         </androidx.appcompat.widget.LinearLayoutCompat>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/dashboard_CARD_history"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        app:cardBackgroundColor="@color/background_white_snow"
-        app:cardCornerRadius="@dimen/spacing_24"
-        app:cardElevation="2dp">
+        app:cardBackgroundColor="@color/white"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="8dp"
+        app:strokeWidth="0dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="@dimen/spacing_20">
+            android:padding="24dp">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                tools:ignore="UseCompoundDrawables">
+                android:layout_marginBottom="12dp">
 
                 <androidx.appcompat.widget.AppCompatImageView
-                    android:layout_width="@dimen/spacing_20"
-                    android:layout_height="@dimen/spacing_20"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:contentDescription="@string/risk_logo"
                     android:src="@android:drawable/ic_dialog_info"
-                    app:tint="@color/aa_brand_primary_dark"
-                    android:layout_marginEnd="@dimen/spacing_8"/>
+                    app:tint="@color/brand_button_light_muted"
+                    android:layout_marginEnd="8dp"/>
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/risk_score_last_7_days"
                     android:fontFamily="@font/roboto_bold"
-                    android:textSize="@dimen/text_size_body"
+                    android:textSize="18sp"
                     android:textColor="@color/text"/>
             </androidx.appcompat.widget.LinearLayoutCompat>
-
-            <com.google.android.material.textview.MaterialTextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/risk_long_text"
-                android:textSize="@dimen/text_medium"
-                android:textColor="@color/brand_button_dark_muted"
-                android:fontFamily="@font/roboto_bold"
-                android:layout_marginStart="@dimen/spacing_28"
-                android:layout_marginBottom="@dimen/spacing_16"/>
 
             <com.github.mikephil.charting.charts.LineChart
                 android:id="@+id/dashboard_CHART_history"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="match_parent"
+                android:layout_marginTop="8dp"/>
 
         </androidx.appcompat.widget.LinearLayoutCompat>
     </com.google.android.material.card.MaterialCardView>

@@ -24,6 +24,10 @@ import androidx.core.graphics.toColorInt
 import androidx.core.content.ContextCompat
 import com.yahav.athleagent.BuildConfig
 import com.yahav.athleagent.R
+import android.view.animation.AnimationUtils
+import android.widget.TextView
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 class AthleteDashboardActivity : AppCompatActivity() {
 
@@ -33,12 +37,22 @@ class AthleteDashboardActivity : AppCompatActivity() {
 
     private val geminiApiKey = BuildConfig.GEMINI_API_KEY
 
+    private var typingJob: Job? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAthleteDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        applyEntranceAnimations()
+
         loadHistoricalData()
+    }
+
+    private fun applyEntranceAnimations() {
+        val animation = AnimationUtils.loadAnimation(this, R.anim.anim_card_entrance)
+        binding.dashboardCARDRisk.startAnimation(animation)
+        binding.dashboardCARDHistory.startAnimation(animation)
     }
 
     override fun onResume() {
@@ -202,6 +216,17 @@ class AthleteDashboardActivity : AppCompatActivity() {
         }
     }
 
+    private fun typeText(textView: TextView, fullText: String) {
+        typingJob?.cancel()
+        textView.text = ""
+        typingJob = lifecycleScope.launch {
+            for (char in fullText) {
+                textView.append(char.toString())
+                delay(30)
+            }
+        }
+    }
+
     @SuppressLint("SetTextI18n")
     private suspend fun fetchAIRecommendation(
         riskScore: Int,
@@ -226,7 +251,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
             val aiText = response.text ?: "No recommendation available."
 
             withContext(Dispatchers.Main) {
-                binding.dashboardTXTAiRecommendation.text = aiText
+                typeText(binding.dashboardTXTAiRecommendation, aiText)
             }
 
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())

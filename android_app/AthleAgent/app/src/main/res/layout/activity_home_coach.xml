@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -15,6 +14,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/coach_home_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -23,7 +23,8 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_24">
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="32dp">
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="wrap_content"
@@ -37,8 +38,8 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/roboto_regular"
                         android:text="@string/welcome_coach"
-                        android:textColor="@color/text"
-                        android:textSize="@dimen/text_size_input_bigger" />
+                        android:textColor="@color/lm_text_muted"
+                        android:textSize="16sp" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/coachHome_LBL_name"
@@ -47,7 +48,7 @@
                         android:fontFamily="@font/roboto_bold"
                         android:text="@string/coach_name"
                         android:textColor="@color/brand_button_light_muted"
-                        android:textSize="@dimen/headline_text_survey" />
+                        android:textSize="32sp" />
                 </androidx.appcompat.widget.LinearLayoutCompat>
 
                 <com.google.android.material.textview.MaterialTextView
@@ -58,11 +59,11 @@
                     android:layout_centerVertical="true"
                     android:background="@drawable/bg_team_chip"
                     android:fontFamily="@font/roboto_bold"
-                    android:paddingHorizontal="@dimen/spacing_16"
-                    android:paddingVertical="@dimen/spacing_8"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
                     android:text="@string/Team_name"
                     android:textColor="@color/brand_button_light_muted"
-                    android:textSize="@dimen/text_size_input_bigger" />
+                    android:textSize="14sp" />
 
             </RelativeLayout>
 
@@ -71,23 +72,22 @@
                 android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_32"
+                android:layout_marginBottom="32dp"
                 app:cardBackgroundColor="@color/background_white_floral"
-                app:cardCornerRadius="@dimen/spacing_12"
-                app:cardElevation="0dp"
-                app:strokeColor="@color/fui_bgTwitter"
-                app:strokeWidth="1.5dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:padding="@dimen/spacing_16">
+                    android:padding="20dp">
 
                     <androidx.appcompat.widget.AppCompatImageView
-                        android:layout_width="@dimen/spacing_36"
-                        android:layout_height="@dimen/spacing_36"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
                         android:src="@android:drawable/ic_menu_info_details"
                         app:tint="@color/fui_bgTwitter" />
 
@@ -95,22 +95,23 @@
                         android:id="@+id/coachHome_LBL_notifText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/spacing_12"
+                        android:layout_marginStart="16dp"
                         android:fontFamily="@font/roboto_bold"
                         android:text="@string/you_have_2_new_athlete_join_requests"
                         android:textColor="@color/brand_button_dark_muted"
-                        android:textSize="@dimen/text_size_body" />
+                        android:textSize="14sp" />
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spacing_16"
+                android:layout_marginBottom="20dp"
+                android:layout_marginStart="8dp"
                 android:fontFamily="@font/roboto_bold"
                 android:text="@string/daily_actions"
                 android:textColor="@color/brand_button_dark_muted"
-                android:textSize="@dimen/login_text_size" />
+                android:textSize="20sp" />
 
             <!-- Action area when there is a team (dashboard and management) -->
             <androidx.appcompat.widget.LinearLayoutCompat
@@ -124,28 +125,29 @@
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/coachHome_BTN_dashboard"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/spacing_8"
+                    android:layout_height="180dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
                     app:cardBackgroundColor="@color/white"
-                    app:cardCornerRadius="@dimen/spacing_20"
-                    app:cardElevation="3dp">
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="8dp"
+                    app:strokeWidth="0dp">
 
                     <androidx.appcompat.widget.LinearLayoutCompat
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="@dimen/spacing_24">
+                        android:padding="16dp">
 
                         <androidx.appcompat.widget.AppCompatImageView
-                            android:layout_width="@dimen/spacing_44"
-                            android:layout_height="@dimen/spacing_44"
-                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:layout_marginBottom="12dp"
                             android:src="@drawable/sharp_patient_list_24"
-                            app:tint="@color/material_dynamic_tertiary50" />
+                            app:tint="@color/brand_button_light_muted" />
 
                         <com.google.android.material.textview.MaterialTextView
                             android:layout_width="wrap_content"
@@ -154,35 +156,36 @@
                             android:text="@string/team_ndashboard"
                             android:textAlignment="center"
                             android:textColor="@color/text"
-                            android:textSize="@dimen/text_size_input_bigger" />
+                            android:textSize="18sp" />
                     </androidx.appcompat.widget.LinearLayoutCompat>
                 </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/coachHome_BTN_manageTeam"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="180dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
                     app:cardBackgroundColor="@color/white"
-                    app:cardCornerRadius="@dimen/spacing_20"
-                    app:cardElevation="3dp">
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="8dp"
+                    app:strokeWidth="0dp">
 
                     <androidx.appcompat.widget.LinearLayoutCompat
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="@dimen/spacing_24">
+                        android:padding="16dp">
 
                         <androidx.appcompat.widget.AppCompatImageView
-                            android:layout_width="@dimen/spacing_44"
-                            android:layout_height="@dimen/spacing_44"
-                            android:layout_marginBottom="@dimen/spacing_16"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:layout_marginBottom="12dp"
                             android:src="@android:drawable/ic_menu_manage"
-                            app:tint="@color/text" />
+                            app:tint="@color/brand_button_light_muted" />
 
                         <com.google.android.material.textview.MaterialTextView
                             android:layout_width="wrap_content"
@@ -191,7 +194,7 @@
                             android:text="@string/manage_nteam"
                             android:textAlignment="center"
                             android:textColor="@color/text"
-                            android:textSize="@dimen/text_size_input_bigger" />
+                            android:textSize="18sp" />
                     </androidx.appcompat.widget.LinearLayoutCompat>
                 </com.google.android.material.card.MaterialCardView>
             </androidx.appcompat.widget.LinearLayoutCompat>
@@ -205,22 +208,23 @@
                 android:clickable="true"
                 android:focusable="true"
                 app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="@dimen/spacing_20"
-                app:cardElevation="3dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="8dp"
+                app:strokeWidth="0dp">
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="@dimen/spacing_24">
+                    android:padding="32dp">
 
                     <androidx.appcompat.widget.AppCompatImageView
-                        android:layout_width="@dimen/spacing_44"
-                        android:layout_height="@dimen/spacing_44"
-                        android:layout_marginBottom="@dimen/spacing_16"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_marginBottom="16dp"
                         android:src="@android:drawable/ic_menu_add"
-                        app:tint="@color/text" />
+                        app:tint="@color/brand_button_light_muted" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="wrap_content"
@@ -229,7 +233,7 @@
                         android:text="Create\nNew Team"
                         android:textAlignment="center"
                         android:textColor="@color/text"
-                        android:textSize="@dimen/text_size_input_bigger" />
+                        android:textSize="16sp" />
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </com.google.android.material.card.MaterialCardView>
 
@@ -241,11 +245,11 @@
         style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/spacing_16"
+        android:layout_marginBottom="16dp"
         android:fontFamily="@font/roboto_bold"
         android:text="@string/log_out_coach"
         android:textColor="@color/text"
-        android:textSize="@dimen/login_text_size"
+        android:textSize="16sp"
         app:iconTint="@color/text"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
