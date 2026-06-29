@@ -6,13 +6,14 @@
 
 |----------|------|
 
-| [`notebooks/model_improvement_journey.ipynb`](notebooks/model_improvement_journey.ipynb) | **Appendix** — data generation, feature comparison, model selection, metrics, charts |
+| [`notebooks/model_improvement_journey.ipynb`](notebooks/model_improvement_journey.ipynb) | **Live demo** — CSV subset → EDA → split → train 5 candidates → policy winner |
 
 | [`artifacts/promoted.json`](artifacts/promoted.json) | Production model pointer (updated by `run_pipeline.py`) |
 
-| `data_generator.py` | Synthetic training CSV (`athlete_injury_data.csv`) |
+| `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook (120 athletes × 150 days) |
+| `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, ~1000×365 for production) |
 
-| `train_model.py` | Train candidates → `artifacts/<run_id>/` (**winner fixed: `XGBoostDeep`**) |
+| `train_model.py` | Train 5 candidates (`MODEL_CANDIDATE_NAMES`) → tiered policy picks winner → `artifacts/<run_id>/` |
 
 | `validate_metrics.py` | Promotion policy gates |
 
@@ -26,6 +27,18 @@
 
 **Serving (inference):** via FastAPI backend — local `uvicorn` or Docker ([`docs/DOCKER.md`](../docs/DOCKER.md)). Training scripts run **outside** the container.
 
+## Model candidates (`MODEL_CANDIDATE_NAMES`)
+
+| Model | Role |
+|-------|------|
+| `LogisticRegression` | Linear baseline — often fails FPR/recall gates |
+| `RandomForest` | Bagging ensemble |
+| `GradientBoosting` | sklearn boosting |
+| `XGBoostCalibratedTuned` | Calibrated XGB — common policy winner |
+| `XGBoostDeep` | Deep XGB — high-recall alternative |
+
+Edit the tuple in `train_model.py` to change candidates project-wide.
+
 
 
 ## Production artifact (current)
@@ -36,13 +49,13 @@
 
 |------|-------|
 
-| Promoted run | `artifacts/20260629_113445/` |
+| Promoted run | `artifacts/20260629_161704/` |
 
-| Winner | **`XGBoostDeep`** |
+| Winner | From `pick_best_model()` policy (see `run_manifest.json`) |
 
 | Features | 35 (`backend/data/model_feature_contract.json`) |
 
-| Decision threshold (manifest) | **0.18** |
+| Decision threshold (manifest) | From policy sweep (see `run_manifest.json`) |
 
 | UI risk bands (serving) | Low ≤ 20% · Medium 21–70% · High > 70% |
 
@@ -82,7 +95,7 @@ If blocked → `POST /predict/daily` returns **HTTP 503** (no fallback predictio
 
 ML_model/artifacts/<run_id>/
 
-├── injury_model.pkl      # joblib bundle (XGBoostDeep + preprocessing)
+├── injury_model.pkl      # joblib bundle (policy-selected model + preprocessing)
 
 ├── run_manifest.json     # metrics, threshold, policy, winner
 

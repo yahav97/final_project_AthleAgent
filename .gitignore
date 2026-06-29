@@ -41,3 +41,4 @@ Thumbs.db
 ML_model/athlete_injury_data.csv
 ML_model/benchmark_holdout.csv
 ML_model/dataset_quality_report.json
+# Demo CSV for notebook (tracked): ML_model/fixtures/athlete_injury_demo.csv
