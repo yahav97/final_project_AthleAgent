@@ -33,6 +33,6 @@ Pointer: `ML_model/artifacts/promoted.json` → `run_manifest.json`, `injury_mod
 | Script | Role |
 |--------|------|
 | `ML_model/data_generator.py` | Build synthetic `athlete_injury_data.csv` |
-| `ML_model/train_model.py` | Train candidates, write `artifacts/<run_id>/` |
+| `ML_model/train_model.py` | Train 5 candidates (`MODEL_CANDIDATE_NAMES`), write `artifacts/<run_id>/` |
 | `ML_model/validate_metrics.py` | Policy gates |
 | `ML_model/run_pipeline.py` | End-to-end + promote |

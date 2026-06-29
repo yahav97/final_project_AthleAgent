@@ -1,0 +1,43 @@
+{
+  "created_at_utc": "2026-06-29T18:40:34.841074+00:00",
+  "run_id": "20260629_184034",
+  "artifacts_dir": "ML_model/artifacts/20260629_184034",
+  "dataset_path": "ML_model/athlete_injury_data.csv",
+  "dataset_rows": 359000,
+  "benchmark_path": "ML_model/benchmark_holdout.csv",
+  "threshold": 0.1,
+  "policy": {
+    "recall_hard_min": 0.8,
+    "recall_min": 0.8,
+    "fpr_max_operating": 0.55,
+    "precision_min": 0.13,
+    "f1_min": 0.22
+  },
+  "winner": "XGBoostCalibratedTuned",
+  "winner_metrics": {
+    "Recall@Threshold": 0.811404931862427,
+    "Precision@Threshold": 0.28748383388417875,
+    "F1@Threshold": 0.4245485219531863,
+    "FPR@Threshold": 0.4168684422921711,
+    "BrierScore": 0.11251198029151553,
+    "ROC-AUC": 0.792663749452897,
+    "LogLoss": 0.3693991354328651
+  },
+  "risk_bins": [
+    {
+      "bin": "green_0_20",
+      "samples": 54540,
+      "injury_rate": 0.0914008067473414
+    },
+    {
+      "bin": "yellow_20_50",
+      "samples": 11454,
+      "injury_rate": 0.3137768465165008
+    },
+    {
+      "bin": "red_50_100",
+      "samples": 5806,
+      "injury_rate": 0.6457113331036859
+    }
+  ]
+}
