@@ -42,7 +42,7 @@ The Android app collects data (check-ins, Health Connect, meal photos). A **Fast
 ### Backend & ML (as implemented)
 
 * Inference runs on the **server** (`backend/ml/model_loader.py`, `POST /predict/daily`) — not on-device.
-* Promoted model: **XGBoostDeep**, 36 features, quality gates before serving.
+* Promoted model: **`XGBoostDeep`** @ threshold **0.18** — 35 features, Recall **88.7%**, ROC-AUC **79.1%** (see `ML_model/artifacts/promoted.json`).
 * Training pipeline: `ML_model/train_model.py`, `ML_model/run_pipeline.py`.
 
 ## 🏗️ System Architecture & Workflow

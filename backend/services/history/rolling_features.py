@@ -7,6 +7,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from services.feature_engineering import (
+    acwr_baseline_from_weekly_stats,
+    acwr_ratio_bounded,
+)
 from services.field_transforms import (
     daily_distance_km_from_doc,
     hrv_proxy_from_resting_hr,
@@ -55,10 +59,17 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
     frame["acute_load_7d"] = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
     weekly_mean = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
     weekly_std = frame["daily_distance_km"].rolling(7, min_periods=1).std().fillna(0.0)
-    chronic_load = weekly_mean * 0.85 + weekly_std * 0.35 + 0.5
-    frame["chronic_load_21d"] = np.maximum(chronic_load, 0.55)
-    frame["acwr_ratio"] = frame["acute_load_7d"] / frame["chronic_load_21d"].replace(0, pd.NA)
-    frame["acwr_ratio"] = frame["acwr_ratio"].fillna(1.0).clip(lower=0.35, upper=2.8)
+    baseline = pd.Series(
+        [
+            acwr_baseline_from_weekly_stats(float(mean), float(std))
+            for mean, std in zip(weekly_mean, weekly_std, strict=True)
+        ],
+        index=frame.index,
+    )
+    frame["acwr_ratio"] = [
+        acwr_ratio_bounded(float(acute), float(base))
+        for acute, base in zip(frame["acute_load_7d"], baseline, strict=True)
+    ]
 
     frame["sleep_debt_3d"] = (8.0 - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
     frame["hrv_rolling_7d"] = frame["hrv_score"].rolling(7, min_periods=1).mean()
@@ -67,7 +78,6 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
     latest = frame.iloc[-1]
     return {
         "acute_load_7d": float(latest["acute_load_7d"]),
-        "chronic_load_21d": float(latest["chronic_load_21d"]),
         "acwr_ratio": float(latest["acwr_ratio"]),
         "sleep_debt_3d": float(latest["sleep_debt_3d"]),
         "hrv_drop": float(latest["hrv_drop"]),

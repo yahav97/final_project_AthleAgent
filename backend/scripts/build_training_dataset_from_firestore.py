@@ -4,12 +4,12 @@ Export a training CSV from Firestore with **serve parity**:
 Same merge policy as ``predict_injury_risk_from_firestore`` (sleep on D;
 load from D-1; check-in on D; nutrition from D-1 + server-side backfill).
 
-Labels ``injury_tomorrow`` come from ``injuredYesterday`` on ``daily_checkins/{date+1}``
+Labels ``injury_today`` come from ``injuredYesterday`` on ``daily_checkins/{date+1}``
 (legacy fallback: ``daily_health/{date+1}``). Rows without a next-day check-in or
 legacy health doc are skipped.
 
 Output columns match ``ML_model/train_model`` expectations: base feature columns
-(see ``TRAINING_BASE_FEATURE_COLUMNS``) plus ``athlete_id``, ``date``, ``injury_tomorrow``.
+(see ``TRAINING_BASE_FEATURE_COLUMNS``) plus ``athlete_id``, ``date``, ``injury_today``.
 Rolling columns ``acwr_ratio_ma7``, … are omitted here and recomputed by ``train_model``.
 
 Run from repo root or backend (venv with firebase-admin):
@@ -34,7 +34,7 @@ if str(BACKEND) not in sys.path:
 from services.history_service import (
     _get_firestore_client,
     fetch_daily_firestore_snapshot,
-    fetch_injury_tomorrow_label,
+    fetch_injury_today_label,
     stable_athlete_numeric_id,
 )
 from services.model_features import TRAINING_BASE_FEATURE_COLUMNS
@@ -136,7 +136,7 @@ def main() -> int:
             date_keys = _daterange_keys(start_dt, end_dt)
 
         for date_key in date_keys:
-            label = fetch_injury_tomorrow_label(uid, date_key)
+            label = fetch_injury_today_label(uid, date_key)
             if label is None:
                 skipped_no_next += 1
                 continue
@@ -151,7 +151,7 @@ def main() -> int:
             row: dict[str, Any] = {
                 "athlete_id": athlete_id,
                 "date": date_key,
-                "injury_tomorrow": label,
+                "injury_today": label,
             }
             row.update(feats)
             rows.append(row)
@@ -160,7 +160,7 @@ def main() -> int:
         print("No rows exported.", file=sys.stderr)
         return 3
 
-    columns = ["athlete_id", "date", *TRAINING_BASE_FEATURE_COLUMNS, "injury_tomorrow"]
+    columns = ["athlete_id", "date", *TRAINING_BASE_FEATURE_COLUMNS, "injury_today"]
     df = pd.DataFrame(rows).loc[:, columns]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.output, index=False)

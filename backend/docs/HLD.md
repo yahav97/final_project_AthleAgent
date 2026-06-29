@@ -251,10 +251,10 @@ flowchart LR
 | Risk bands | Low ≤ 20% · Medium 21–70% · High > 70% (`services/risk_levels.py`, aligned with Android) |
 | Confidence | blend: 60% history confidence + 40% data quality |
 
-> **הערה:** סף אימון **0.18** ב-manifest משמש Recall/Precision בלבד — לא לסיווג `risk_level` ב-production.
+> **הערה:** סף האימון ב-`run_manifest.json` משמש Recall/Precision בלבד — לא לסיווג `risk_level` ב-production.
 
 ### 7.3 Feature Count
-36 features — מקור אמת: `services/model_features.py`
+35 features — מקור אמת: `services/model_features.py`
 
 ---
 
@@ -262,7 +262,7 @@ flowchart LR
 
 | Setting | Source | Default |
 |---------|--------|---------|
-| `MODEL_PATH` | env | `ML_model/artifacts/20260512_075115/injury_model.pkl` |
+| `MODEL_PATH` | env | empty → `ML_model/artifacts/promoted.json` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | env / file | `backend/firebase-key.json` |
 | `ENABLE_TEST_PREDICT_ENDPOINT` | env | `false` |
 | `CORS_ORIGINS` | config | localhost ports |

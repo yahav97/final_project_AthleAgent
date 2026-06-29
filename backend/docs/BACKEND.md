@@ -7,31 +7,31 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 ### ארכיטקטורה
 
 ```
-┌─────────────────┐
-│  Android App    │  (Kotlin)
-└────────┬────────┘
-         │ HTTP/REST (predict trigger; no auth)
-         │ Firebase Auth + Firestore SDK (client-side)
-         ▼
-┌─────────────────┐
-│  FastAPI Backend│  (Python)
-└────────┬────────┘
-    ┌────┴────┬──────────────┬─────────────┐
-    ▼         ▼              ▼             ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│Firestore │ │Gemini AI │ │Health    │ │ML Model  │
-│(App data)│ │(אופציונלי│ │Connect   │ │(XGBoost/ │
-│          │ │ בלקוח)   │ │(Android) │ │joblib)   │
-└──────────┘ └──────────┘ └──────────┘ └──────────┘
+┌──────────────────────────────────────┐
+│           Android App (Kotlin)        │
+│  Health Connect · Firebase SDK        │
+│  Gemini (תזונה / המלצות — בלקוח בלבד) │
+└──────────────────┬───────────────────┘
+                   │ HTTP POST /predict/daily
+                   │ (trigger: userId + date)
+                   ▼
+         ┌─────────────────┐
+         │  FastAPI Backend │
+         └────────┬────────┘
+              ┌───┴───┐
+              ▼       ▼
+        ┌──────────┐ ┌──────────┐
+        │ Firestore│ │ ML Model │
+        │ read/write│ │ XGBoost  │
+        └──────────┘ └──────────┘
 ```
 
 ### טכנולוגיות
 
-- **Frontend**: Android (Kotlin), Health Connect SDK
-- **Backend**: FastAPI (Python), Firestore, ML inference
-- **ML**: XGBoost, scikit-learn, joblib
-- **External APIs**: Google Gemini AI (ניתוח תזונה באפליקציה), Firebase
-- **Authentication**: Firebase Auth (בצד האפליקציה)
+- **Frontend**: Android (Kotlin), Health Connect SDK, Firebase Auth (client-side)
+- **Backend**: FastAPI (Python), Firestore Admin, ML inference (joblib / XGBoost)
+- **ML training**: XGBoost, scikit-learn (מחוץ ל-container — `ML_model/`)
+- **Authentication**: Firebase Auth באפליקציה; הבקאנד **לא** מבצע OAuth / Gemini
 
 ---
 
@@ -39,7 +39,7 @@ AthleAgent אוספת נתוני יום מספורטאי (Health Connect, check-
 
 ```
 backend/
-├── main.py                         # FastAPI entry point
+├── main.py                         # FastAPI entry point (lifespan → load_model)
 ├── config.py                       # Configuration
 ├── data/
 │   └── model_feature_contract.json # רשימת עמודות + defaults (נטען מהדיסק)
@@ -78,7 +78,6 @@ backend/
 - קבצים מעל ~250 שורות פוצלו לחבילות (`preprocessing/`, `history/`, `prediction/`).
 - `model_feature_contract.json` נשמר על הדיסק; `model_features.py` טוען פעם אחת (לא רשימות כבדות בקוד).
 - `schemas/enums.py` מחליף מחרוזות קבועות (`HistoryConfidence`, `ModelGateReason`, `ModelLiveStatus`).
-- `external/google_auth.py` קיים אך **לא מחובר** ל-routes (OAuth לא בשימוש).
 
 ---
 
@@ -184,7 +183,7 @@ Preprocessing:
     │
     ▼
 History Enrichment (7 days):
-    • acute_load_7d, chronic_load_21d
+    • acute_load_7d, acwr_ratio
     • acwr_ratio, sleep_debt_3d, hrv_drop
     │
     ▼
@@ -193,8 +192,8 @@ Data Quality Check:
     • hard_missing מקסימום score 0.25 — נרשם בלוג בלבד
     │
     ▼
-Model Inference (XGBoostDeep):
-    • 36 features → predict_proba
+Model Inference (promoted bundle):
+    • 35 features → predict_proba
     • classify_risk_level(proba) — Low ≤ 20%, Medium 21–70%, High > 70%
     │
     ▼
@@ -338,7 +337,7 @@ RISK_MEDIUM_CUTOFF=0.20
 | `services/prediction/` | לוגיקת חיזוי (service, bundle, confidence) |
 | `services/preprocessing/` | הנדסת פיצ'רים + איכות נתונים |
 | `services/history/` | היסטוריה + Firestore |
-| `data/model_feature_contract.json` | 36 עמודות + defaults |
+| `data/model_feature_contract.json` | 35 עמודות + defaults |
 | `schemas/inference.py` | Pydantic models |
 | `schemas/enums.py` | Enum-ים לסטטוסים ו-confidence |
 | `ml/model_loader.py` | טעינת מודל + gates |

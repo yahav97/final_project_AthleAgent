@@ -9,8 +9,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ml_ops_log import append_ops_event
-
 
 def _run(command: list[str], cwd: Path, allowed_exit_codes: tuple[int, ...] = (0,)) -> int:
     proc = subprocess.run(command, cwd=str(cwd), check=False, capture_output=True, text=True)
@@ -45,13 +43,6 @@ def _promote(ml_dir: Path, artifacts_dir: Path, degraded_rc: bool) -> None:
     }
     with open(promoted_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
-    append_ops_event(
-        "model_promoted",
-        run_id=run_id,
-        model_path=model_rel,
-        manifest_path=manifest_rel,
-        degraded=degraded_rc,
-    )
     if degraded_rc:
         print("Warning: promoted with degraded validation (exit code 2).")
     print(f"Promoted artifact set: {artifacts_dir}")
@@ -66,47 +57,32 @@ def main() -> int:
     args = parser.parse_args()
 
     ml_dir = Path(__file__).resolve().parent
-    append_ops_event(
-        "pipeline_started",
-        num_athletes=args.num_athletes,
-        days=args.days,
-        seed=args.seed,
+    _run(
+        [
+            sys.executable,
+            "data_generator.py",
+            "--num-athletes",
+            str(args.num_athletes),
+            "--days",
+            str(args.days),
+            "--seed",
+            str(args.seed),
+        ],
+        ml_dir,
     )
-    try:
-        _run(
-            [
-                sys.executable,
-                "data_generator.py",
-                "--num-athletes",
-                str(args.num_athletes),
-                "--days",
-                str(args.days),
-                "--seed",
-                str(args.seed),
-            ],
-            ml_dir,
-        )
-        benchmark_cmd = [sys.executable, "create_benchmark_set.py", "--seed", str(args.seed)]
-        if args.force_benchmark:
-            benchmark_cmd.append("--force")
-        _run(benchmark_cmd, ml_dir)
-        _run([sys.executable, "train_model.py"], ml_dir)
-        validate_exit = _run(
-            [sys.executable, "validate_metrics.py"],
-            ml_dir,
-            allowed_exit_codes=(0, 2),
-        )
-        artifacts_dir = _latest_artifacts_dir(ml_dir)
-        _promote(ml_dir, artifacts_dir, degraded_rc=(validate_exit == 2))
-        append_ops_event(
-            "pipeline_completed",
-            run_id=artifacts_dir.name,
-            validate_exit_code=validate_exit,
-        )
-        return 0
-    except RuntimeError as exc:
-        append_ops_event("pipeline_step_failed", error=str(exc))
-        raise
+    benchmark_cmd = [sys.executable, "create_benchmark_set.py", "--seed", str(args.seed)]
+    if args.force_benchmark:
+        benchmark_cmd.append("--force")
+    _run(benchmark_cmd, ml_dir)
+    _run([sys.executable, "train_model.py"], ml_dir)
+    validate_exit = _run(
+        [sys.executable, "validate_metrics.py"],
+        ml_dir,
+        allowed_exit_codes=(0, 2),
+    )
+    artifacts_dir = _latest_artifacts_dir(ml_dir)
+    _promote(ml_dir, artifacts_dir, degraded_rc=(validate_exit == 2))
+    return 0
 
 
 if __name__ == "__main__":

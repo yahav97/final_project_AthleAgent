@@ -33,9 +33,9 @@ def stable_athlete_numeric_id(user_id: str) -> int:
     return numeric_id if numeric_id > 0 else 1
 
 
-def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
+def fetch_injury_today_label(user_id: str, date_key: str) -> int | None:
     """
-    Label for training row ``(user_id, date_key)``.
+    Training label for row ``(user_id, date_key)`` → ``injury_today``.
 
     On ``users/{uid}/daily_checkins/{D+1}``, ``injuredYesterday`` indicates injury on calendar day ``D``.
     Falls back to the same field on ``daily_health/{D+1}`` for legacy data.
@@ -52,7 +52,7 @@ def fetch_injury_tomorrow_label(user_id: str, date_key: str) -> int | None:
             return 0 if parsed is None else parsed
         health_doc = _sync_document_get(user_ref.collection("daily_health").document(next_key))
     except Exception:
-        logger.exception("fetch_injury_tomorrow_label failed user_id=%s date=%s", user_id, date_key)
+        logger.exception("fetch_injury_today_label failed user_id=%s date=%s", user_id, date_key)
         return None
     if not health_doc.exists:
         return None

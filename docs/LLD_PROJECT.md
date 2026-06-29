@@ -265,7 +265,7 @@ POST /predict/daily {userId, date}
           merge → daily_health/{date}
 ```
 
-### 3.3 Model Features (36 columns)
+### 3.3 Model Features (35 columns)
 
 מקור אמת: `backend/services/model_features.py`
 
@@ -276,7 +276,7 @@ POST /predict/daily {userId, date}
 | Recovery | sleep_hours, hrv_score, resting_hr, respiratory_rate, spo2 |
 | Nutrition | nutrition_intake_calories, daily_calories, total_calories_burned, calorie_balance |
 | Subjective | stress_level, muscle_soreness, energy_level, injured_yesterday |
-| Engineered | acute_load_7d, chronic_load_21d, acwr_ratio, acwr_ratio_ma7, sleep_hours_ma7, sleep_debt_3d, hrv_drop, load_recovery_imbalance, speed_intensity_ratio |
+| Engineered | acute_load_7d, acwr_ratio, acwr_ratio_ma7, sleep_hours_ma7, sleep_debt_3d, hrv_drop, load_recovery_imbalance, speed_intensity_ratio |
 
 ---
 
@@ -301,10 +301,10 @@ flowchart LR
 ```python
 {
     "estimator": XGBClassifier,
-    "feature_columns": [...],  # 36 names
-    "threshold": 0.18,
+    "feature_columns": [...],  # 35 names
+    "threshold": "<from run_manifest.json>",
     "medium_threshold": 0.11,
-    "winner": "XGBoostDeep"
+    "winner": "<from run_manifest.json>"
 }
 ```
 

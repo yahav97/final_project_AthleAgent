@@ -112,10 +112,6 @@ class Settings(BaseSettings):
     )
     GOOGLE_APPLICATION_CREDENTIALS: Path | None = None
 
-    # Reserved for future OAuth routes (see external/google_auth.py)
-    GOOGLE_CLIENT_ID: str | None = None
-    GOOGLE_CLIENT_SECRET: str | None = None
-
     # -------------------------------------------------------------------------
     # API metadata
     # -------------------------------------------------------------------------

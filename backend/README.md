@@ -64,13 +64,13 @@ If gate validation fails:
 pip install -r backend/requirements.txt
 ```
 
-The backend loads a **joblib** bundle whose estimator is **XGBoost** (`XGBoostDeep`). These packages are **required** at the pinned versions in `backend/requirements.txt`:
+The backend loads a **joblib** bundle (estimator type from `promoted.json` / `run_manifest.json`). These packages are **required** at the pinned versions in `backend/requirements.txt`:
 
 | Package | Version | Role |
 |---------|---------|------|
 | `joblib` | `1.5.3` | Load `injury_model.pkl` at startup |
-| `scikit-learn` | `1.8.0` | Preprocessing pipeline inside the saved model |
-| `xgboost` | `3.1.2` | Classifier used for `/predict/daily` inference |
+| `scikit-learn` | `1.8.0` | Preprocessing pipeline + RandomForest (current promoted model) |
+| `xgboost` | `3.1.2` | Training pipeline / optional if a boosted model is promoted |
 
 Promoted model pointer: `ML_model/artifacts/promoted.json`  
 After install, verify ML status: `GET http://localhost:8000/status/ml` → expect `"status": "Live"`.

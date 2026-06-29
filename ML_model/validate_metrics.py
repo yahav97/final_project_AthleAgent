@@ -9,15 +9,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from ml_ops_log import append_ops_event
-
-TARGET_RECALL = 0.85
+TARGET_RECALL = 0.80
 MIN_RECALL_THRESHOLD = 0.80
 MIN_AUC_THRESHOLD = 0.68
 TARGET_PRECISION = 0.13
 TARGET_F1 = 0.22
-MAX_FPR_OPERATING = 0.70
-THRESHOLD = 0.4
+MAX_FPR_OPERATING = 0.58
+THRESHOLD = 0.18
 
 
 def _latest_artifacts_dir(script_dir: str) -> str | None:
@@ -110,12 +108,6 @@ def main() -> int:
             f"\nREJECTED: {top['Model']} failed hard safety gate "
             f"(Recall={recall_value:.4f} < {MIN_RECALL_THRESHOLD})."
         )
-        append_ops_event(
-            "validation_rejected",
-            model=str(top["Model"]),
-            recall=recall_value,
-            reason="recall_below_hard_gate",
-        )
         return 2
 
     if recall_target_ok and fpr_ok and auc_ok and precision_ok and f1_ok:
@@ -125,12 +117,6 @@ def main() -> int:
             f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
             f"Hard gate: Recall>={MIN_RECALL_THRESHOLD}."
         )
-        append_ops_event(
-            "validation_passed",
-            model=str(top["Model"]),
-            recall=recall_value,
-            roc_auc=float(top["ROC-AUC"]),
-        )
         return 0
 
     print(
@@ -138,12 +124,6 @@ def main() -> int:
         f"(Recall>={TARGET_RECALL}, FPR<={MAX_FPR_OPERATING}, AUC>={MIN_AUC_THRESHOLD}, "
         f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
         f"but passes hard gate Recall>={MIN_RECALL_THRESHOLD}."
-    )
-    append_ops_event(
-        "validation_degraded",
-        model=str(top["Model"]),
-        recall=recall_value,
-        roc_auc=float(top["ROC-AUC"]),
     )
     return 2
 

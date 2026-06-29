@@ -14,7 +14,7 @@
 
 ```
 backend/
-├── main.py                     # FastAPI app, CORS, startup load_model
+├── main.py                     # FastAPI app, CORS, lifespan load_model
 ├── config.py                   # Settings (pydantic-settings)
 ├── data/
 │   └── model_feature_contract.json
@@ -56,20 +56,24 @@ backend/
 ## 2. Entry Point — `main.py`
 
 ```python
-app = FastAPI(title="AthleAgent API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_model(settings.MODEL_PATH)  # gate-validated
+    yield  # shutdown: log only
+
+app = FastAPI(..., lifespan=lifespan)
 app.add_middleware(CORSMiddleware, ...)
+app.add_middleware(RequestLoggingMiddleware)
 app.include_router(health_router)
 app.include_router(predict_router)
-
-@app.on_event("startup")
-async def startup_event():
-    load_model(settings.MODEL_PATH)  # gate-validated
+app.include_router(observability_router)
+register_exception_handlers(app)
 ```
 
 | Event | Action |
 |-------|--------|
-| Startup | Load XGBoost bundle from `MODEL_PATH` or `promoted.json` |
-| Shutdown | Log only |
+| Startup (`lifespan` enter) | Load model bundle from `MODEL_PATH` or `promoted.json` |
+| Shutdown (`lifespan` exit) | Log only |
 | Run (Docker) | `docker compose up --build` from repo root — see [`docs/DOCKER.md`](../../docs/DOCKER.md) |
 | Run (local) | `uvicorn main:app --host 0.0.0.0 --port 8000` |
 
@@ -80,9 +84,9 @@ async def startup_event():
 ```python
 class Settings(BaseSettings):
     ENABLE_TEST_PREDICT_ENDPOINT: bool = False
-    MODEL_PATH: str = "ML_model/artifacts/20260512_075115/injury_model.pkl"
-    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str]  # default: backend/firebase-key.json
-    GEMINI_API_KEY: Optional[str]                 # unused in routes
+    MODEL_PATH: str = ""  # empty → artifacts/promoted.json
+    FIREBASE_SERVICE_ACCOUNT_KEY: Path | None  # default: backend/firebase-key.json
+    GOOGLE_APPLICATION_CREDENTIALS: Path | None = None
     CORS_ORIGINS: list = ["http://localhost:3000", ...]
     PROJECT_NAME: str = "AthleAgent API"
     VERSION: str = "1.0.0"
@@ -121,8 +125,8 @@ Returns from `get_model_status()`:
 {
   "status": "Live|Blocked",
   "gate_reason": "none|manifest_recall_below_hard_gate|...",
-  "winner": "XGBoostDeep",
-  "threshold": 0.18,
+  "winner": "<from run_manifest.json>",
+  "threshold": "<from run_manifest.json>",
   "policy": {},
   "degraded_rc": false
 }
@@ -211,7 +215,7 @@ All fields optional — service applies defaults.
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
 | `repository.save_daily_prediction_result` | Merge write to daily_health |
 | `repository.merge_nutrition_with_history` | אתמול + ממוצעים כלליים; מחזיר `(doc, imputed)` |
-| `repository.fetch_injury_tomorrow_label` | Training label from D+1 checkin |
+| `repository.fetch_injury_today_label` | Training label (`injury_today`) from D+1 checkin |
 | `repository.stable_athlete_numeric_id` | SHA256 → int for CSV export |
 
 > `history_service.py` re-exports the above (including `_get_firestore_client` alias).
@@ -223,7 +227,7 @@ Input: list of `{date_key, daily_distance_km, sleep_hours, hrv_score}` per day.
 | Feature | Formula |
 |---------|---------|
 | `acute_load_7d` | 7-day rolling mean of `daily_distance_km` |
-| `chronic_load_21d` | approximated from weekly mean + std (7-day window) |
+| `acwr_ratio` | acute / 7d baseline (mean×0.85 + std×0.35 + 0.5, internal) |
 | `acwr_ratio` | acute / chronic, clipped [0.35, 2.8] |
 | `sleep_debt_3d` | rolling sum of `(8.0 - sleep_hours)`, 3 days |
 | `hrv_drop` | current hrv - 7d rolling mean, clipped [-15, 15] |
@@ -264,7 +268,7 @@ users/{uid}/daily_nutrition/{date-1}           → nutrition_yesterday
 
 | Module / Function | Responsibility |
 |----------|----------------|
-| `request_mapping.injury_request_to_model_dataframe` | Pydantic → 1-row DataFrame (36 cols) |
+| `request_mapping.injury_request_to_model_dataframe` | Pydantic → 1-row DataFrame (35 cols) |
 | `quality.calculate_data_quality_score` | Completeness score 0–1 |
 | `validation.validate_feature_vector_for_model` | Align columns to bundle |
 | `scales.stress_to_model_scale` / `soreness_to_model_scale` / `energy_to_model_scale` | Android → training scale |
@@ -300,7 +304,7 @@ Derived features computed in preprocessing:
 
 ### 6.5 `model_features.py` + `data/model_feature_contract.json`
 
-**36 model columns** — stored in `backend/data/model_feature_contract.json` and loaded once via `model_features.py` (not inline Python lists).
+**35 model columns** — stored in `backend/data/model_feature_contract.json` and loaded once via `model_features.py` (not inline Python lists).
 
 **Defaults:** `default_values` in the same JSON — population medians for imputation.
 
@@ -338,10 +342,10 @@ _active_manifest: dict = {}
 ```python
 {
     "estimator": <sklearn-compatible classifier>,
-    "feature_columns": ["bmi", "age", ...],  # 36 names
-    "threshold": 0.18,
+    "feature_columns": ["bmi", "age", ...],  # 35 names
+    "threshold": "<from run_manifest.json>",
     "medium_threshold": 0.11,  # optional
-    "winner": "XGBoostDeep"
+    "winner": "<from run_manifest.json>"
 }
 ```
 
@@ -391,8 +395,7 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 |--------|---------|
 | `seed_demo_athlete_firestore.py` | Demo data for testing |
 | `build_training_dataset_from_firestore.py` | Export CSV for retraining |
-| `introspect_firestore.py` | Debug Firestore structure |
-| `smoke_uvicorn.py` | Server smoke test |
+| `trace_request.sh` | Trace unified logs by `request_id` / event / source |
 
 ---
 
@@ -407,7 +410,7 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |
 | `tests/unit/test_train_serve_parity.py` | Training CSV ↔ serving alignment |
-| `tests/integration/test_prediction_model_columns.py` | 36-column contract |
+| `tests/integration/test_prediction_model_columns.py` | 35-column contract |
 | `tests/unit/test_exceptions.py` | Domain exception status codes |
 | `tests/integration/test_openapi_contract.py` | OpenAPI path coverage |
 
@@ -430,7 +433,7 @@ sequenceDiagram
     FS-->>HS: snapshot
     PS->>PS: injury_prediction_request_from_firestore_snapshot()
     PS->>PP: injury_request_to_model_dataframe()
-    PP-->>PS: df (36 cols)
+    PP-->>PS: df (35 cols)
     PS->>HS: get_history_window_context(uid, date, 7)
     HS->>FS: read historical daily_health
     HS-->>PS: {confidence, features}
@@ -479,9 +482,7 @@ flowchart TD
 
 | # | Location | Issue |
 |---|----------|-------|
-| 1 | `external/google_auth.py` | Not imported by any route |
-| 2 | `config.GEMINI_API_KEY` | Configured but no Gemini routes |
-| 3 | Android trigger gate | אין בדיקת עומס `{D-1}` > 0 לפני `/predict/daily` | חיזוי עם load חלש אם לא ענדו שעון אתמול |
+| 1 | Android trigger gate | אין בדיקת עומס `{D-1}` > 0 לפני `/predict/daily` | חיזוי עם load חלש אם לא ענדו שעון אתמול |
 
 ---
 

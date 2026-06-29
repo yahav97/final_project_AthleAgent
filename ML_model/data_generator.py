@@ -53,6 +53,19 @@ def _rolling_mean(values: list[float], window: int) -> float:
     return float(np.mean(tail)) if tail else 0.0
 
 
+def _acwr_baseline_from_distance_tail(
+    distance_history_km: list[float],
+    window: int = 7,
+) -> float:
+    """Internal ACWR denominator from 7-day distance history (not a model feature)."""
+    tail = distance_history_km[-window:] if len(distance_history_km) >= window else distance_history_km
+    if not tail:
+        return 0.55
+    weekly_mean = float(np.mean(tail))
+    weekly_std = float(np.std(tail)) if len(tail) > 1 else 0.0
+    return float(max(0.55, weekly_mean * 0.85 + weekly_std * 0.35 + 0.5))
+
+
 def _bounded(value: float, low: float, high: float) -> float:
     """Clip scalar into closed interval [low, high]."""
     return float(min(high, max(low, value)))
@@ -71,13 +84,17 @@ def compute_training_reference_features(
         raise ValueError("distance/sleep/hrv history lists must be non-empty")
 
     acute_load_7d = _rolling_mean(distance_history_km, 7)
-    chronic_load_21d = max(0.1, _rolling_mean(distance_history_km, 21))
-    acwr_ratio = _bounded(acute_load_7d / chronic_load_21d, 0.35, 2.8)
+    acwr_ratio = _bounded(
+        acute_load_7d / _acwr_baseline_from_distance_tail(distance_history_km, window=7),
+        0.35,
+        2.8,
+    )
     sleep_debt_3d = float(sum(max(0.0, 8.0 - s) for s in sleep_history_hours[-3:]))
-    hrv_drop = float(hrv_history_scores[-1] - _rolling_mean(hrv_history_scores, 7))
+    hrv_drop = float(
+        max(-15.0, min(15.0, hrv_history_scores[-1] - _rolling_mean(hrv_history_scores, 7)))
+    )
     return {
         "acute_load_7d": acute_load_7d,
-        "chronic_load_21d": chronic_load_21d,
         "acwr_ratio": acwr_ratio,
         "sleep_debt_3d": sleep_debt_3d,
         "hrv_drop": hrv_drop,
@@ -140,10 +157,10 @@ def generate_synthetic_data(
         sleep_history: list[float] = []
         hrv_history: list[float] = []
         post_injury_cooldown = 0
-        prev_injury_tomorrow = 0
+        prev_injury_today = 0
 
         for day in range(days_per_athlete):
-            injured_yesterday = int(prev_injury_tomorrow)
+            injured_yesterday = int(prev_injury_today)
             weekly_cycle = np.sin((2 * np.pi * (day % 7)) / 7.0)
             annual_cycle = np.sin((2 * np.pi * day / 365.0) + season_phase)
             mesocycle = np.sin((2 * np.pi * day / 28.0) + mesocycle_phase)
@@ -303,7 +320,7 @@ def generate_synthetic_data(
                 )
             )
             # Structured sensor dropouts: more likely under high stress/low recovery states.
-            sensor_dropout = rng.random() < (0.018 + 0.01 * max(0.0, stress_signal - 7.0))
+            sensor_dropout = rng.random() < (0.012 + 0.008 * max(0.0, stress_signal - 7.0))
             if sensor_dropout:
                 sleep_hours = _bounded(sleep_hours + rng.normal(0.0, 0.45), 4.5, 9.8)
                 hrv_score = int(_bounded(hrv_score + rng.normal(0.0, 4.0), 30.0, 105.0))
@@ -316,8 +333,6 @@ def generate_synthetic_data(
             hrv_history.append(float(hrv_score))
 
             refs = compute_training_reference_features(distance_history, sleep_history, hrv_history)
-            acute_load_7d = refs["acute_load_7d"]
-            chronic_load_21d = refs["chronic_load_21d"]
             acwr_ratio = refs["acwr_ratio"]
             sleep_debt_3d = refs["sleep_debt_3d"]
             hrv_drop = refs["hrv_drop"]
@@ -345,62 +360,66 @@ def generate_synthetic_data(
             elevation_load = elevation_gained / 300.0
             speed_burst = max(0.0, max_speed - avg_speed * 1.3) / 5.0 if avg_speed > 1.0 else 0.0
 
-            hazard_logit = (
-                -3.6
-                + 2.80 * acwr_excess
-                + 0.22 * sleep_stress
-                + 0.25 * hrv_stress
-                + 0.06 * stress_level
-                + 0.35 * synergistic_overload_exp
-                + 0.65 * max(0.0, -sleep_trend_5d)
-                + 0.40 * max(0.0, load_trend_5d)
-                + (0.30 if post_injury_cooldown > 0 else 0.0)
-                + 0.12 * injured_yesterday
-                - 0.06 * (energy_level / 10.0)
-                + 0.05 * calorie_surplus
-                + 0.10 * external_shock
-                + 0.03 * (athlete_age - 28.0) / 10.0
-                + 0.09 * min(6, career_injury_episodes)
-                - 0.35 * recovery_protection
-                - 0.22 * resilience
-                + 0.22 * spo2_stress
-                + 0.16 * rr_elevation
-                + 0.10 * elevation_load
-                - 0.08 * max(0.0, (vo2_max - 45.0) / 20.0)
-                + 0.06 * max(0.0, (body_fat_pct - 20.0) / 10.0)
-                + 0.12 * speed_burst
-            )
-            injury_probability = _bounded(_sigmoid(hazard_logit), 0.005, 0.88)
-            injury_tomorrow = int(rng.random() < injury_probability)
+            load_recovery_imbalance_day = acwr_ratio * sleep_debt_3d
 
-            # Hard negatives: occasionally keep athletes healthy despite high apparent risk.
+            hazard_logit = (
+                -4.25
+                + 3.75 * acwr_excess
+                + 0.40 * sleep_stress
+                + 0.45 * hrv_stress
+                + 0.12 * stress_level
+                + 0.58 * synergistic_overload_exp
+                + 0.72 * max(0.0, -sleep_trend_5d)
+                + 0.50 * max(0.0, load_trend_5d)
+                + (0.38 if post_injury_cooldown > 0 else 0.0)
+                + 0.22 * injured_yesterday
+                - 0.08 * (energy_level / 10.0)
+                + 0.06 * calorie_surplus
+                + 0.14 * external_shock
+                + 0.04 * (athlete_age - 28.0) / 10.0
+                + 0.16 * min(6, career_injury_episodes)
+                - 0.45 * recovery_protection
+                - 0.30 * resilience
+                + 0.28 * spo2_stress
+                + 0.20 * rr_elevation
+                + 0.14 * elevation_load
+                - 0.12 * max(0.0, (vo2_max - 45.0) / 20.0)
+                + 0.09 * max(0.0, (body_fat_pct - 20.0) / 10.0)
+                + 0.16 * speed_burst
+                + 0.07 * max(0.0, muscle_soreness - 4.0)
+                + 0.08 * (load_recovery_imbalance_day / 10.0)
+            )
+            injury_probability = _bounded(_sigmoid(hazard_logit), 0.004, 0.80)
+            injury_today = int(rng.random() < injury_probability)
+
+            # Hard negatives: rare — resilient athletes can absorb short overload spikes.
             if (
-                injury_tomorrow == 1
+                injury_today == 1
                 and acwr_ratio > 1.35
                 and sleep_debt_3d > 3.5
                 and (recovery_protection > 0.55 or resilience > 1.1)
-                and rng.random() < 0.25
+                and rng.random() < 0.08
             ):
-                injury_tomorrow = 0
+                injury_today = 0
             if (
-                injury_tomorrow == 1
+                injury_today == 1
                 and strong_athlete
                 and acwr_ratio > 1.25
                 and stress_level < 7
-                and rng.random() < 0.30
+                and rng.random() < 0.10
             ):
-                injury_tomorrow = 0
+                injury_today = 0
 
-            # Rare unexplained injuries: preserve minimal label noise.
+            # Rare unexplained injuries: minimal label noise only.
             if (
-                injury_tomorrow == 0
+                injury_today == 0
                 and acwr_ratio < 1.05
                 and sleep_debt_3d < 1.5
                 and stress_level < 5
-                and rng.random() < 0.001
+                and rng.random() < 0.0004
             ):
-                injury_tomorrow = 1
-            if injury_tomorrow:
+                injury_today = 1
+            if injury_today:
                 post_injury_cooldown = int(rng.integers(4, 10))
                 fatigue_state += 0.6
                 recovery_state -= 0.45
@@ -409,7 +428,7 @@ def generate_synthetic_data(
                 post_injury_cooldown = max(0, post_injury_cooldown - 1)
                 recovery_state += 0.06
 
-            prev_injury_tomorrow = injury_tomorrow
+            prev_injury_today = injury_today
 
             row = {
                 'athlete_id': athlete_id,
@@ -440,7 +459,7 @@ def generate_synthetic_data(
                 'stress_level': stress_level,
                 'muscle_soreness': min(10, muscle_soreness),
                 'energy_level': energy_level,
-                'injury_tomorrow': injury_tomorrow,
+                'injury_today': injury_today,
             }
             all_data.append(row)
 
@@ -466,13 +485,23 @@ def generate_synthetic_data(
     df['acute_load_7d'] = df.groupby('athlete_id')['daily_distance_km'].transform(
         lambda x: x.rolling(7).mean()
     )
-    # Chronic load: 21-day rolling average
-    df['chronic_load_21d'] = df.groupby('athlete_id')['daily_distance_km'].transform(
-        lambda x: x.rolling(21).mean()
+
+    def _acwr_ratio_from_distances(distances: pd.Series) -> pd.Series:
+        acute = distances.rolling(7, min_periods=1).mean()
+        weekly_std = distances.rolling(7, min_periods=1).std().fillna(0.0)
+        acute_vals = np.asarray(acute, dtype=float)
+        weekly_std_vals = np.asarray(weekly_std, dtype=float)
+        baseline_raw = pd.Series(
+            acute_vals * 0.85 + weekly_std_vals * 0.35 + 0.5,
+            index=distances.index,
+        )
+        baseline = baseline_raw.where(baseline_raw >= 0.55, 0.55)
+        ratio = pd.Series(acute_vals, index=distances.index) / baseline.replace(0, np.nan)
+        return ratio.fillna(1.0).clip(0.35, 2.8)
+
+    df['acwr_ratio'] = df.groupby('athlete_id')['daily_distance_km'].transform(
+        _acwr_ratio_from_distances
     )
-    # ACWR ratio - Research shows >1.4 indicates high injury risk (Gabbett, 2016)
-    df['acwr_ratio'] = df['acute_load_7d'] / df['chronic_load_21d'].replace(0, np.nan)
-    df['acwr_ratio'] = df['acwr_ratio'].fillna(1.0).clip(0.35, 2.8)  # Keep consistent with serving bounds
     
     # Energy balance (calories in - calories out)
     df['calorie_balance'] = df['daily_calories'] - df['total_calories_burned']
@@ -511,8 +540,8 @@ def generate_synthetic_data(
 
 def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
     """Write dataset quality diagnostics JSON and return path."""
-    class_counts = df["injury_tomorrow"].value_counts().to_dict()
-    injury_rate = float(df["injury_tomorrow"].mean())
+    class_counts = df["injury_today"].value_counts().to_dict()
+    injury_rate = float(df["injury_today"].mean())
     corr_cols = ["daily_distance_km", "sleep_hours", "stress_level", "muscle_soreness", "acwr_ratio", "hrv_drop"]
     corr = df.loc[:, corr_cols].corr()
     report = {

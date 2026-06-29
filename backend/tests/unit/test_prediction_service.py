@@ -89,14 +89,14 @@ class TestDefaultedCriticalFeatures:
         )
         count = ps._count_defaulted_critical_features(df)
         assert count >= 0
-        assert count <= 7
+        assert count <= 6
 
     def test_counts_zero_when_history_features_differ(self):
         df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
         df.at[df.index[0], "acwr_ratio"] = 1.85
         df.at[df.index[0], "hrv_drop"] = -3.2
         count = ps._count_defaulted_critical_features(df)
-        assert count == 5  # only acwr_ratio and hrv_drop differ from defaults
+        assert count == 4  # only acwr_ratio and hrv_drop differ from defaults
 
 
 class TestFirestoreFieldHelpers:

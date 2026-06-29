@@ -1,6 +1,10 @@
 import pytest
 
-from services.feature_engineering import compute_derived_features
+from services.feature_engineering import (
+    acwr_baseline_from_acute_proxy,
+    acwr_ratio_bounded,
+    compute_derived_features,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -16,10 +20,9 @@ def test_acwr_ratio_bounded():
     out = compute_derived_features(row)
     assert 0.35 <= out["acwr_ratio"] <= 2.8
     assert out["acute_load_7d"] > 0
-    assert out["chronic_load_21d"] > 0
-    raw_ratio = out["acute_load_7d"] / out["chronic_load_21d"]
-    expected = min(2.8, max(0.35, raw_ratio))
-    assert out["acwr_ratio"] == pytest.approx(expected)
+    baseline = acwr_baseline_from_acute_proxy(out["acute_load_7d"])
+    assert out["acwr_ratio"] == pytest.approx(acwr_ratio_bounded(out["acute_load_7d"], baseline))
+    assert "chronic_load_7d" not in out
 
 
 def test_rest_day_low_acute():

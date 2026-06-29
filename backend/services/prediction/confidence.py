@@ -11,7 +11,6 @@ from services.model_features import DEFAULT_FEATURE_VALUES
 
 ROLLING_FEATURE_COLUMNS: tuple[str, ...] = (
     "acute_load_7d",
-    "chronic_load_21d",
     "acwr_ratio",
     "acwr_ratio_ma7",
     "sleep_hours_ma7",

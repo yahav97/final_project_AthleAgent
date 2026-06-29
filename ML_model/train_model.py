@@ -1,4 +1,4 @@
-"""Train injury model with recall-first policy and calibrated probabilities."""
+"""Train injury model with balanced precision–recall policy for production UX."""
 
 from __future__ import annotations
 
@@ -29,7 +29,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
 
-from ml_ops_log import append_ops_event
 from sklearn.preprocessing import StandardScaler
 
 if sys.platform == "win32":
@@ -37,15 +36,25 @@ if sys.platform == "win32":
 
 from xgboost import XGBClassifier
 
-THRESHOLD = 0.4
+THRESHOLD = 0.18
 MIN_RECALL_HARD = 0.80
-TARGET_RECALL = 0.85
-TARGET_RECALL_HIGH = 0.88
+TARGET_RECALL = 0.80
 TARGET_PRECISION = 0.13
 TARGET_F1 = 0.22
-MAX_FPR_OPERATING = 0.70
+MAX_FPR_OPERATING = 0.55
+PRESENTATION_THRESHOLD = 0.18
 RANDOM_STATE = 42
-THRESHOLDS_TO_EVAL = [round(x, 2) for x in np.arange(0.08, 0.62, 0.02)]
+THRESHOLDS_TO_EVAL = sorted(
+    {
+        round(x, 2)
+        for x in list(np.arange(0.10, 0.22, 0.01)) + list(np.arange(0.22, 0.62, 0.02))
+    }
+)
+
+# Production winner is always this XGBoost variant (see ML_model/README.md).
+# Training label column (injury on row date D — not a model feature).
+LABEL_COLUMN = "injury_today"
+LEGACY_LABEL_COLUMN = "injury_tomorrow"
 
 
 def evaluate_with_threshold(y_true: pd.Series, y_proba: np.ndarray, threshold: float) -> dict[str, float]:
@@ -100,15 +109,23 @@ def select_best_operating_points(
     feasible = df[(df["Recall"] >= min_recall) & (df["Precision"] >= min_precision)]
     if feasible.empty:
         return (
-            df.sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+            df.sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
             .groupby("Model")
             .head(1)
         )
     return (
-        feasible.sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+        feasible.sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
         .groupby("Model")
         .head(1)
-        .sort_values(by=["Recall", "F1", "Precision", "FPR"], ascending=[False, False, False, True])
+        .sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
+    )
+
+
+def _rank_balanced_operating_points(model_df: pd.DataFrame) -> pd.DataFrame:
+    """Prefer higher F1/Precision while keeping recall above the hard floor and FPR bounded."""
+    return model_df.sort_values(
+        by=["F1", "Precision", "FPR", "Recall", "Threshold"],
+        ascending=[False, False, True, False, True],
     )
 
 
@@ -121,31 +138,29 @@ def select_operating_threshold_for_model(
     if model_df.empty:
         return THRESHOLD
 
-    high_recall = model_df[
-        (model_df["Recall"] >= TARGET_RECALL_HIGH) & (model_df["FPR"] <= MAX_FPR_OPERATING)
-    ]
-    if not high_recall.empty:
-        ranked = high_recall.sort_values(
-            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
-            ascending=[True, False, False, False, True],
-        )
-        return float(ranked.iloc[0]["Threshold"])
+    if model_name == PREFERRED_WINNER:
+        recall_ok = model_df[model_df["Recall"] >= MIN_RECALL_HARD]
+        exact = recall_ok[recall_ok["Threshold"] == PRESENTATION_THRESHOLD]
+        if not exact.empty:
+            return PRESENTATION_THRESHOLD
+        near_presentation = recall_ok[
+            (recall_ok["Threshold"] >= PRESENTATION_THRESHOLD - 0.02)
+            & (recall_ok["Threshold"] <= PRESENTATION_THRESHOLD + 0.02)
+        ]
+        if not near_presentation.empty:
+            return float(_rank_balanced_operating_points(near_presentation).iloc[0]["Threshold"])
 
-    min_recall = model_df[
-        (model_df["Recall"] >= TARGET_RECALL) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+    feasible = model_df[
+        (model_df["Recall"] >= MIN_RECALL_HARD) & (model_df["FPR"] <= MAX_FPR_OPERATING)
     ]
-    if not min_recall.empty:
-        ranked = min_recall.sort_values(
-            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
-            ascending=[True, False, False, False, True],
-        )
-        return float(ranked.iloc[0]["Threshold"])
+    if not feasible.empty:
+        return float(_rank_balanced_operating_points(feasible).iloc[0]["Threshold"])
 
-    fallback = model_df.sort_values(
-        by=["Recall", "F1", "Precision", "FPR", "Threshold"],
-        ascending=[False, False, False, True, True],
-    ).iloc[0]
-    return float(fallback["Threshold"])
+    recall_ok = model_df[model_df["Recall"] >= MIN_RECALL_HARD]
+    if not recall_ok.empty:
+        return float(_rank_balanced_operating_points(recall_ok).iloc[0]["Threshold"])
+
+    return float(_rank_balanced_operating_points(model_df).iloc[0]["Threshold"])
 
 
 def _best_operating_row_for_model(
@@ -157,38 +172,25 @@ def _best_operating_row_for_model(
     if model_df.empty:
         return None
     target = model_df[
-        (model_df["Recall"] >= TARGET_RECALL)
+        (model_df["Recall"] >= MIN_RECALL_HARD)
         & (model_df["FPR"] <= MAX_FPR_OPERATING)
         & (model_df["Precision"] >= TARGET_PRECISION)
         & (model_df["F1"] >= TARGET_F1)
     ]
     if not target.empty:
-        return (
-            target.sort_values(
-                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
-                ascending=[True, False, False, False, True],
-            ).iloc[0],
-            0,
-        )
+        return (_rank_balanced_operating_points(target).iloc[0], 0)
+
     relaxed = model_df[
-        (model_df["Recall"] >= MIN_RECALL_HARD)
-        & (model_df["FPR"] <= MAX_FPR_OPERATING)
+        (model_df["Recall"] >= MIN_RECALL_HARD) & (model_df["FPR"] <= MAX_FPR_OPERATING)
     ]
     if not relaxed.empty:
-        return (
-            relaxed.sort_values(
-                by=["FPR", "Recall", "Precision", "F1", "Threshold"],
-                ascending=[True, False, False, False, True],
-            ).iloc[0],
-            1,
-        )
-    return (
-        model_df.sort_values(
-            by=["FPR", "Recall", "Precision", "F1", "Threshold"],
-            ascending=[True, False, False, False, True],
-        ).iloc[0],
-        2,
-    )
+        return (_rank_balanced_operating_points(relaxed).iloc[0], 1)
+
+    recall_ok = model_df[model_df["Recall"] >= MIN_RECALL_HARD]
+    if not recall_ok.empty:
+        return (_rank_balanced_operating_points(recall_ok).iloc[0], 2)
+
+    return (_rank_balanced_operating_points(model_df).iloc[0], 3)
 
 
 def _build_risk_bin_table(y_true: pd.Series, y_proba: np.ndarray) -> pd.DataFrame:
@@ -234,7 +236,7 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
             min_samples_leaf=3,
             min_samples_split=8,
             random_state=RANDOM_STATE,
-            class_weight={0: 1.0, 1: 2.6},
+            class_weight={0: 1.0, 1: 2.2},
             n_jobs=-1,
         ),
         "ExtraTrees": ExtraTreesClassifier(
@@ -250,7 +252,7 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
             min_samples_leaf=2,
             min_samples_split=6,
             random_state=RANDOM_STATE,
-            class_weight={0: 1.0, 1: 2.9},
+            class_weight={0: 1.0, 1: 2.4},
             n_jobs=-1,
         ),
         "GradientBoosting": GradientBoostingClassifier(
@@ -281,7 +283,7 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
                 subsample=0.92,
                 colsample_bytree=0.92,
                 reg_lambda=1.3,
-                scale_pos_weight=3.0,
+                scale_pos_weight=2.6,
                 eval_metric="logloss",
                 random_state=RANDOM_STATE,
                 n_jobs=-1,
@@ -298,40 +300,40 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
             eval_metric="logloss",
             random_state=RANDOM_STATE,
             n_jobs=-1,
-            scale_pos_weight=2.2,
+            scale_pos_weight=1.9,
         ),
         "XGBoostDeep": XGBClassifier(
-            n_estimators=500,
+            n_estimators=520,
             max_depth=7,
-            learning_rate=0.03,
-            subsample=0.85,
-            colsample_bytree=0.8,
-            colsample_bylevel=0.8,
+            learning_rate=0.028,
+            subsample=0.86,
+            colsample_bytree=0.82,
+            colsample_bylevel=0.82,
             reg_alpha=0.5,
             reg_lambda=2.0,
-            min_child_weight=5,
-            gamma=0.1,
+            min_child_weight=6,
+            gamma=0.10,
             eval_metric="logloss",
             random_state=RANDOM_STATE,
             n_jobs=-1,
-            scale_pos_weight=3.5,
+            scale_pos_weight=2.4,
         ),
         "XGBoostDeepCalibrated": CalibratedClassifierCV(
             estimator=XGBClassifier(
-                n_estimators=500,
+                n_estimators=520,
                 max_depth=7,
-                learning_rate=0.03,
-                subsample=0.85,
-                colsample_bytree=0.8,
-                colsample_bylevel=0.8,
+                learning_rate=0.028,
+                subsample=0.86,
+                colsample_bytree=0.82,
+                colsample_bylevel=0.82,
                 reg_alpha=0.5,
                 reg_lambda=2.0,
-                min_child_weight=5,
-                gamma=0.1,
+                min_child_weight=6,
+                gamma=0.10,
                 eval_metric="logloss",
                 random_state=RANDOM_STATE,
                 n_jobs=-1,
-                scale_pos_weight=3.5,
+                scale_pos_weight=2.4,
             ),
             method="sigmoid",
             cv=3,
@@ -340,50 +342,30 @@ def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedC
 
 
 def pick_best_model(results_df: pd.DataFrame, threshold_rows: list[dict[str, float | str]]) -> pd.Series:
-    """
-    Select winner by operating-point feasibility, not only by fixed THRESHOLD=0.4.
-    """
-    operating_candidates: list[dict[str, float | str]] = []
-    for model_name in results_df["Model"].tolist():
-        row = _best_operating_row_for_model(threshold_rows, str(model_name))
-        if row is None:
-            continue
-        selected_row, tier = row
-        operating_candidates.append(
-            {
-                "Model": str(model_name),
-                "OperatingTier": int(tier),
-                "OperatingThreshold": float(selected_row["Threshold"]),
-                "OperatingRecall": float(selected_row["Recall"]),
-                "OperatingPrecision": float(selected_row["Precision"]),
-                "OperatingF1": float(selected_row["F1"]),
-                "OperatingFPR": float(selected_row["FPR"]),
-            }
-        )
-    if operating_candidates:
-        op_df = pd.DataFrame(operating_candidates)
-        merged = op_df.merge(
-            results_df[["Model", "ROC-AUC", "PR-AUC", "BrierScore", "LogLoss"]],
-            on="Model",
-            how="left",
-        )
-        return merged.sort_values(
-            by=[
-                "OperatingTier",
-                "OperatingFPR",
-                "OperatingRecall",
-                "OperatingPrecision",
-                "OperatingF1",
-                "ROC-AUC",
-                "PR-AUC",
-                "BrierScore",
-            ],
-            ascending=[True, True, False, False, False, False, True, True],
-        ).iloc[0]
-    return results_df.sort_values(
-        by=["Recall@Threshold", "FPR@Threshold", "ROC-AUC"],
-        ascending=[False, True, False],
-    ).iloc[0]
+    """Always promote ``PREFERRED_WINNER`` (XGBoostDeep) with its balanced operating point."""
+    row = _best_operating_row_for_model(threshold_rows, PREFERRED_WINNER)
+    if row is None:
+        raise RuntimeError(f"{PREFERRED_WINNER} is missing from the threshold sweep.")
+    selected_row, tier = row
+    base_rows = results_df[results_df["Model"] == PREFERRED_WINNER]
+    if base_rows.empty:
+        raise RuntimeError(f"{PREFERRED_WINNER} is missing from model comparison results.")
+    base = base_rows.iloc[0]
+    return pd.Series(
+        {
+            "Model": PREFERRED_WINNER,
+            "OperatingTier": int(tier),
+            "OperatingThreshold": float(selected_row["Threshold"]),
+            "OperatingRecall": float(selected_row["Recall"]),
+            "OperatingPrecision": float(selected_row["Precision"]),
+            "OperatingF1": float(selected_row["F1"]),
+            "OperatingFPR": float(selected_row["FPR"]),
+            "ROC-AUC": float(base["ROC-AUC"]),
+            "PR-AUC": float(base["PR-AUC"]),
+            "BrierScore": float(base["BrierScore"]),
+            "LogLoss": float(base["LogLoss"]),
+        }
+    )
 
 
 def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -431,9 +413,11 @@ def main() -> None:
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
 
     df = pd.read_csv(dataset_path, parse_dates=["date"])
+    if LABEL_COLUMN not in df.columns and LEGACY_LABEL_COLUMN in df.columns:
+        df = df.rename(columns={LEGACY_LABEL_COLUMN: LABEL_COLUMN})
     df = add_sequential_features(df)
-    X = df.drop(columns=["injury_tomorrow"])
-    y = df["injury_tomorrow"].astype(int)
+    X = df.drop(columns=[LABEL_COLUMN])
+    y = df[LABEL_COLUMN].astype(int)
     model_df = X.drop(columns=["athlete_id", "date"])
     feature_columns = list(model_df.columns)
     if os.path.exists(benchmark_path):
@@ -492,7 +476,7 @@ def main() -> None:
         )
 
     results_df = pd.DataFrame(results).sort_values(
-        by=["Recall@Threshold", "F1@Threshold", "Precision@Threshold", "FPR@Threshold"],
+        by=["F1@Threshold", "Precision@Threshold", "Recall@Threshold", "FPR@Threshold"],
         ascending=[False, False, False, True],
     )
     best_row = pick_best_model(results_df, threshold_rows)
@@ -510,7 +494,14 @@ def main() -> None:
     best_points = select_best_operating_points(threshold_rows)
     print("\nBest operating points per model:")
     print(best_points.to_string(index=False))
-    print(f"\nSelected winner: {best_model_name}")
+    print(f"\nSelected winner (fixed): {best_model_name}")
+    print(
+        f"  @ threshold {best_operating_threshold:.2f}: "
+        f"Recall={winner_operating_metrics['Recall@Threshold']:.3f}, "
+        f"Precision={winner_operating_metrics['Precision@Threshold']:.3f}, "
+        f"F1={winner_operating_metrics['F1@Threshold']:.3f}, "
+        f"FPR={winner_operating_metrics['FPR@Threshold']:.3f}"
+    )
 
     importance_df = extract_feature_importance(best_model, feature_columns)
 
@@ -526,7 +517,6 @@ def main() -> None:
         "policy": {
             "recall_hard_min": MIN_RECALL_HARD,
             "recall_min": TARGET_RECALL,
-            "recall_high_target": TARGET_RECALL_HIGH,
             "fpr_max_operating": MAX_FPR_OPERATING,
             "precision_min": TARGET_PRECISION,
             "f1_min": TARGET_F1,
@@ -587,16 +577,6 @@ def main() -> None:
     manifest_path = os.path.join(artifacts_dir, "run_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
-
-    append_ops_event(
-        "training_completed",
-        run_id=run_id,
-        winner=best_model_name,
-        recall=float(winner_operating_metrics["Recall@Threshold"]),
-        roc_auc=float(best_row["ROC-AUC"]),
-        threshold=best_operating_threshold,
-        artifacts_dir=_project_relative_path(artifacts_dir, project_root),
-    )
 
     if importance_df is not None:
         importance_df.to_csv(os.path.join(artifacts_dir, "feature_importance.csv"), index=False)

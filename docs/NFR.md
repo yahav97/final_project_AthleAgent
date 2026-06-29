@@ -35,7 +35,7 @@
 
 | ID           | קטגוריה       | מדד                                | יעד                  | עדיפות |
 | ------------ | ------------- | ---------------------------------- | -------------------- | ------ |
-| NFR-ML-01    | ML            | Recall@Threshold (0.18)            | ≥ 0.80               | P0     |
+| NFR-ML-01    | ML            | Recall@Threshold (manifest)        | ≥ 0.80               | P0     |
 | NFR-ML-02    | ML            | ROC-AUC                            | ≥ 0.68               | P0     |
 | NFR-ML-03    | ML            | Brier Score                        | ≤ 0.15               | P1     |
 | NFR-ML-04    | ML            | Train–serve parity                 | 100%                 | P0     |
@@ -58,7 +58,7 @@
 | NFR-UX-02    | UX מדיד       | Sync success rate                  | ≥ 90%                | P1     |
 
 
-**Baseline נוכחי (מודל promoted):** run `20260512_075115` — ראו [§3.1](#31-מדדי-איכות-ml-offline).
+**Baseline נוכחי (מודל promoted):** run `20260629_113445` — ראו [§3.1](#31-מדדי-איכות-ml-offline).
 
 ---
 
@@ -66,17 +66,17 @@
 
 ### 3.1 מדדי איכות ML (offline)
 
-מודל production: **XGBoostDeep**, **36 פיצ'רים**. סף החלטה במודל (manifest): **0.18**; רמות UI/API: Low ≤20%, Medium 21–70%, High >70%.
+מודל production: **XGBoostDeep**, **35 פיצ'רים**. סף החלטה במודל (manifest): **0.18**; רמות UI/API: Low ≤20%, Medium 21–70%, High >70%.
 
 
 | מדד                 | יעד (gate)      | Baseline (holdout) | מקור                                                   |
 | ------------------- | --------------- | ------------------ | ------------------------------------------------------ |
-| Recall@Threshold    | ≥ 0.80          | **0.866**          | `ML_model/artifacts/20260512_075115/run_manifest.json` |
-| ROC-AUC             | ≥ 0.68          | **0.723**          | אותו manifest                                          |
-| Precision@Threshold | ≥ 0.13 (policy) | **0.141**          | אותו manifest                                          |
-| F1@Threshold        | ≥ 0.22 (policy) | **0.242**          | אותו manifest                                          |
-| Brier Score         | ≤ 0.15          | **0.115**          | אותו manifest                                          |
-| FPR@Threshold       | ≤ 0.70 (policy) | **0.651**          | אותו manifest                                          |
+| Recall@Threshold    | ≥ 0.80          | **0.887**          | `ML_model/artifacts/20260629_113445/run_manifest.json` |
+| ROC-AUC             | ≥ 0.68          | **0.791**          | אותו manifest                                          |
+| Precision@Threshold | ≥ 0.13 (policy) | **0.246**          | אותו manifest                                          |
+| F1@Threshold        | ≥ 0.22 (policy) | **0.385**          | אותו manifest                                          |
+| Brier Score         | ≤ 0.15          | **0.129**          | אותו manifest                                          |
+| FPR@Threshold       | ≤ 0.70 (policy) | **0.565**          | אותו manifest                                          |
 
 
 **Calibration (risk bins):**
@@ -84,9 +84,9 @@
 
 | bin (finalRiskScore) | injury rate בפועל |
 | -------------------- | ----------------- |
-| 0–20 (green)         | 5.0%              |
-| 20–50 (yellow)       | 11.4%             |
-| 50–100 (red)         | 37.2%             |
+| 0–20 (green)         | 5.6%              |
+| 21–50 (yellow)       | 16.6%             |
+| 51–100 (red)         | 51.5%             |
 
 
 > מונוטוניות: ככל שהציון גבוה יותר, שיעור הפציעות בדאטה גבוה יותר — evidence ל-calibration.
@@ -98,7 +98,7 @@
 
 |                   |                                                                  |
 | ----------------- | ---------------------------------------------------------------- |
-| **תיאור**         | המודל חייב לזהות רוב מקרי הפציעה (מינימום recall) בסף הפעלה 0.18 |
+| **תיאור**         | המודל חייב לזהות רוב מקרי הפציעה (מינימום recall) בסף הפעלה מה-manifest |
 | **מדד**           | `Recall@Threshold`                                               |
 | **יעד**           | ≥ 0.80 (hard gate בקוד); policy training: ≥ 0.85                 |
 | **מדידה offline** | `ML_model/validate_metrics.py` + `run_manifest.json`             |
@@ -145,7 +145,7 @@
 
 |           |                                                 |
 | --------- | ----------------------------------------------- |
-| **תיאור** | אותם 36 פיצ'רים, באותו סדר, באימון וב-inference |
+| **תיאור** | אותם 35 פיצ'רים, באותו סדר, באימון וב-inference |
 | **מדד**   | התאמת עמודות train vs serve                     |
 | **יעד**   | 100% — אפס עמודות חסרות/עודפות                  |
 | **מדידה** | `backend/tests/test_train_serve_parity.py`      |
