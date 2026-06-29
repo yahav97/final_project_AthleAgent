@@ -1,4 +1,7 @@
-"""Population-average nutrition inputs when a user has no logged meals."""
+"""Population-average nutrition inputs when a user has no logged meals.
+
+Defaults align with medians in ``ML_model/athlete_injury_data.csv`` (synthetic training cohort).
+"""
 
 from __future__ import annotations
 

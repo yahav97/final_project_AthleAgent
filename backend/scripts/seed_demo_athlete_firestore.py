@@ -111,8 +111,8 @@ def main() -> int:
     }
 
     nutrition: dict[str, Any] = {
-        "totalProtein": 125,
-        "totalCarbs": 290,
+        "totalProtein": 130,
+        "totalCarbs": 300,
         "mealsLoggedCount": 3,
     }
 

@@ -84,10 +84,11 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Nutrition imputation when a day has no logged meals
     # -------------------------------------------------------------------------
-    NUTRITION_DEFAULT_PROTEIN: int = 125
-    NUTRITION_DEFAULT_CARBS: int = 290
+    # Medians from ML_model/data_generator.py synthetic cohort (seed=42).
+    NUTRITION_DEFAULT_PROTEIN: int = 130
+    NUTRITION_DEFAULT_CARBS: int = 300
     NUTRITION_DEFAULT_MEALS_LOGGED: int = 3
-    NUTRITION_DEFAULT_CALORIES: int = 2500
+    NUTRITION_DEFAULT_CALORIES: int = 2600
 
     # -------------------------------------------------------------------------
     # HTTP middleware & dev-only mock endpoint

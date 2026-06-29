@@ -174,7 +174,7 @@ class TestFirestoreSnapshotMapping:
         snap["daily_nutrition_yesterday"] = {}
         req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
         assert req.nutritionImputed is True
-        assert req.totalProtein == 125
+        assert req.totalProtein == 130
 
     def test_nutrition_not_imputed_when_yesterday_logged(self, firestore_snapshot):
         req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", firestore_snapshot)

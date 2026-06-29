@@ -148,10 +148,10 @@ class TestMergeNutritionWithHistory:
     def test_empty_primary_gets_population_defaults_and_imputed_flag(self):
         out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", {})
         assert imputed is True
-        assert out["totalProtein"] == 125
-        assert out["totalCarbs"] == 290
+        assert out["totalProtein"] == 130
+        assert out["totalCarbs"] == 300
         assert out["mealsLoggedCount"] == 3
-        assert out["totalCalories"] == 2500
+        assert out["totalCalories"] == 2600
 
     def test_yesterday_values_preserved_when_present(self):
         primary = {"totalProtein": 140, "totalCarbs": 310, "mealsLoggedCount": 4, "totalCalories": 2700}
@@ -165,5 +165,5 @@ class TestMergeNutritionWithHistory:
         assert imputed is True
         assert out["totalProtein"] == 150
         assert out["totalCalories"] == 2600
-        assert out["totalCarbs"] == 290
+        assert out["totalCarbs"] == 300
         assert out["mealsLoggedCount"] == 3

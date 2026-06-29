@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from services.model_features import DEFAULT_FEATURE_VALUES
+
 
 def compute_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
     """
@@ -47,7 +49,7 @@ def compute_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
     if total_calories_burned <= 0 and (active_cal > 0 or bmr_cal > 0):
         total_calories_burned = active_cal + bmr_cal
     if total_calories_burned <= 0:
-        total_calories_burned = 2450.0
+        total_calories_burned = float(DEFAULT_FEATURE_VALUES["total_calories_burned"])
 
     return {
         "acute_load_7d": acute_load_7d,
