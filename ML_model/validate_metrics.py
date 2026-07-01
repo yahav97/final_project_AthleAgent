@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 
-TARGET_RECALL = 0.80
-MIN_RECALL_THRESHOLD = 0.80
-MIN_AUC_THRESHOLD = 0.68
-TARGET_PRECISION = 0.13
-TARGET_F1 = 0.22
-MAX_FPR_OPERATING = 0.58
-THRESHOLD = 0.18
+from policy_config import get_policy
 
 
 def _latest_artifacts_dir(script_dir: str) -> str | None:
@@ -79,7 +72,8 @@ def main() -> int:
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             top = None
     if top is None:
-        gated = df[df["Recall@Threshold"] >= MIN_RECALL_THRESHOLD]
+        policy = get_policy()
+        gated = df[df["Recall@Threshold"] >= policy.MIN_RECALL_HARD]
         ranked_base = gated if not gated.empty else df
         ranked = ranked_base.sort_values(
             by=[
@@ -92,38 +86,41 @@ def main() -> int:
             ],
             ascending=[True, False, False, False, True, False],
         )
-        print(f"Policy threshold: {THRESHOLD}")
+        print(f"Policy threshold: {policy.THRESHOLD}")
         print(ranked.to_string(index=False))
         top = ranked.iloc[0].to_dict()
 
+    policy = get_policy()
     recall_value = float(top["Recall@Threshold"])
-    recall_hard_gate_ok = recall_value >= MIN_RECALL_THRESHOLD
-    recall_target_ok = recall_value >= TARGET_RECALL
-    fpr_ok = float(top["FPR@Threshold"]) <= MAX_FPR_OPERATING
-    auc_ok = float(top["ROC-AUC"]) >= MIN_AUC_THRESHOLD
-    precision_ok = float(top["Precision@Threshold"]) >= TARGET_PRECISION
-    f1_ok = float(top["F1@Threshold"]) >= TARGET_F1
+    recall_hard_gate_ok = recall_value >= policy.MIN_RECALL_HARD
+    recall_target_ok = recall_value >= policy.TARGET_RECALL
+    fpr_ok = float(top["FPR@Threshold"]) <= policy.MAX_FPR_OPERATING
+    auc_ok = float(top["ROC-AUC"]) >= policy.MIN_AUC_FOR_LIVE
+    precision_ok = float(top["Precision@Threshold"]) >= policy.TARGET_PRECISION
+    f1_ok = float(top["F1@Threshold"]) >= policy.TARGET_F1
     if not recall_hard_gate_ok:
         print(
             f"\nREJECTED: {top['Model']} failed hard safety gate "
-            f"(Recall={recall_value:.4f} < {MIN_RECALL_THRESHOLD})."
+            f"(Recall={recall_value:.4f} < {policy.MIN_RECALL_HARD})."
         )
         return 2
 
     if recall_target_ok and fpr_ok and auc_ok and precision_ok and f1_ok:
         print(
             f"\nPASS: {top['Model']} meets targets "
-            f"(Recall>={TARGET_RECALL}, FPR<={MAX_FPR_OPERATING}, AUC>={MIN_AUC_THRESHOLD}, "
-            f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}). "
-            f"Hard gate: Recall>={MIN_RECALL_THRESHOLD}."
+            f"(Recall>={policy.TARGET_RECALL}, FPR<={policy.MAX_FPR_OPERATING}, "
+            f"AUC>={policy.MIN_AUC_FOR_LIVE}, Precision>={policy.TARGET_PRECISION}, "
+            f"F1>={policy.TARGET_F1}). "
+            f"Hard gate: Recall>={policy.MIN_RECALL_HARD}."
         )
         return 0
 
     print(
         f"\nWARN: Top model {top['Model']} does not meet all targets "
-        f"(Recall>={TARGET_RECALL}, FPR<={MAX_FPR_OPERATING}, AUC>={MIN_AUC_THRESHOLD}, "
-        f"Precision>={TARGET_PRECISION}, F1>={TARGET_F1}) "
-        f"but passes hard gate Recall>={MIN_RECALL_THRESHOLD}."
+        f"(Recall>={policy.TARGET_RECALL}, FPR<={policy.MAX_FPR_OPERATING}, "
+        f"AUC>={policy.MIN_AUC_FOR_LIVE}, Precision>={policy.TARGET_PRECISION}, "
+        f"F1>={policy.TARGET_F1}) "
+        f"but passes hard gate Recall>={policy.MIN_RECALL_HARD}."
     )
     return 2
 

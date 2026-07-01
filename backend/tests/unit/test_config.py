@@ -26,6 +26,19 @@ class TestCorsOriginsParsing:
 
 
 class TestDomainDefaults:
+    def test_ml_gate_defaults_match_training_policy(self):
+        import sys
+        from pathlib import Path
+
+        ml_root = str(Path(__file__).resolve().parents[2] / "ML_model")
+        if ml_root not in sys.path:
+            sys.path.insert(0, ml_root)
+        from policy_config import DEFAULT_MIN_AUC_FOR_LIVE, DEFAULT_MIN_RECALL_HARD
+
+        s = Settings()
+        assert s.ML_MIN_RECALL_HARD == DEFAULT_MIN_RECALL_HARD
+        assert s.ML_MIN_AUC_FOR_LIVE == DEFAULT_MIN_AUC_FOR_LIVE
+
     def test_ml_gate_defaults(self):
         s = Settings()
         assert s.ML_MIN_RECALL_HARD == 0.80

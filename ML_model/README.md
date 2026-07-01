@@ -13,6 +13,7 @@
 | `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook (120 athletes × 150 days) |
 | `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, ~1000×365 for production) |
 
+| `policy_config.py` | **Single source** for selection gates (Recall, FPR, F1, …) — notebook can override live |
 | `train_model.py` | Train 5 candidates (`MODEL_CANDIDATE_NAMES`) → tiered policy picks winner → `artifacts/<run_id>/` |
 
 | `validate_metrics.py` | Promotion policy gates |

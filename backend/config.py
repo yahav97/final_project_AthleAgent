@@ -11,6 +11,7 @@ staging and future tuning do not require hunting through service modules.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -29,6 +30,22 @@ def _default_firebase_service_account_key() -> Path | None:
 def _project_root() -> Path:
     """Repository root (parent of backend/)."""
     return _BACKEND_DIR.parent
+
+
+def _ml_policy_serving_defaults() -> tuple[float, float]:
+    """Load ML serving gate defaults from ML_model/policy_config.py."""
+    ml_root = str(_project_root() / "ML_model")
+    if ml_root not in sys.path:
+        sys.path.insert(0, ml_root)
+    try:
+        from policy_config import DEFAULT_MIN_AUC_FOR_LIVE, DEFAULT_MIN_RECALL_HARD
+
+        return DEFAULT_MIN_RECALL_HARD, DEFAULT_MIN_AUC_FOR_LIVE
+    except ImportError:
+        return 0.80, 0.68
+
+
+_ML_DEFAULT_RECALL_HARD, _ML_DEFAULT_AUC_FOR_LIVE = _ml_policy_serving_defaults()
 
 
 def _default_log_dir() -> Path:
@@ -53,9 +70,10 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # ML model loading & live gates (see backend/docs/MODEL.md)
     # -------------------------------------------------------------------------
+    # Defaults synced with ML_model/policy_config.py (override via .env in staging).
     MODEL_PATH: Path | None = None
-    ML_MIN_RECALL_HARD: float = 0.80
-    ML_MIN_AUC_FOR_LIVE: float = 0.68
+    ML_MIN_RECALL_HARD: float = _ML_DEFAULT_RECALL_HARD
+    ML_MIN_AUC_FOR_LIVE: float = _ML_DEFAULT_AUC_FOR_LIVE
     ML_DEGRADED_AUC_OFFSET: float = 0.02
 
     # -------------------------------------------------------------------------

@@ -36,12 +36,17 @@ if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
 
 from xgboost import XGBClassifier
 
-THRESHOLD = 0.18
-MIN_RECALL_HARD = 0.80
-TARGET_RECALL = 0.80
-TARGET_PRECISION = 0.13
-TARGET_F1 = 0.22
-MAX_FPR_OPERATING = 0.55
+from policy_config import (
+    apply_policy_overrides,
+    evaluate_policy_gates,
+    get_policy,
+    policy_as_dict,
+    policy_thresholds,
+    reset_policy,
+)
+
+# Model-selection gates: ML_model/policy_config.py (notebook can override live).
+# Backend serving gate defaults: backend/config.py → ML_MIN_RECALL_HARD, ML_MIN_AUC_FOR_LIVE.
 RANDOM_STATE = 42
 THRESHOLDS_TO_EVAL = sorted(
     {
@@ -52,7 +57,6 @@ THRESHOLDS_TO_EVAL = sorted(
 
 # Training label column (injury on row date D — not a model feature).
 LABEL_COLUMN = "injury_today"
-LEGACY_LABEL_COLUMN = "injury_tomorrow"
 
 
 def evaluate_with_threshold(y_true: pd.Series, y_proba: np.ndarray, threshold: float) -> dict[str, float]:
@@ -100,9 +104,14 @@ def threshold_sweep(y_true: pd.Series, y_proba: np.ndarray, model_name: str) -> 
 
 def select_best_operating_points(
     threshold_rows: list[dict[str, float | str]],
-    min_recall: float = TARGET_RECALL,
-    min_precision: float = TARGET_PRECISION,
+    min_recall: float | None = None,
+    min_precision: float | None = None,
 ) -> pd.DataFrame:
+    policy = get_policy()
+    if min_recall is None:
+        min_recall = policy.TARGET_RECALL
+    if min_precision is None:
+        min_precision = policy.TARGET_PRECISION
     df = pd.DataFrame(threshold_rows)
     feasible = df[(df["Recall"] >= min_recall) & (df["Precision"] >= min_precision)]
     if feasible.empty:
@@ -132,17 +141,19 @@ def select_operating_threshold_for_model(
     model_name: str,
 ) -> float:
     df = pd.DataFrame(threshold_rows)
+    policy = get_policy()
     model_df = df[df["Model"] == model_name].copy()
     if model_df.empty:
-        return THRESHOLD
+        return policy.THRESHOLD
 
     feasible = model_df[
-        (model_df["Recall"] >= MIN_RECALL_HARD) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+        (model_df["Recall"] >= policy.MIN_RECALL_HARD)
+        & (model_df["FPR"] <= policy.MAX_FPR_OPERATING)
     ]
     if not feasible.empty:
         return float(_rank_balanced_operating_points(feasible).iloc[0]["Threshold"])
 
-    recall_ok = model_df[model_df["Recall"] >= MIN_RECALL_HARD]
+    recall_ok = model_df[model_df["Recall"] >= policy.MIN_RECALL_HARD]
     if not recall_ok.empty:
         return float(_rank_balanced_operating_points(recall_ok).iloc[0]["Threshold"])
 
@@ -154,25 +165,27 @@ def _best_operating_row_for_model(
     model_name: str,
 ) -> tuple[pd.Series, int] | None:
     df = pd.DataFrame(threshold_rows)
+    policy = get_policy()
     model_df = df[df["Model"] == model_name].copy()
     if model_df.empty:
         return None
     target = model_df[
-        (model_df["Recall"] >= MIN_RECALL_HARD)
-        & (model_df["FPR"] <= MAX_FPR_OPERATING)
-        & (model_df["Precision"] >= TARGET_PRECISION)
-        & (model_df["F1"] >= TARGET_F1)
+        (model_df["Recall"] >= policy.MIN_RECALL_HARD)
+        & (model_df["FPR"] <= policy.MAX_FPR_OPERATING)
+        & (model_df["Precision"] >= policy.TARGET_PRECISION)
+        & (model_df["F1"] >= policy.TARGET_F1)
     ]
     if not target.empty:
         return (_rank_balanced_operating_points(target).iloc[0], 0)
 
     relaxed = model_df[
-        (model_df["Recall"] >= MIN_RECALL_HARD) & (model_df["FPR"] <= MAX_FPR_OPERATING)
+        (model_df["Recall"] >= policy.MIN_RECALL_HARD)
+        & (model_df["FPR"] <= policy.MAX_FPR_OPERATING)
     ]
     if not relaxed.empty:
         return (_rank_balanced_operating_points(relaxed).iloc[0], 1)
 
-    recall_ok = model_df[model_df["Recall"] >= MIN_RECALL_HARD]
+    recall_ok = model_df[model_df["Recall"] >= policy.MIN_RECALL_HARD]
     if not recall_ok.empty:
         return (_rank_balanced_operating_points(recall_ok).iloc[0], 2)
 
@@ -324,28 +337,9 @@ OPERATING_TIER_LABELS: dict[int, str] = {
 }
 
 
-def policy_thresholds() -> dict[str, float]:
-    return {
-        "recall_hard_min": MIN_RECALL_HARD,
-        "recall_target": TARGET_RECALL,
-        "precision_min": TARGET_PRECISION,
-        "f1_min": TARGET_F1,
-        "fpr_max_operating": MAX_FPR_OPERATING,
-        "fixed_comparison_threshold": THRESHOLD,
-    }
-
-
-def evaluate_policy_gates(recall: float, precision: float, f1: float, fpr: float) -> dict[str, bool]:
-    return {
-        "recall_hard": recall >= MIN_RECALL_HARD,
-        "fpr": fpr <= MAX_FPR_OPERATING,
-        "precision": precision >= TARGET_PRECISION,
-        "f1": f1 >= TARGET_F1,
-    }
-
-
 def build_fixed_threshold_gate_table(results_df: pd.DataFrame) -> pd.DataFrame:
     """Mark pass/fail at the fixed comparison threshold (default 0.18)."""
+    policy = get_policy()
     rows: list[dict[str, float | str | bool]] = []
     for _, row in results_df.iterrows():
         recall = float(row["Recall@Threshold"])
@@ -356,7 +350,7 @@ def build_fixed_threshold_gate_table(results_df: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "Model": row["Model"],
-                "Threshold": THRESHOLD,
+                "Threshold": policy.THRESHOLD,
                 "Recall": recall,
                 "Precision": precision,
                 "F1": f1,
@@ -494,8 +488,8 @@ class TrainResult:
 
 def load_dataset(path: str | Path) -> pd.DataFrame:
     df = pd.read_csv(path, parse_dates=["date"])
-    if LABEL_COLUMN not in df.columns and LEGACY_LABEL_COLUMN in df.columns:
-        df = df.rename(columns={LEGACY_LABEL_COLUMN: LABEL_COLUMN})
+    if LABEL_COLUMN not in df.columns:
+        raise ValueError(f"Dataset must include '{LABEL_COLUMN}' column: {path}")
     return df
 
 
@@ -521,8 +515,8 @@ def subset_dataset(
 
 
 def prepare_model_frames(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, list[str]]:
-    if LABEL_COLUMN not in df.columns and LEGACY_LABEL_COLUMN in df.columns:
-        df = df.rename(columns={LEGACY_LABEL_COLUMN: LABEL_COLUMN})
+    if LABEL_COLUMN not in df.columns:
+        raise ValueError(f"Dataset must include '{LABEL_COLUMN}' column.")
     df = add_sequential_features(df)
     y = df[LABEL_COLUMN].astype(int)
     model_df = df.drop(columns=[LABEL_COLUMN, "athlete_id", "date"])
@@ -585,12 +579,13 @@ def train_and_compare(
     calibration_bins: dict[str, pd.DataFrame] = {}
     threshold_rows: list[dict[str, float | str]] = []
 
+    policy = get_policy()
     for model_name, model in catalog.items():
         if verbose:
             print(f"Training {model_name}...")
         model.fit(split.X_train, split.y_train)
         y_proba = model.predict_proba(split.X_test)[:, 1]
-        metrics = evaluate_with_threshold(split.y_test, y_proba, THRESHOLD)
+        metrics = evaluate_with_threshold(split.y_test, y_proba, policy.THRESHOLD)
         pr_precision, pr_recall, _ = precision_recall_curve(split.y_test, y_proba)
         pr_auc = auc(pr_recall, pr_precision)
         metrics.update(
@@ -601,7 +596,7 @@ def train_and_compare(
                 "LogLoss": log_loss(split.y_test, y_proba, labels=[0, 1]),
                 "BrierScore": brier_score_loss(split.y_test, y_proba),
                 "BalancedAccuracy@Threshold": balanced_accuracy_score(
-                    split.y_test, (y_proba >= THRESHOLD).astype(int)
+                    split.y_test, (y_proba >= policy.THRESHOLD).astype(int)
                 ),
             }
         )
@@ -665,13 +660,7 @@ def save_training_artifacts(
         "feature_columns": split.feature_columns,
         "threshold": result.best_operating_threshold,
         "medium_threshold": max(0.15, result.best_operating_threshold * 0.6),
-        "policy": {
-            "recall_hard_min": MIN_RECALL_HARD,
-            "recall_min": TARGET_RECALL,
-            "fpr_max_operating": MAX_FPR_OPERATING,
-            "precision_min": TARGET_PRECISION,
-            "f1_min": TARGET_F1,
-        },
+        "policy": policy_as_dict(),
         "winner": result.best_model_name,
     }
     joblib.dump(model_bundle, output_model_path)
