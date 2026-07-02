@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Verify promoted model artifact
-        run: python backend/scripts/verify_demo_readiness.py
-
       - name: Run pytest
         working-directory: backend
         env:

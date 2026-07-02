@@ -30,6 +30,12 @@ import numpy as np
 import pandas as pd
 
 from policy_config import DEFAULT_SLEEP_TARGET_HOURS
+from feature_contract import (
+    assert_finite_feature_columns,
+    assert_whole_number_columns,
+    normalize_whole_number_columns,
+    workout_intensity_minutes,
+)
 
 # ============================================================================
 # CONFIGURATION
@@ -195,9 +201,10 @@ def generate_synthetic_data(
             daily_distance = _bounded(daily_distance, 0.0, 22.0)
             prior_load_km = daily_distance
 
-            workout_intensity = int(
-                _bounded(daily_distance * rng.uniform(4.2, 6.1) * microcycle_load, 0.0, 180.0)
+            active_calories_burned = int(
+                _bounded(daily_distance * rng.uniform(55, 75), 0.0, 1800.0)
             )
+            workout_intensity = workout_intensity_minutes(daily_distance, float(active_calories_burned))
             avg_cadence = _bounded(166.0 + rng.normal(0, 6) + daily_distance * 0.35, 145.0, 192.0)
 
             session_minutes = max(5.0, float(workout_intensity)) if daily_distance > 0.2 else 0.0
@@ -296,7 +303,6 @@ def generate_synthetic_data(
             nutrition_intake_calories = int(
                 _bounded(float(daily_calories) + rng.normal(0.0, 180.0), 1200.0, 4500.0)
             )
-            active_calories_burned = int(_bounded(daily_distance * rng.uniform(55, 75), 0.0, 1800.0))
             bmr = int(10 * weight + 6.25 * (height * 100) - 5 * athlete_age + 5)
             total_burned = int(_bounded(bmr + active_calories_burned, 1400.0, 5200.0))
 
@@ -542,7 +548,15 @@ def generate_synthetic_data(
         axis=1,
     )
     final_df = final_df.sort_values(["athlete_id", "date"]).reset_index(drop=True)
-    
+    final_df = normalize_whole_number_columns(final_df)
+    assert_whole_number_columns(final_df)
+    model_feature_cols = [
+        column
+        for column in final_df.columns
+        if column not in {"athlete_id", "date", "injury_today"}
+    ]
+    assert_finite_feature_columns(final_df, model_feature_cols)
+
     return final_df
 
 

@@ -36,7 +36,7 @@ class TestScaleMapping:
 
     @pytest.mark.parametrize(
         ("raw", "expected_approx"),
-        [(3, 5.5), (5, 9.5)],
+        [(3, 6.0), (5, 10.0)],
     )
     def test_soreness_to_model_scale(self, raw, expected_approx):
         assert soreness_to_model_scale(raw) == pytest.approx(expected_approx)

@@ -22,7 +22,7 @@
 2. **Fixed benchmark holdout** — `benchmark_holdout.csv` → train 5 candidates → `pick_best_model`  
 3. **CV agreement warning** — if CV leader ≠ holdout winner  
 4. **Full-data refit** — winner retrains on all rows → `injury_model.pkl`  
-5. **Promotion** — `validate_metrics.py` on holdout metrics  
+5. **Promotion** — `validate_metrics.py` on holdout metrics (exit `0` = full pass; use `run_pipeline.py --allow-degraded` only for hard-gate pass with WARN)  
 
 Details: [`docs/MODEL_SELECTION.md`](docs/MODEL_SELECTION.md)
 
@@ -48,8 +48,11 @@ ML_model/artifacts/<run_id>/
 ## Quick commands
 
 ```bash
-# Full synthetic pipeline + promote
+# Full synthetic pipeline + promote (full validation pass only)
 python ML_model/run_pipeline.py
+
+# Promote when validation WARNs (hard gate pass, not all soft targets)
+python ML_model/run_pipeline.py --allow-degraded
 
 # Check serving status (backend must be running)
 curl http://localhost:8000/status/ml

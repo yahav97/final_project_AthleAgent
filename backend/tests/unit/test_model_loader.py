@@ -145,3 +145,12 @@ class TestPromotedPointerResolution:
         result = model_loader.load_model(fallback_model)
         assert result is None
         assert model_loader.get_model_gate_reason() == "ungated_fallback_blocked"
+
+
+class TestPromotedArtifactReadiness:
+    def test_promoted_bundle_is_live(self):
+        model_loader.load_model()
+        status = model_loader.get_model_status()
+        assert status["status"] == "Live"
+        assert status["gate_reason"] == "none"
+        assert status.get("winner")

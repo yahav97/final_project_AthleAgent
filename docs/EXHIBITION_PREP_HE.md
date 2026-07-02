@@ -17,7 +17,7 @@
 
 | # | בדיקה | פקודה / מיקום | תוצאה צפויה |
 |---|--------|---------------|-------------|
-| 1 | מודל promoted זמין | `python backend/scripts/verify_demo_readiness.py` | `Demo readiness: OK` |
+| 1 | מודל promoted זמין | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedArtifactReadiness -q` | `1 passed` |
 | 2 | Backend רץ (Docker) | `docker compose up --build` | `/status/ml` → `"status": "Live"` |
 | 3 | Backend לא חשוף לרשת | `docker-compose.yml` → `127.0.0.1:8000:8000` | נגיש רק מ-localhost / emulator |
 | 4 | Firebase key | `backend/firebase-key.json` קיים | אין שגיאת credentials |

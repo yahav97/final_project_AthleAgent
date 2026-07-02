@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from middleware.request_logging import RequestLoggingMiddleware
+from middleware.request_logging import FirebaseAuthMiddleware, RequestLoggingMiddleware
 from utils.exceptions import register_exception_handlers
 from utils.logging import logger
 
@@ -60,6 +60,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(FirebaseAuthMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(health_router)

@@ -5,6 +5,7 @@ The JSON is the single source of truth for:
 - ``MODEL_FEATURE_COLUMNS`` — column order passed to ``predict_proba``
 - ``DEFAULT_FEATURE_VALUES`` — population defaults when history is thin
 - ``TRAINING_CSV_EXCLUDE_COLUMNS`` — columns derived only at serve time
+- ``INTEGER_FEATURE_COLUMNS`` — features stored as whole numbers (train + serve)
 """
 
 from __future__ import annotations
@@ -47,9 +48,26 @@ def training_csv_exclude_columns_from_contract() -> tuple[str, ...]:
     return tuple(str(column) for column in excluded)
 
 
+def integer_feature_columns_from_contract() -> tuple[str, ...]:
+    columns = load_model_feature_contract().get("integer_feature_columns", ())
+    if not isinstance(columns, list):
+        raise ValueError("model_feature_contract.json: integer_feature_columns must be a list")
+    return tuple(str(column) for column in columns)
+
+
+def coerce_whole_number_features(features: dict[str, float]) -> dict[str, float]:
+    """Round contract integer columns so serve-time values match synthetic training data."""
+    out = dict(features)
+    for column in INTEGER_FEATURE_COLUMNS:
+        if column in out:
+            out[column] = float(round(out[column]))
+    return out
+
+
 MODEL_FEATURE_COLUMNS: list[str] = list(feature_column_names_from_contract())
 DEFAULT_FEATURE_VALUES: dict[str, float] = default_feature_values_from_contract()
 TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = training_csv_exclude_columns_from_contract()
+INTEGER_FEATURE_COLUMNS: tuple[str, ...] = integer_feature_columns_from_contract()
 TRAINING_BASE_FEATURE_COLUMNS: tuple[str, ...] = tuple(
     column for column in MODEL_FEATURE_COLUMNS if column not in TRAINING_CSV_EXCLUDE_COLUMNS
 )

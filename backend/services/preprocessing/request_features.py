@@ -56,7 +56,10 @@ def nutrition_calorie_estimates(
 
 
 def workout_intensity_minutes(daily_distance_km: float, active_calories: float) -> float:
-    return daily_distance_km * 5.5 + active_calories / 40.0
+    """Same formula as ML_model/data_generator.py (distance + active burn proxy)."""
+    if daily_distance_km <= 0.2:
+        return 0.0
+    return float(round(daily_distance_km * 5.5 + active_calories / 40.0))
 
 
 def estimate_avg_cadence(
@@ -155,7 +158,7 @@ def base_model_features_from_request(payload_dict: dict[str, Any]) -> ModelFeatu
     )
 
     hrv_rmssd = safe_float(payload_dict.get("hrvRmssd"))
-    hrv_score = hrv_rmssd if hrv_rmssd > 0 else 0.0
+    hrv_score = float(round(hrv_rmssd)) if hrv_rmssd > 0 else 0.0
 
     return {
         "bmi": float(bmi_from_body_metrics(
@@ -171,22 +174,22 @@ def base_model_features_from_request(payload_dict: dict[str, Any]) -> ModelFeatu
         "injured_yesterday": injured_yesterday,
         "daily_distance_km": daily_distance_km_value,
         "workout_intensity_minutes": float(workout_minutes),
-        "avg_cadence": float(avg_cadence),
+        "avg_cadence": float(round(avg_cadence)),
         "elevation_gained_m": safe_float(payload_dict.get("elevationGainedMeters")),
-        "floors_climbed": safe_float(payload_dict.get("floorsClimbed")),
+        "floors_climbed": float(round(safe_float(payload_dict.get("floorsClimbed")))),
         "avg_speed": avg_speed,
         "max_speed": max_speed,
         "avg_power": safe_float(payload_dict.get("avgPower")),
-        "active_calories_burned": active_calories,
+        "active_calories_burned": float(round(active_calories)),
         "bmr_calories": bmr_calories,
         "sleep_hours": float(sleep_hours),
         "hrv_score": float(hrv_score),
-        "resting_hr": float(resting_hr_value),
+        "resting_hr": float(round(resting_hr_value)),
         "respiratory_rate": safe_float(payload_dict.get("respiratoryRate")),
         "spo2": safe_float(payload_dict.get("oxygenSaturation")),
-        "nutrition_intake_calories": float(nutrition_intake_calories),
-        "daily_calories": float(daily_calories),
-        "total_calories_burned": float(total_burned),
+        "nutrition_intake_calories": float(round(nutrition_intake_calories)),
+        "daily_calories": float(round(daily_calories)),
+        "total_calories_burned": float(round(total_burned)),
         "stress_level": stress_to_model_scale(payload_dict.get("stressLevel")),
         "muscle_soreness": soreness_to_model_scale(payload_dict.get("muscleSoreness")),
         "energy_level": energy_to_model_scale(payload_dict.get("energyLevel")),

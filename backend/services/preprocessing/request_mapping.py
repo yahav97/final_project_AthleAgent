@@ -9,7 +9,7 @@ import pandas as pd
 
 from schemas.inference import InjuryPredictionRequest
 from services.feature_engineering import compute_derived_features
-from services.model_features import MODEL_FEATURE_COLUMNS
+from services.model_features import MODEL_FEATURE_COLUMNS, coerce_whole_number_features
 from services.preprocessing.request_features import (
     add_same_day_composite_features,
     base_model_features_from_request,
@@ -31,6 +31,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     features = base_model_features_from_request(payload_dict)
     features.update(compute_derived_features(features))
     features = add_same_day_composite_features(features)
+    features = coerce_whole_number_features(features)
 
     row: dict[str, float] = {}
     for column in MODEL_FEATURE_COLUMNS:

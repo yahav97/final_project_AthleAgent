@@ -3,6 +3,23 @@
     "acwr_ratio_ma7",
     "sleep_hours_ma7"
   ],
+  "integer_feature_columns": [
+    "age",
+    "history_injury_count",
+    "injured_yesterday",
+    "workout_intensity_minutes",
+    "avg_cadence",
+    "floors_climbed",
+    "hrv_score",
+    "resting_hr",
+    "active_calories_burned",
+    "nutrition_intake_calories",
+    "daily_calories",
+    "total_calories_burned",
+    "stress_level",
+    "muscle_soreness",
+    "energy_level"
+  ],
   "feature_columns": [
     "bmi",
     "age",

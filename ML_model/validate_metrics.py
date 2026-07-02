@@ -118,7 +118,7 @@ def main() -> int:
             f"\nREJECTED: {top['Model']} failed hard safety gate "
             f"(Recall={recall_value:.4f} < {policy.MIN_RECALL_HARD})."
         )
-        return 2
+        return 1
 
     if recall_target_ok and fpr_ok and auc_ok and precision_ok and f1_ok:
         print(

@@ -54,6 +54,11 @@ def main() -> int:
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--force-benchmark", action="store_true")
+    parser.add_argument(
+        "--allow-degraded",
+        action="store_true",
+        help="Promote when validate_metrics exits 2 (passes hard gate only, not all targets).",
+    )
     args = parser.parse_args()
 
     ml_dir = Path(__file__).resolve().parent
@@ -78,7 +83,7 @@ def main() -> int:
     validate_exit = _run(
         [sys.executable, "validate_metrics.py"],
         ml_dir,
-        allowed_exit_codes=(0, 2),
+        allowed_exit_codes=(0, 2) if args.allow_degraded else (0,),
     )
     artifacts_dir = _latest_artifacts_dir(ml_dir)
     _promote(ml_dir, artifacts_dir, degraded_rc=(validate_exit == 2))

@@ -26,7 +26,7 @@ Verify:
 |-------|-----|----------|
 | Liveness | http://localhost:8000/health | 200 OK |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
-| Pre-demo script | `python backend/scripts/verify_demo_readiness.py` | `Demo readiness: OK` |
+| Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedArtifactReadiness -q` | `1 passed` |
 
 > **Security (demo):** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=demo`.
 
