@@ -81,8 +81,8 @@
 | AI | ניתוח ארוחות ב-Gemini Vision, המלצות טקסט בדשבורד |
 | ML | 35 פיצ'רים, XGBoost, gates (Recall ≥ 80%, AUC ≥ 0.68) |
 | מאמן | יצירת קבוצה, אישור בקשות, דשבורד קבוצתי |
-| אמינות | cross-trigger, confidence score, train-serve parity tests |
-| DevOps | Docker, ~150+ בדיקות pytest, observability |
+| אמינות | cross-trigger, confidence score, train-serve parity (חוזה + תחזוקה ידנית) |
+| DevOps | Docker, ~214 בדיקות pytest, observability |
 
 ---
 
@@ -272,7 +272,7 @@ usecaseDiagram
 | NFR-02 | זמינות | Firestore managed + backend stateless |
 | NFR-03 | אמינות בנתונים חסרים | defaults ניטרליים + confidence |
 | NFR-04 | ML gates | Recall ≥ 0.80, AUC ≥ 0.68 — `model_loader.py` |
-| NFR-05 | train-serve parity | `test_train_serve_parity.py` |
+| NFR-05 | train-serve parity | חוזה 35 פיצ'רים + תחזוקה מתואמת בין `data_generator.py` לשרת |
 | NFR-06 | פרטיות | ללא PHI בלוגים; Gemini client-side |
 | NFR-07 | תחזוקה | הפרדת Android / Backend / ML_model |
 
@@ -802,7 +802,7 @@ if (todaySleep > 0L && yesterdaySteps > 0L && hasTodaySurvey) {
 
 **הבעיה:** פיצ'רים שונים בין `data_generator.py` (אימון) ל-`feature_engineering.py` (שרת) גורמים לציונים שונים על אותם נתונים.
 
-**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) + בדיקות `test_train_serve_parity.py`.
+**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) + תחזוקה ידנית של נוסחאות זהות בין `data_generator.py` (אימון) ל-`feature_engineering.py` / `rolling_features.py` (שרת).
 
 ### 10.6 Docker / Firebase Key חסר
 
@@ -893,7 +893,7 @@ erDiagram
 |------|-----------|---------|
 | Backend unit | pytest | `test_preprocessing`, `test_request_features`, `test_validation`, `test_prediction_service`, `test_field_transforms`, `test_history_repository`, `test_nutrition_defaults`, `test_model_loader` |
 | Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
-| Train-serve | pytest | `test_train_serve_parity` |
+| Train-serve | חוזה + code review | `model_feature_contract.json`, `data_generator.py`, `feature_engineering.py` |
 | Android | JUnit | `ExampleUnitTest` (placeholder) |
 
 **הרצה:**

@@ -148,8 +148,8 @@
 | **תיאור** | אותם 35 פיצ'רים, באותו סדר, באימון וב-inference |
 | **מדד**   | התאמת עמודות train vs serve                     |
 | **יעד**   | 100% — אפס עמודות חסרות/עודפות                  |
-| **מדידה** | `backend/tests/test_train_serve_parity.py`      |
-| **ראיה**  | פלט pytest ירוק                                 |
+| **מדידה** | חוזה `model_feature_contract.json` + עדכון מתואם של `data_generator.py` ו-`feature_engineering.py` / `rolling_features.py` |
+| **ראיה**  | code review; `tests/unit/test_validation.py` (סדר עמודות) |
 
 
 ---
@@ -443,7 +443,7 @@
 | Unit        | `tests/unit/test_preprocessing.py`, `tests/unit/test_request_features.py`, `tests/unit/test_validation.py`, `tests/unit/test_prediction_service.py`, `tests/unit/test_field_transforms.py`, `tests/unit/test_history_repository.py`, `tests/unit/test_nutrition_defaults.py` |
 | Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py`, `tests/integration/test_prediction_model_columns.py` |
 | Gates       | `tests/unit/test_model_loader.py`                                    |
-| Contract    | `tests/unit/test_train_serve_parity.py`, `tests/integration/test_openapi_contract.py`       |
+| Contract    | `tests/unit/test_validation.py`, `tests/integration/test_openapi_contract.py`       |
 
 
 ---

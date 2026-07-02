@@ -417,7 +417,7 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `tests/unit/test_validation.py` | ModelServingContract, column alignment |
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |
-| `tests/unit/test_train_serve_parity.py` | Training CSV ↔ serving alignment |
+| `model_feature_contract.json` + `data_generator.py` / `feature_engineering.py` | Train-serve parity — תחזוקה ידנית של נוסחאות |
 | `tests/integration/test_prediction_model_columns.py` | HTTP `/predict/daily` with real model artifact |
 | `tests/unit/test_exceptions.py` | Domain exception status codes |
 | `tests/integration/test_openapi_contract.py` | OpenAPI path coverage |

@@ -315,7 +315,7 @@ prediction_confidence = (0.6 × history_score + 0.4 × quality_score) × 100
 
 | אתגר | הסבר קצר |
 |------|----------|
-| **Train-serve parity** | אותן נוסחאות פיצ'רים באימון (`data_generator.py`) ובשרת (`request_features.py` + `feature_engineering.py`) — נבדק ב-`test_train_serve_parity.py` |
+| **Train-serve parity** | אותן נוסחאות פיצ'רים באימון (`data_generator.py`) ובשרת (`request_features.py` + `feature_engineering.py`) — נשמרים ידנית לפי חוזה 35 פיצ'רים |
 | **Model manifest gates** | הבקאנד לא משרת מודל גרוע — `GET /status/ml` → Live/Blocked (`config.ML_MIN_*`) |
 | **Firestore-as-truth** | decoupling: trigger חיזוי ≠ קריאת תוצאה — תומך retry ו-async |
 | **Date-split sync** | שינה ל-{D}, עומס ל-{D-1} — `firestore_mapping.py` + `WearableSyncActivity` |
@@ -522,7 +522,7 @@ speed_intensity_ratio
 | **ML** | XGBoost, scikit-learn, pandas, joblib |
 | **AI** | Google Gemini Vision + Text (client-side) |
 | **Health** | Google Health Connect SDK |
-| **DevOps** | Docker, GitHub Actions (pytest), **216+** בדיקות backend |
+| **DevOps** | Docker, GitHub Actions (pytest), **214+** בדיקות backend |
 
 ---
 
