@@ -14,6 +14,7 @@
 |------|-------|
 | Model family | See `run_manifest.json` → `winner` (e.g. `XGBoostDeep`) |
 | Feature count | 35 (`backend/data/model_feature_contract.json`) |
+| Integer features | 15 whole-number columns (`integer_feature_columns`) — rounded at train + serve |
 | Operating threshold | From policy sweep — see manifest `threshold` |
 | Production risk bands | Low ≤ 20% · Medium 21–70% · High > 70% — `services/risk_levels.py` |
 | Prediction target | Injury risk **today** (calendar day D), morning inference |

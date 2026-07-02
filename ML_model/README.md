@@ -7,12 +7,13 @@
 | [`artifacts/promoted.json`](artifacts/promoted.json) | Production model pointer (updated by `run_pipeline.py`) |
 | `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook |
 | `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, ~1000×365) |
+| `feature_contract.py` | Shared JSON loader — `integer_feature_columns`, `workout_intensity_minutes()`, `assert_whole_number_columns()` |
 | `policy_config.py` | Selection gates (Recall, FPR, F1, …) — notebook can override live |
 | `train_model.py` | Full pipeline → `artifacts/<run_id>/` |
 | `validate_metrics.py` | Promotion policy gates |
 | `run_pipeline.py` | End-to-end train + validate + promote |
 
-**Production feature contract:** [`backend/docs/FEATURES.md`](../backend/docs/FEATURES.md) · [`backend/services/model_features.py`](../backend/services/model_features.py)
+**Production feature contract:** [`backend/docs/FEATURES.md`](../backend/docs/FEATURES.md) · [`backend/services/model_features.py`](../backend/services/model_features.py) · [`feature_contract.py`](feature_contract.py)
 
 **Serving:** FastAPI backend — local `uvicorn` or Docker ([`docs/DOCKER.md`](../docs/DOCKER.md)). Training runs **outside** the container.
 

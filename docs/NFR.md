@@ -145,11 +145,11 @@
 
 |           |                                                 |
 | --------- | ----------------------------------------------- |
-| **תיאור** | אותם 35 פיצ'רים, באותו סדר, באימון וב-inference |
-| **מדד**   | התאמת עמודות train vs serve                     |
-| **יעד**   | 100% — אפס עמודות חסרות/עודפות                  |
-| **מדידה** | חוזה `model_feature_contract.json` + עדכון מתואם של `data_generator.py` ו-`feature_engineering.py` / `rolling_features.py` |
-| **ראיה**  | code review; `tests/unit/test_validation.py` (סדר עמודות) |
+| **תיאור** | אותם 35 פיצ'רים, באותו סדר ובאותם **סוגי ערכים** (כולל 15 עמודות שלמות), באימון וב-inference |
+| **מדד**   | התאמת עמודות train vs serve + ערכים שלמים לפי חוזה |
+| **יעד**   | 100% — אפס עמודות חסרות/עודפות; אפס שברים בעמודות `integer_feature_columns` |
+| **מדידה** | `model_feature_contract.json` + `data_generator.py` / `feature_contract.py` (אימון) ו-`request_features.py` + `coerce_whole_number_features()` (שרת) |
+| **ראיה**  | `tests/unit/test_validation.py` (סדר עמודות); `tests/unit/test_feature_type_contract.py` (שלמים + נוסחת `workout_intensity_minutes`) |
 
 
 ---

@@ -297,7 +297,7 @@ Derived features computed in preprocessing:
 | `calorie_balance` | intake - burned |
 | `load_recovery_imbalance` | f(acwr, sleep_debt) |
 | `speed_intensity_ratio` | max_speed / avg_speed |
-| `workout_intensity_minutes` | from active calories heuristic |
+| `workout_intensity_minutes` | `0` if distance ≤ 0.2 km; else `round(distance × 5.5 + active_cal / 40)` — shared with `ML_model/feature_contract.py` |
 
 ---
 
@@ -309,12 +309,16 @@ Derived features computed in preprocessing:
 |---------------------|------|
 | `load_model_feature_contract()` | Parse JSON (cached) |
 | `MODEL_FEATURE_COLUMNS` | Column order for `predict_proba` |
+| `INTEGER_FEATURE_COLUMNS` | 15 whole-number fields (from `integer_feature_columns` in JSON) |
+| `coerce_whole_number_features()` | Round integer contract columns before inference DataFrame |
 | `DEFAULT_FEATURE_VALUES` | Population defaults for thin history |
 | `TRAINING_BASE_FEATURE_COLUMNS` | Columns present in training CSV export |
 
 **Defaults:** `default_values` in the same JSON — population medians for imputation.
 
 **Training exclusion:** `acwr_ratio_ma7`, `sleep_hours_ma7` recomputed in `train_model.add_sequential_features`.
+
+**ML training:** `ML_model/feature_contract.py` loads the same JSON; `data_generator.py` calls `normalize_whole_number_columns()` + `assert_whole_number_columns()` at export.
 
 ---
 
@@ -417,7 +421,7 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `tests/unit/test_validation.py` | ModelServingContract, column alignment |
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |
-| `model_feature_contract.json` + `data_generator.py` / `feature_engineering.py` | Train-serve parity — תחזוקה ידנית של נוסחאות |
+| `model_feature_contract.json` + `feature_contract.py` / `request_features.py` + `test_feature_type_contract.py` | Train-serve parity — נוסחאות + 15 עמודות שלמות |
 | `tests/integration/test_prediction_model_columns.py` | HTTP `/predict/daily` with real model artifact |
 | `tests/unit/test_exceptions.py` | Domain exception status codes |
 | `tests/integration/test_openapi_contract.py` | OpenAPI path coverage |

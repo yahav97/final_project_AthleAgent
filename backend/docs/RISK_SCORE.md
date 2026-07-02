@@ -244,7 +244,7 @@ Cross-trigger בין סקר לשעון — כל מסך ממתין לנתון מ�
 | שדה Firestore | פיצ'ר מודל | סקאלה באפליקציה → מודל |
 |---------------|------------|------------------------|
 | `stressLevel` | `stress_level` | 0–100 → 1–10 (÷10) |
-| `muscleSoreness` | `muscle_soreness` | 1–5 → 1–10 (`×2−0.5`) |
+| `muscleSoreness` | `muscle_soreness` | 1–5 → 1–10 (`×2−0.5`, **עיגול** לשלם) |
 | `energyLevel` | `energy_level` | 0–100 → 1–10 (÷10) |
 | `injuredYesterday` | `injured_yesterday` | 0/1 — פציעה ב-D−1 |
 
@@ -314,7 +314,9 @@ Cross-trigger בין סקר לשעון — כל מסך ממתין לנתון מ�
 sleep_hours        = clamp(sleepMinutes / 60,  3, 12)
 daily_distance_km  = distanceMeters/1000  OR  steps × 0.0008  (max 60)
 stress_level       = stressLevel / 10  if stressLevel > 10  else stressLevel  (1–10)
-muscle_soreness    = soreness × 2 − 0.5  if soreness ≤ 5  (1–10)
+muscle_soreness    = round(soreness × 2 − 0.5)  if soreness ≤ 5  (1–10, whole number)
+stress_level       = round(...)  after scale mapping
+energy_level       = round(...)  after scale mapping
 energy_level       = energyLevel / 10  if energyLevel > 10  (1–10)
 bmi                = weight_kg / (height_m)²  clamped 15–45
 hrv_score          = hrvRmssd  OR  110 − resting_hr × 0.65
@@ -327,7 +329,7 @@ resting_hr         = restingHeartRate  →  heartRateMin  →  heartRateAvg
 
 | פיצ'ר | נוסחה | טווח / הערה |
 |--------|--------|-------------|
-| `workout_intensity_minutes` | `distance_km × 5.5 + active_cal / 40` | 0–240 דקות |
+| `workout_intensity_minutes` | `0` if distance ≤ 0.2 km; else `round(distance × 5.5 + active_cal / 40)` | 0–240 דקות, שלם |
 | `acute_load_7d` | `max(0.05, distance × 0.95 + active_cal/450)` | proxy ליום בודד |
 | `acwr_ratio` | `acute / baseline` (baseline פנימי, לא פיצ'ר) | חסום **0.35 – 2.8** |
 | `sleep_debt_3d` | `max(0, (8 − sleep_hours) × 1.25)` | proxy ליום בודד |
@@ -1027,7 +1029,7 @@ prediction_confidence = round((0.6 × history_score + 0.4 × quality_score) × 1
 | שינה | 390 דקות (6.5 שעות) |
 | צעדים | 8,500 (אין מרחק) |
 | סטרס | 60 (→ 6/10) |
-| כאב שרירים | 3 (→ 5.5/10) |
+| כאב שרירים | 3 (→ 6/10, `round(3×2−0.5)`) |
 | injuredYesterday | 0 |
 | היסטוריה | 6 ימים → `confidence = medium` |
 
@@ -1037,7 +1039,7 @@ prediction_confidence = round((0.6 × history_score + 0.4 × quality_score) × 1
 daily_distance_km  = 8500 × 0.0008 = 6.8 km
 sleep_hours        = 6.5
 stress_level       = 6
-muscle_soreness    = 5.5
+muscle_soreness    = 6
 acute_load_7d      = (ממוצע 6 ימי מרחק מהיסטוריה) ≈ 5.2
 acwr_ratio         ≈ 1.15
 sleep_debt_3d      ≈ 4.5
@@ -1101,6 +1103,7 @@ risk_score = 0.2341
 | [`MODEL.md`](MODEL.md) | קונפיג מודל, gate, סף אימון (manifest) |
 | [`BACKEND.md`](BACKEND.md) | API, ארכיטקטורה, מבנה תיקיות |
 | [`ML_model/notebooks/model_improvement_journey.ipynb`](../../ML_model/notebooks/model_improvement_journey.ipynb) | מסע שיפור המודל, גרפים, השוואות |
-| `backend/data/model_feature_contract.json` | רשימת 35 פיצ'רים + defaults |
-| `backend/services/model_features.py` | Loader ל-contract JSON |
+| `backend/data/model_feature_contract.json` | 35 פיצ'רים + `integer_feature_columns` + defaults |
+| `backend/services/model_features.py` | Loader — `MODEL_FEATURE_COLUMNS`, `INTEGER_FEATURE_COLUMNS`, `coerce_whole_number_features()` |
+| `ML_model/feature_contract.py` | אותו חוזה לאימון — `assert_whole_number_columns()` |
 | `ML_model/artifacts/.../feature_importance.csv` | חשיבות פיצ'רים מהאימון |

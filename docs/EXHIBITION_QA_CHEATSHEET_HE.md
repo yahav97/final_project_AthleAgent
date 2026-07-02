@@ -208,7 +208,7 @@ Firestore → InjuryPredictionRequest
 
 | **אין דאטה אמיתי** | דאטה סינתטי מבוסס מחקר (ACWR, HRV, שינה) |
 
-| **סעיף 4 (ריק)** | דברי על: חוזה פיצ'רים + תואמות אימון/שרת (ידני), ML gates, Firestore-as-truth |
+| **סעיף 4 (ריק)** | דברי על: חוזה פיצ'רים + תואמות אימון/שרת (`integer_feature_columns`, נוסחאות משותפות), ML gates, Firestore-as-truth |
 
 
 

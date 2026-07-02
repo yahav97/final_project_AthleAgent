@@ -11,6 +11,7 @@
 |---|---|
 | **מודל** | **XGBoostCalibratedTuned** (run `20260629_184034`) |
 | **מספר פיצ'רים** | 35 (`model_features.py`) |
+| **שדות שלמים (train + serve)** | 15 (`integer_feature_columns` ב-`model_feature_contract.json`) |
 | **סף אימון (manifest)** | **0.10** |
 | **רמות סיכון (production)** | Low ≤ 20% · Medium 21–70% · High > 70% (`risk_levels.py`, תואם Android) |
 | **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
@@ -250,9 +251,9 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 |---|---|---|
 | `sleepMinutes` | `sleep_hours` | חלוקה ב-60, חסום 3–12 |
 | `distanceMeters` | `daily_distance_km` | חלוקה ב-1000. אם חסר — `steps × 0.0008` |
-| `stressLevel` | `stress_level` | אם > 10 → חלוקה ב-10 (המרה מ-0–100 ל-1–10) |
-| `muscleSoreness` | `muscle_soreness` | אם ≤ 5 → כפל ב-2 (המרה מ-1–5 ל-1–10) |
-| `energyLevel` | `energy_level` | אם > 10 → חלוקה ב-10 |
+| `stressLevel` | `stress_level` | אם > 10 → חלוקה ב-10; **עיגול** לשלם (1–10) |
+| `muscleSoreness` | `muscle_soreness` | אם ≤ 5 → `×2−0.5`, ואז **עיגול** לשלם (1–10) |
+| `energyLevel` | `energy_level` | אם > 10 → חלוקה ב-10; **עיגול** לשלם (1–10) |
 | `injuredYesterday` | `injured_yesterday` | true→1, false→0 |
 | `weightKg` + `heightCm` | `bmi` | `weight / (height_m²)`, חסום 15–45 |
 | `hrvRmssd` | `hrv_score` | ישיר (חסום 30–105). אם חסר: `110 − resting_hr × 0.65` |
@@ -262,13 +263,21 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 | פיצ'ר | נוסחה |
 |---|---|
-| `workout_intensity_minutes` | `daily_distance_km × 5.5 + active_calories / 40` (חסום 0–240) |
+| `workout_intensity_minutes` | אם `distance ≤ 0.2 km` → 0; אחרת `round(distance × 5.5 + active_cal / 40)` (חסום 0–240) — נוסחה משותפת עם `data_generator.py` |
 | `calorie_balance` | `daily_calories − total_calories_burned` |
 | `load_recovery_imbalance` | `acwr_ratio × sleep_debt_3d` |
 | `speed_intensity_ratio` | `max_speed / (avg_speed + 0.1)` (חסום עד 5.0) |
 | `avg_speed` (fallback) | אם אין מהשעון → `daily_distance_km / (workout_intensity / 60)` |
 | `max_speed` (fallback) | אם אין מהשעון → `avg_speed × 1.3` |
 | `avg_cadence` (fallback) | אם אין מהשעון → `steps / workout_intensity_minutes` |
+
+### חוזה סוגי ערכים (train–serve)
+
+מקור אמת: `backend/data/model_feature_contract.json` → `integer_feature_columns` (נטען גם ב-`ML_model/feature_contract.py`).
+
+לפני `predict_proba`, `coerce_whole_number_features()` מעגל את 15 העמודות האלה ל**מספרים שלמים** (sklearn עדיין מקבל `float64`). כולל: סקר 1–10, קלוריות, `hrv_score`, `resting_hr`, `avg_cadence`, `workout_intensity_minutes`, `age`, `history_injury_count`, `injured_yesterday`.
+
+בדיקות: `tests/unit/test_feature_type_contract.py` (backend) + `assert_whole_number_columns()` ב-`data_generator.py` ובמחברת.
 
 ---
 

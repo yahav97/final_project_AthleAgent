@@ -111,7 +111,7 @@ ML_model/artifacts/<run_id>/
 | More models (LightGBM, CatBoost) | Marginal gain vs training time |
 | SMOTE / row oversampling | Risks leakage with sequential athlete data |
 | Temporal split (train past / test future per athlete) | Different product question; current split simulates “new athletes” |
-| Auto feature selection | Contract is fixed 35 features for train-serve parity |
+| Auto feature selection | Contract is fixed 35 features (+ 15 integer columns) for train-serve parity |
 | Neural nets | Tabular data; boosting is standard |
 
 ## Retrain (synthetic pipeline)

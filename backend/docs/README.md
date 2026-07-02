@@ -15,4 +15,4 @@ Avoid duplicating content across files. Use this map:
 
 **Project-wide design docs:** [`docs/HLD_PROJECT.md`](../../docs/HLD_PROJECT.md) · [`docs/LLD_PROJECT.md`](../../docs/LLD_PROJECT.md) · [`docs/DOCKER.md`](../../docs/DOCKER.md)
 
-**Code of truth for feature names:** `backend/services/model_features.py`
+**Code of truth for feature names:** `backend/services/model_features.py` + `backend/data/model_feature_contract.json` (`integer_feature_columns`)

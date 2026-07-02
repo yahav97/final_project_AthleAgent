@@ -75,7 +75,7 @@ backend/
 
 **הערות ארגון:**
 - קבצים מעל ~250 שורות פוצלו לחבילות (`preprocessing/`, `history/`, `prediction/`).
-- `model_feature_contract.json` נשמר על הדיסק; `model_features.py` טוען פעם אחת (לא רשימות כבדות בקוד).
+- `model_feature_contract.json` נשמר על הדיסק; `model_features.py` טוען פעם אחת (`MODEL_FEATURE_COLUMNS`, `INTEGER_FEATURE_COLUMNS`, `coerce_whole_number_features`).
 - `schemas/enums.py` מחליף מחרוזות קבועות (`HistoryConfidence`, `ModelGateReason`, `ModelLiveStatus`).
 
 ---

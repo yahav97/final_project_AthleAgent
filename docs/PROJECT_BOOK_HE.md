@@ -81,7 +81,7 @@
 | AI | ניתוח ארוחות ב-Gemini Vision, המלצות טקסט בדשבורד |
 | ML | 35 פיצ'רים, XGBoost, gates (Recall ≥ 80%, AUC ≥ 0.68) |
 | מאמן | יצירת קבוצה, אישור בקשות, דשבורד קבוצתי |
-| אמינות | cross-trigger, confidence score, train-serve parity (חוזה + תחזוקה ידנית) |
+| אמינות | cross-trigger, confidence score, train-serve parity (חוזה 35 + 15 שלמים) |
 | DevOps | Docker, ~214 בדיקות pytest, observability |
 
 ---
@@ -272,7 +272,7 @@ usecaseDiagram
 | NFR-02 | זמינות | Firestore managed + backend stateless |
 | NFR-03 | אמינות בנתונים חסרים | defaults ניטרליים + confidence |
 | NFR-04 | ML gates | Recall ≥ 0.80, AUC ≥ 0.68 — `model_loader.py` |
-| NFR-05 | train-serve parity | חוזה 35 פיצ'רים + תחזוקה מתואמת בין `data_generator.py` לשרת |
+| NFR-05 | train-serve parity | חוזה 35 פיצ'רים + 15 עמודות שלמות + נוסחאות משותפות (`feature_contract.py` / `request_features.py`) |
 | NFR-06 | פרטיות | ללא PHI בלוגים; Gemini client-side |
 | NFR-07 | תחזוקה | הפרדת Android / Backend / ML_model |
 
@@ -571,7 +571,7 @@ flowchart TD
 | סובייקטיבי | `stress_level`, `muscle_soreness`, `energy_level`, `injured_yesterday` |
 | מנוע (engineered) | `acute_load_7d`, `acwr_ratio`, `acwr_ratio_ma7`, `sleep_hours_ma7`, `sleep_debt_3d`, `hrv_drop`, `load_recovery_imbalance`, `speed_intensity_ratio` |
 
-מקור אמת: `backend/data/model_feature_contract.json`
+מקור אמת: `backend/data/model_feature_contract.json` (כולל `integer_feature_columns` — 15 שדות שלמים)
 
 ### 8.4 Top 5 פיצ'רים לפי חשיבות
 
@@ -802,7 +802,7 @@ if (todaySleep > 0L && yesterdaySteps > 0L && hasTodaySurvey) {
 
 **הבעיה:** פיצ'רים שונים בין `data_generator.py` (אימון) ל-`feature_engineering.py` (שרת) גורמים לציונים שונים על אותם נתונים.
 
-**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) + תחזוקה ידנית של נוסחאות זהות בין `data_generator.py` (אימון) ל-`feature_engineering.py` / `rolling_features.py` (שרת).
+**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) כולל `integer_feature_columns` (15 שדות שלמים — סקר, קלוריות, HR וכו'). נוסחאות משותפות: `workout_intensity_minutes()` ב-`ML_model/feature_contract.py` וב-`request_features.py`; עיגול סקר ב-`scales.py`; `coerce_whole_number_features()` לפני inference. בדיקות: `test_feature_type_contract.py`.
 
 ### 10.6 Docker / Firebase Key חסר
 
@@ -891,9 +891,9 @@ erDiagram
 
 | שכבה | Framework | דוגמאות |
 |------|-----------|---------|
-| Backend unit | pytest | `test_preprocessing`, `test_request_features`, `test_validation`, `test_prediction_service`, `test_field_transforms`, `test_history_repository`, `test_nutrition_defaults`, `test_model_loader` |
+| Backend unit | pytest | `test_preprocessing`, `test_request_features`, `test_feature_type_contract`, `test_validation`, `test_prediction_service`, … |
 | Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
-| Train-serve | חוזה + code review | `model_feature_contract.json`, `data_generator.py`, `feature_engineering.py` |
+| Train-serve | חוזה + בדיקות אוטומטיות | `model_feature_contract.json`, `feature_contract.py`, `test_feature_type_contract.py` |
 | Android | JUnit | `ExampleUnitTest` (placeholder) |
 
 **הרצה:**

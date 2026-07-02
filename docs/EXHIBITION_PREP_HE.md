@@ -68,7 +68,7 @@
 **למה "21 מדדים פיזיים"?**  
 ב-Health Connect מוגדרים **19 סוגי רשומות** (הרשאות קריאה): שינה, דופק, צעדים, מרחק, מהירות, קלוריות פעילות/כוללות, BMR, משקל, HRV, דופק מנוחה, SpO2, VO2max, אחוז שומן, קצב נשימה, עליית גובה, קומות, קצב צעדים, סשן אימון. מהן נגזרים שדות נוספים ב-Firestore (למשל `sleepMinutes`, `distanceMeters`, `heartRateAvg`). המספר 21 בפוסטר מתאר את **מקורות האיסוף הפיזיים** — לא את מספר הפיצ'רים של המודל.
 
-**חשוב להבחין:** המודל ML משתמש ב-**35 פיצ'רים** (כולל פיצ'רים מחושבים כמו ACWR, חוב שינה, ירידת HRV). ראו [model_feature_contract.json](../backend/data/model_feature_contract.json).
+**חשוב להבחין:** המודל ML משתמש ב-**35 פיצ'רים** (כולל פיצ'רים מחושבים כמו ACWR, חוב שינה, ירידת HRV). **15 מהם** מוגדרים כמספרים שלמים ב-`integer_feature_columns`. ראו [model_feature_contract.json](../backend/data/model_feature_contract.json).
 
 ---
 
@@ -331,7 +331,7 @@ prediction_confidence = (0.6 × history_score + 0.4 × quality_score) × 100
 
 | אתגר | הסבר קצר |
 |------|----------|
-| **Train-serve parity** | אותן נוסחאות פיצ'רים באימון (`data_generator.py`) ובשרת (`request_features.py` + `feature_engineering.py`) — נשמרים ידנית לפי חוזה 35 פיצ'רים |
+| **Train-serve parity** | אותן נוסחאות + **אותם סוגי ערכים** (15 עמודות שלמות) — חוזה `model_feature_contract.json`, `feature_contract.py` (אימון), `coerce_whole_number_features()` (שרת) |
 | **Model manifest gates** | הבקאנד לא משרת מודל גרוע — `GET /status/ml` → Live/Blocked (`config.ML_MIN_*`) |
 | **Firestore-as-truth** | decoupling: trigger חיזוי ≠ קריאת תוצאה — תומך retry ו-async |
 | **Date-split sync** | שינה ל-{D}, עומס ל-{D-1} — `firestore_mapping.py` + `WearableSyncActivity` |
@@ -355,7 +355,7 @@ prediction_confidence = (0.6 × history_score + 0.4 × quality_score) × 100
 | `history/day_quality.py` | יום איכותי = 3/4 קטגוריות שעון |
 | `history/rolling_features.py` | ACWR, sleep_debt, hrv_drop על היסטוריה |
 | `config.py` | כל הספים: risk, history, confidence, nutrition |
-| `data/model_feature_contract.json` | רשימת 35 העמודות + defaults |
+| `data/model_feature_contract.json` | 35 עמודות + `integer_feature_columns` + defaults |
 
 ### קבועי מדיניות מרכזיים (`backend/config.py`)
 
