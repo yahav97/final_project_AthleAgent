@@ -13,6 +13,7 @@ from services.prediction.confidence import (
     history_score_from_confidence,
     prediction_confidence_0_100,
 )
+from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import (
     field_from_docs,
     heart_rate_avg_from_doc,
@@ -194,12 +195,14 @@ class TestFirestoreSnapshotMapping:
     def test_nutrition_imputed_when_yesterday_meals_missing(self, firestore_snapshot):
         snap = dict(firestore_snapshot)
         snap["daily_nutrition_yesterday"] = {}
-        req = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        mapped = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        req = resolve_request_nutrition(mapped)
         assert req.nutritionImputed is True
         assert req.totalProtein == 130
 
     def test_nutrition_not_imputed_when_yesterday_logged(self, firestore_snapshot):
-        req = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", firestore_snapshot)
+        mapped = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", firestore_snapshot)
+        req = resolve_request_nutrition(mapped)
         assert req.nutritionImputed is False
 
 

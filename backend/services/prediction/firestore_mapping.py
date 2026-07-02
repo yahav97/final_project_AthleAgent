@@ -11,7 +11,6 @@ from services.field_transforms import (
     heart_rate_avg_from_doc,
     injured_yesterday_from_docs,
 )
-from services.nutrition_defaults import apply_nutrition_population_defaults
 
 
 def field_from_docs(
@@ -47,15 +46,13 @@ def injury_prediction_request_from_firestore_snapshot(
     - Sleep / recovery: ``daily_health/{D}`` only (last night ending this morning).
     - Physical load: ``daily_health/{D-1}`` only (Android sync writes load to prior day).
     - Survey: ``daily_checkins/{D}``.
-    - Nutrition: ``daily_nutrition/{D-1}`` with population defaults when fields are missing/zero.
-      ``predict_injury_risk`` runs ``resolve_request_nutrition`` again (idempotent).
+    - Nutrition: raw ``daily_nutrition/{D-1}`` fields (defaults applied in ``predict_injury_risk``).
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}
     health_yesterday = snapshot.get("daily_health_yesterday") or {}
     checkins = snapshot.get("daily_checkins") or {}
-    nutrition_raw = snapshot.get("daily_nutrition_yesterday") or {}
-    nutrition, nutrition_imputed = apply_nutrition_population_defaults(nutrition_raw)
+    nutrition_yesterday = snapshot.get("daily_nutrition_yesterday") or {}
 
     def today_only(field_options: list[str]) -> Any:
         return field_from_docs(health_today, {}, field_options, prefer_primary=True)
@@ -95,9 +92,8 @@ def injury_prediction_request_from_firestore_snapshot(
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),
-        totalProtein=nutrition.get("totalProtein"),
-        totalCarbs=nutrition.get("totalCarbs"),
-        mealsLoggedCount=nutrition.get("mealsLoggedCount"),
-        nutritionTotalCalories=nutrition.get("totalCalories"),
-        nutritionImputed=nutrition_imputed,
+        totalProtein=nutrition_yesterday.get("totalProtein"),
+        totalCarbs=nutrition_yesterday.get("totalCarbs"),
+        mealsLoggedCount=nutrition_yesterday.get("mealsLoggedCount"),
+        nutritionTotalCalories=nutrition_yesterday.get("totalCalories"),
     )

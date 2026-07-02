@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from services.history.day_quality import count_watch_sync_signal_groups, is_quality_history_day
+from services.history.day_quality import (
+    WATCH_SYNC_SIGNAL_GROUPS,
+    count_watch_sync_signal_groups,
+    is_quality_history_day,
+)
 from services.history.history_merge import merge_wake_up_day_row
 from services.history.repository import (
     fetch_user_history,
@@ -12,7 +16,6 @@ from services.history.repository import (
     stable_athlete_numeric_id,
 )
 from services.history.rolling_features import compute_historical_derived_features, sleep_hours
-from services.nutrition_defaults import apply_nutrition_population_defaults
 
 pytestmark = pytest.mark.unit
 
@@ -43,6 +46,9 @@ class TestSleepHours:
 
 
 class TestHistoryDayQuality:
+    def test_watch_sync_signal_groups_are_four_named_categories(self):
+        assert set(WATCH_SYNC_SIGNAL_GROUPS) == {"load", "sleep", "heart", "energy"}
+
     def _synced_physical_day(self, **extra: object) -> dict:
         return {
             "distanceMeters": 5000,
@@ -262,42 +268,3 @@ class TestFetchUserHistory:
         assert "2026-05-06" in requested_health_keys
         assert "2026-05-07" not in requested_health_keys
         assert "2026-04-30" in requested_health_keys
-
-
-class TestNutritionDefaults:
-    def test_empty_primary_gets_population_defaults_and_imputed_flag(self):
-        out, imputed = apply_nutrition_population_defaults({})
-        assert imputed is True
-        assert out["totalProtein"] == 130
-        assert out["totalCarbs"] == 300
-        assert out["mealsLoggedCount"] == 3
-        assert out["totalCalories"] == 2600
-
-    def test_yesterday_values_preserved_when_present(self):
-        primary = {"totalProtein": 140, "totalCarbs": 310, "mealsLoggedCount": 4, "totalCalories": 2700}
-        out, imputed = apply_nutrition_population_defaults(primary)
-        assert imputed is False
-        assert out == primary
-
-    def test_partial_yesterday_sets_imputed_flag(self):
-        primary = {"totalProtein": 150, "totalCalories": 2600}
-        out, imputed = apply_nutrition_population_defaults(primary)
-        assert imputed is True
-        assert out["totalProtein"] == 150
-        assert out["totalCalories"] == 2600
-        assert out["totalCarbs"] == 300
-        assert out["mealsLoggedCount"] == 3
-
-    def test_zero_nutrition_values_get_population_defaults(self):
-        primary = {
-            "totalProtein": 0,
-            "totalCarbs": 0,
-            "mealsLoggedCount": 0,
-            "totalCalories": 0,
-        }
-        out, imputed = apply_nutrition_population_defaults(primary)
-        assert imputed is True
-        assert out["totalProtein"] == 130
-        assert out["totalCarbs"] == 300
-        assert out["mealsLoggedCount"] == 3
-        assert out["totalCalories"] == 2600

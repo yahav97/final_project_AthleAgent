@@ -103,7 +103,7 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     - Sleep: ``daily_health/{D}``.
     - Physical load: ``daily_health/{D-1}`` only.
     - Survey: ``daily_checkins/{D}``.
-    - Nutrition: ``daily_nutrition/{D-1}`` + population defaults for missing fields.
+    - Nutrition: ``daily_nutrition/{D-1}`` + population defaults via ``resolve_request_nutrition``.
     """
     snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
     if not snapshot:

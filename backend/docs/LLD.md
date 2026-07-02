@@ -396,7 +396,7 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `tests/integration/test_inference_edge_cases.py` | Validation errors, `/status/ml` load |
 | `tests/unit/test_prediction_service.py` | Bundle, confidence, Firestore mapping, predict orchestration |
 | `tests/unit/test_field_transforms.py` | Age, distance, HR, injured-yesterday parsing |
-| `tests/unit/test_history_service.py` | Snapshot fetch, rolling features, nutrition defaults |
+| `tests/unit/test_history_repository.py` | Snapshot fetch, rolling features, day quality |
 | `tests/unit/test_preprocessing.py` | DataFrame building, quality score |
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |

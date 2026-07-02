@@ -889,7 +889,7 @@ erDiagram
 
 | שכבה | Framework | דוגמאות |
 |------|-----------|---------|
-| Backend unit | pytest | `test_preprocessing`, `test_prediction_service`, `test_field_transforms`, `test_history_service`, `test_model_loader` |
+| Backend unit | pytest | `test_preprocessing`, `test_prediction_service`, `test_field_transforms`, `test_history_repository`, `test_nutrition_defaults`, `test_model_loader` |
 | Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
 | Train-serve | pytest | `test_train_serve_parity` |
 | Android | JUnit | `ExampleUnitTest` (placeholder) |

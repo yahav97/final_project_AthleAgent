@@ -413,7 +413,7 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. An
 
 | שכבה | Framework | קבצים עיקריים |
 |------|-----------|---------------|
-| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_service.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
+| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
 | Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
 
 **הרצה:**

@@ -6,16 +6,19 @@ from typing import Any
 
 from services.preprocessing.helpers import is_absent_or_weak
 
+# Alternative Firestore / API field names for one wearable signal category.
+WatchSyncFieldNames = tuple[str, ...]
+
 # Evaluated on merged wake-up-day rows (physical@W-1, sleep@W) from fetch_user_history.
-SYNC_LOAD_FIELDS: tuple[str, ...] = (
+LOAD_FIELD_NAMES: WatchSyncFieldNames = (
     "distanceMeters",
     "distance_meters",
     "daily_distance_meters",
     "steps",
     "daily_steps",
 )
-SYNC_SLEEP_FIELDS: tuple[str, ...] = ("sleepMinutes", "sleep_minutes")
-SYNC_HEART_FIELDS: tuple[str, ...] = (
+SLEEP_FIELD_NAMES: WatchSyncFieldNames = ("sleepMinutes", "sleep_minutes")
+HEART_FIELD_NAMES: WatchSyncFieldNames = (
     "heartRateAvg",
     "avgHeartRate",
     "heart_rate_avg",
@@ -26,7 +29,7 @@ SYNC_HEART_FIELDS: tuple[str, ...] = (
     "hrv_rmssd",
     "hrv_score",
 )
-SYNC_ENERGY_FIELDS: tuple[str, ...] = (
+ENERGY_FIELD_NAMES: WatchSyncFieldNames = (
     "activeCalories",
     "active_calories",
     "active_calories_burned",
@@ -37,24 +40,28 @@ SYNC_ENERGY_FIELDS: tuple[str, ...] = (
     "bmr_calories",
 )
 
-SYNC_SIGNAL_GROUPS: tuple[tuple[str, ...], ...] = (
-    SYNC_LOAD_FIELDS,
-    SYNC_SLEEP_FIELDS,
-    SYNC_HEART_FIELDS,
-    SYNC_ENERGY_FIELDS,
-)
+# Named categories → field-name aliases. At least MIN_WATCH_SYNC_SIGNAL_GROUPS of 4 → real sync.
+WATCH_SYNC_SIGNAL_GROUPS: dict[str, WatchSyncFieldNames] = {
+    "load": LOAD_FIELD_NAMES,
+    "sleep": SLEEP_FIELD_NAMES,
+    "heart": HEART_FIELD_NAMES,
+    "energy": ENERGY_FIELD_NAMES,
+}
 
-# At least 3 of 4 groups → likely a real watch sync, not a sparse manual doc.
 MIN_WATCH_SYNC_SIGNAL_GROUPS: int = 3
 
 
-def _has_usable_field(row: dict[str, Any], keys: tuple[str, ...]) -> bool:
-    return any(not is_absent_or_weak(row.get(key)) for key in keys)
+def _row_has_any_usable_field(row: dict[str, Any], field_names: WatchSyncFieldNames) -> bool:
+    return any(not is_absent_or_weak(row.get(name)) for name in field_names)
 
 
 def count_watch_sync_signal_groups(row: dict[str, Any]) -> int:
-    """How many watch-sync categories (load/sleep/heart/energy) have usable values."""
-    return sum(1 for group in SYNC_SIGNAL_GROUPS if _has_usable_field(row, group))
+    """How many watch-sync categories (load, sleep, heart, energy) have usable values."""
+    return sum(
+        1
+        for field_names in WATCH_SYNC_SIGNAL_GROUPS.values()
+        if _row_has_any_usable_field(row, field_names)
+    )
 
 
 def is_quality_history_day(row: dict[str, Any]) -> bool:
