@@ -158,7 +158,6 @@ class TestValidateFeatureVector:
         [
             ("stress_level", 0.5, "stress_level"),
             ("muscle_soreness", 11.0, "muscle_soreness"),
-            ("age", 5.0, "age"),
             ("acwr_ratio", 3.5, "acwr_ratio"),
             ("injured_yesterday", 2.0, "injured_yesterday"),
         ],
@@ -173,8 +172,15 @@ class TestValidateFeatureVector:
 
 
 class TestInjuryRequestToDataframe:
+    def test_missing_age_raises(self):
+        req = InjuryPredictionRequest(sleepMinutes=420, steps=10000)
+        with pytest.raises(ValidationError) as exc_info:
+            injury_request_to_model_dataframe(req)
+        assert exc_info.value.code == "missing_age"
+
     def test_distance_from_meters_over_steps(self):
         req = InjuryPredictionRequest(
+            age=28,
             sleepMinutes=420,
             steps=1000,
             distanceMeters=10000,
@@ -183,7 +189,7 @@ class TestInjuryRequestToDataframe:
         assert df["daily_distance_km"].iloc[0] == pytest.approx(10.0)
 
     def test_steps_proxy_when_no_distance(self):
-        req = InjuryPredictionRequest(sleepMinutes=420, steps=10000)
+        req = InjuryPredictionRequest(age=28, sleepMinutes=420, steps=10000)
         df = injury_request_to_model_dataframe(req)
         assert df["daily_distance_km"].iloc[0] == pytest.approx(8.0)
 

@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from typing import Any, Mapping
 
 from services.model_features import DEFAULT_FEATURE_VALUES
+from utils.exceptions import ValidationError
 
 STEPS_TO_KM = 0.0008
 RESTING_HR_MIN = 38.0
 RESTING_HR_MAX = 95.0
-AGE_MIN = 12
-AGE_MAX = 90
+DAYS_PER_YEAR = 365.0
 DEFAULT_RESTING_HR = float(DEFAULT_FEATURE_VALUES["resting_hr"])
-
-
-def _clamp_age(age: int) -> int:
-    return int(max(AGE_MIN, min(AGE_MAX, age)))
 
 
 def _parse_date_key(value: str) -> date | None:
@@ -26,8 +23,8 @@ def _parse_date_key(value: str) -> date | None:
         return None
 
 
-def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) -> int | None:
-    """Compute full years of age from ``birth_date`` (yyyy-MM-dd) as of ``as_of_date``."""
+def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) -> float | None:
+    """Compute decimal age in years from ``birth_date`` (yyyy-MM-dd) as of ``as_of_date``."""
     if birth_date is None:
         return None
     birth_str = str(birth_date).strip()
@@ -41,11 +38,12 @@ def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) ->
     if ref is None:
         ref = date.today()
 
-    age = ref.year - birth.year - ((ref.month, ref.day) < (birth.month, birth.day))
-    return _clamp_age(age)
+    if birth > ref:
+        return None
+    return round(float((ref - birth).days) / DAYS_PER_YEAR, 2)
 
 
-def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> int | None:
+def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> float | None:
     """Compute model age from Firestore profile ``birth_date`` (or ``birthDate``)."""
     birth_raw = profile.get("birth_date")
     if birth_raw is None:
@@ -53,6 +51,28 @@ def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = Non
     if birth_raw is None:
         return None
     return age_from_birth_date(birth_raw, as_of_date=as_of_date)
+
+
+def resolve_model_age(age_raw: object) -> float:
+    """Require athlete age for inference — derived from profile ``birth_date`` at serve time."""
+    if age_raw is None:
+        raise ValidationError(
+            "age is required; set birth_date on user profile",
+            code="missing_age",
+        )
+    try:
+        age = float(age_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "age is invalid; birth_date must be yyyy-MM-dd",
+            code="invalid_age",
+        ) from exc
+    if not math.isfinite(age):
+        raise ValidationError(
+            "age is invalid; birth_date must be yyyy-MM-dd",
+            code="invalid_age",
+        )
+    return round(age, 2)
 
 
 def parse_injured_yesterday_flag(raw: object) -> int | None:

@@ -28,7 +28,10 @@ class InjuryPredictionRequest(BaseModel):
     date: str | None = Field(default=None, description="Day key yyyy-MM-dd")
 
     # users/{uid} profile (optional until shipped on mobile)
-    age: int | None = Field(default=None, description="Athlete age in years")
+    age: float | None = Field(
+        default=None,
+        description="Athlete age in decimal years (required at inference; derived from profile birth_date)",
+    )
     historyInjuryCount: int | None = Field(
         default=None,
         validation_alias=AliasChoices("historyInjuryCount", "history_injury_count"),

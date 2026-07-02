@@ -45,7 +45,6 @@ def validate_feature_vector_for_model(df: pd.DataFrame, model: object | None) ->
         ("muscle_soreness", 1.0, 10.0),
         ("energy_level", 1.0, 10.0),
         ("injured_yesterday", 0.0, 1.0),
-        ("age", 12.0, 90.0),
         ("history_injury_count", 0.0, 50.0),
         ("nutrition_intake_calories", 0.0, 8000.0),
         ("acwr_ratio", 0.35, 2.8),

@@ -13,6 +13,7 @@ from services.field_transforms import (
     daily_distance_km,
     hrv_proxy_from_resting_hr,
     injured_yesterday_as_feature,
+    resolve_model_age,
     resting_hr as resolve_resting_hr,
 )
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
@@ -120,13 +121,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         bmi = float(weight_kg) / (height_m**2)
     bmi = float(max(15.0, min(45.0, bmi)))
 
-    age_val = float(DEFAULT_FEATURE_VALUES["age"])
-    age_raw = payload_dict.get("age")
-    if age_raw is not None:
-        try:
-            age_val = float(max(12.0, min(90.0, int(age_raw))))
-        except (TypeError, ValueError):
-            age_val = float(DEFAULT_FEATURE_VALUES["age"])
+    age_val = resolve_model_age(payload_dict.get("age"))
 
     history_injury_count = float(DEFAULT_FEATURE_VALUES["history_injury_count"])
     hist_raw = payload_dict.get("historyInjuryCount")

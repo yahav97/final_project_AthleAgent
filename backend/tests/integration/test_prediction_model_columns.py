@@ -31,7 +31,7 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
         ps,
         "fetch_daily_firestore_snapshot",
         lambda uid, d: {
-            "profile": {},
+            "profile": {"birth_date": "1995-01-01"},
             "daily_health": {"sleepMinutes": 480},
             "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
             "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2},
@@ -66,6 +66,7 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
             InjuryPredictionRequest(
                 userId="u1",
                 date="2026-04-30",
+                age=28,
                 sleepMinutes=480,
                 steps=7000,
                 stressLevel=30,
@@ -84,6 +85,7 @@ def test_predict_injury_risk_raises_when_model_missing(monkeypatch):
             InjuryPredictionRequest(
                 userId="u1",
                 date="2026-04-30",
+                age=28,
                 sleepMinutes=450,
                 steps=6200,
                 stressLevel=36,

@@ -10,7 +10,7 @@ from services import prediction_service as ps
 from services.field_transforms import injured_yesterday_for_request
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.preprocessing import injury_request_to_model_dataframe
-from utils.exceptions import DatabaseError, MLModelError
+from utils.exceptions import DatabaseError, MLModelError, ValidationError
 
 
 pytestmark = pytest.mark.unit
@@ -85,7 +85,13 @@ class TestConfidenceScoring:
 class TestDefaultedCriticalFeatures:
     def test_counts_columns_matching_defaults(self):
         df = injury_request_to_model_dataframe(
-            InjuryPredictionRequest(userId="u1", date="2026-04-30", sleepMinutes=420, steps=5000)
+            InjuryPredictionRequest(
+                userId="u1",
+                date="2026-04-30",
+                age=28,
+                sleepMinutes=420,
+                steps=5000,
+            )
         )
         count = ps._count_defaulted_critical_features(df)
         assert count >= 0
@@ -137,7 +143,7 @@ class TestFirestoreSnapshotMapping:
         assert req.steps == 8300
         assert req.distanceMeters == 7200
         assert req.heartRateAvg == 58
-        assert req.age == 31
+        assert req.age == 31.48
         assert req.historyInjuryCount == 2
         assert req.totalProtein == 130
         assert req.nutritionTotalCalories == 2550
@@ -146,7 +152,13 @@ class TestFirestoreSnapshotMapping:
         snap = dict(firestore_snapshot)
         snap["profile"] = {"birth_date": "1995-01-01", "historyInjuryCount": 2}
         req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
-        assert req.age == 31
+        assert req.age == 31.48
+
+    def test_missing_birth_date_in_profile_leaves_age_none(self, firestore_snapshot):
+        snap = dict(firestore_snapshot)
+        snap["profile"] = {"historyInjuryCount": 2}
+        req = ps.injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        assert req.age is None
 
     def test_injured_yesterday_from_checkins(self, firestore_snapshot):
         snap = dict(firestore_snapshot)
@@ -182,6 +194,12 @@ class TestFirestoreSnapshotMapping:
 
 
 class TestPredictInjuryRisk:
+    def test_raises_when_age_missing(self):
+        payload = InjuryPredictionRequest(userId="u1", date="2026-04-30", sleepMinutes=420, steps=5000)
+        with pytest.raises(ValidationError) as exc_info:
+            ps.predict_injury_risk(payload)
+        assert exc_info.value.code == "missing_age"
+
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):
         monkeypatch.setattr(ps, "get_model", lambda: None)
         monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
