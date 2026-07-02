@@ -48,14 +48,13 @@ backend/
 │   ├── predict.py                  # POST /predict/daily
 │   └── observability.py            # client telemetry
 ├── services/
-│   ├── prediction_service.py       # shim — ייבוא תאימות
 │   ├── prediction/                 # orchestration, bundle, confidence, firestore mapping
-│   ├── history_service.py          # shim — ייבוא תאימות
 │   ├── history/                    # Firestore client, repository, rolling features
 │   ├── preprocessing/              # quality, validation, scales, request mapping
 │   ├── feature_engineering.py      # derived features (ACWR proxies)
 │   ├── field_transforms.py         # Firestore field helpers
 │   ├── model_features.py           # loader ל-contract JSON (cache בזיכרון)
+│   ├── nutrition_defaults.py       # population nutrition imputation
 │   └── risk_levels.py              # Low/Medium/High cutoffs
 ├── schemas/
 │   ├── inference.py                # Pydantic request/response
@@ -189,7 +188,7 @@ History Enrichment (7 days):
     ▼
 Data Quality Check:
     • quality_score מוריד prediction_confidence (לא חוסם חיזוי)
-    • hard_missing מקסימום score 0.25 — נרשם בלוג בלבד
+    • שדות חסרים/אפס נרשמים ב-weak_fields
     │
     ▼
 Model Inference (promoted bundle):

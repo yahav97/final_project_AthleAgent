@@ -24,14 +24,13 @@ backend/
 │       ├── predict.py          # prediction endpoints
 │       └── observability.py    # client telemetry
 ├── services/
-│   ├── prediction_service.py   # backward-compat re-exports
 │   ├── prediction/             # service, bundle, confidence, firestore_mapping
-│   ├── history_service.py      # backward-compat re-exports
 │   ├── history/                # firestore_client, repository, rolling_features, date_utils
 │   ├── preprocessing/          # quality, validation, scales, request_mapping
 │   ├── feature_engineering.py  # derived features
 │   ├── field_transforms.py     # Firestore field helpers
 │   ├── model_features.py       # loads contract JSON from disk
+│   ├── nutrition_defaults.py   # population nutrition imputation
 │   └── risk_levels.py
 ├── schemas/
 │   ├── inference.py            # Pydantic models
@@ -175,17 +174,15 @@ All fields optional — service applies defaults.
 | `confidence.prediction_confidence_0_100` | 0.6×history + 0.4×quality |
 | `service.persist_prediction_result_or_raise` | Write or raise |
 
-> `prediction_service.py` re-exports the above for backward compatibility and test monkeypatching.
-
 #### Inference Logic (`predict_injury_risk`)
 
 ```
 1. df = injury_request_to_model_dataframe(payload)
-2. df, history_confidence = _apply_history_confidence_fallback(df, payload)
+2. df, history_confidence = apply_history_confidence_fallback(df, payload)
 3. quality = calculate_data_quality_score(payload)
 4. prediction_confidence = blend(history_confidence, quality.score)
-5. model, cols, threshold, ... = _resolve_model_bundle(get_model())
-6. if model is None → raise RuntimeError("model_not_live:...")
+5. model, cols, threshold, ... = resolve_model_bundle(get_model())
+6. if model is None → raise MLModelError("model_not_live:...")
 7. X = validate_feature_vector_for_model(df, model_contract)
 8. proba = model.predict_proba(X)[0, 1]
 9. risk_level = classify_risk_level(proba): Low ≤ 20%, Medium 21–70%, High > 70% (`risk_levels.py`)
@@ -196,11 +193,11 @@ All fields optional — service applies defaults.
 
 | Field category | Source function | Priority |
 |----------------|-----------------|----------|
-| Sleep | `_today_only()` | `daily_health/{D}` |
-| Physical | `_yesterday_only()` | `daily_health/{D-1}` בלבד |
+| Sleep | `today_only()` | `daily_health/{D}` |
+| Physical | `yesterday_only()` | `daily_health/{D-1}` בלבד |
 | Survey | direct from checkins | `daily_checkins/{D}` |
-| Nutrition | `merge_nutrition_with_history()` | `{D-1}` + `nutrition_defaults.py` |
-| HR avg | `_firestore_doc_heartrate_avg()` | `daily_health/{D-1}` בלבד |
+| Nutrition | `apply_nutrition_population_defaults()` | `{D-1}` + `nutrition_defaults.py` |
+| HR avg | `heart_rate_avg_from_doc()` | `daily_health/{D-1}` בלבד |
 
 ---
 
@@ -213,10 +210,7 @@ All fields optional — service applies defaults.
 | `repository.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
 | `repository.save_daily_prediction_result` | Merge write to daily_health |
-| `repository.merge_nutrition_with_history` | אתמול + ממוצעים כלליים; מחזיר `(doc, imputed)` |
 | `repository.stable_athlete_numeric_id` | SHA256 → deterministic int id |
-
-> `history_service.py` re-exports the above (including `_get_firestore_client` alias).
 
 #### Rolling Features (`compute_historical_derived_features`)
 
@@ -363,15 +357,13 @@ MIN_AUC_FOR_LIVE = 0.68
 ```python
 {
     "score": 0.0-1.0,
-    "sensitive_missing": [...],
-    "hard_missing": [...],
-    "has_hard_blocker": bool
+    "weak_fields": [...]
 }
 ```
 
-**Sensitive fields:** `sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`  
-**Imputation flag:** `nutritionImputed` → counts as `nutrition_imputed` (−0.12)  
-**Hard fields:** `userId`, `date` (+ load signal: steps/dist/activeCal **>0**; recovery signal)
+**Measurement fields** (`MEASUREMENT_FIELDS`): missing, null, zero, or NaN → penalty **−0.08** each.  
+**Profile fields** (`PROFILE_FIELDS`): penalized only when explicitly sent as 0 or NaN.  
+**Imputation flag:** `nutritionImputed` → `nutrition_imputed` (−0.12).
 
 Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
@@ -381,9 +373,9 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
 | Error | Source | HTTP | When |
 |-------|--------|------|------|
-| `firestore_snapshot_unavailable` | history_service | 503 | Firestore client None or read fail |
-| `model_not_live:*` | prediction_service | 503 | Gate failed or model not loaded |
-| `prediction_persist_failed` | history_service | 503 | Write returned False |
+| `firestore_snapshot_unavailable` | `history/repository` | 503 | Firestore client None or read fail |
+| `model_not_live:*` | `prediction/service` | 503 | Gate failed or model not loaded |
+| `prediction_persist_failed` | `history/repository` | 503 | Write returned False |
 
 ---
 
@@ -401,8 +393,8 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | Test file | Covers |
 |-----------|--------|
 | `tests/integration/test_routes_predict_daily.py` | Production predict route, error paths |
-| `tests/integration/test_inference_edge_cases.py` | Sparse payloads, missing fields |
-| `tests/unit/test_history_service.py` | Snapshot fetch, rolling features, persist |
+| `tests/integration/test_inference_edge_cases.py` | Validation errors, `/status/ml` load |
+| `tests/unit/test_history_service.py` | Snapshot fetch, rolling features, nutrition defaults |
 | `tests/unit/test_preprocessing.py` | DataFrame building, quality score |
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |
@@ -418,8 +410,9 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 ```mermaid
 sequenceDiagram
     participant R as predict.py
-    participant PS as prediction_service
-    participant HS as history_service
+    participant PS as prediction/service
+    participant FM as firestore_mapping
+    participant HS as history/repository
     participant PP as preprocessing
     participant ML as model_loader
     participant FS as Firestore
@@ -428,13 +421,13 @@ sequenceDiagram
     PS->>HS: fetch_daily_firestore_snapshot(uid, date)
     HS->>FS: parallel reads (profile, health×2, checkin, nutrition)
     FS-->>HS: snapshot
-    PS->>PS: injury_prediction_request_from_firestore_snapshot()
+    PS->>FM: injury_prediction_request_from_firestore_snapshot()
     PS->>PP: injury_request_to_model_dataframe()
     PP-->>PS: df (35 cols)
     PS->>HS: get_history_window_context(uid, date, 7)
     HS->>FS: read historical daily_health
     HS-->>PS: {confidence, features}
-    PS->>PS: _apply_history_confidence_fallback()
+    PS->>PS: apply_history_confidence_fallback()
     PS->>PP: calculate_data_quality_score()
     PS->>ML: get_model()
     ML-->>PS: estimator + feature_columns
@@ -456,19 +449,19 @@ flowchart TD
     main --> predict_route[predict.py]
     main --> model_loader
 
-    predict_route --> prediction_service
+    predict_route --> prediction_svc[prediction/service]
     predict_route --> schemas
 
-    prediction_service --> history_service
-    prediction_service --> preprocessing
-    prediction_service --> model_features
-    prediction_service --> model_loader
-    prediction_service --> schemas
+    prediction_svc --> history_repo[history/repository]
+    prediction_svc --> preprocessing
+    prediction_svc --> model_features
+    prediction_svc --> model_loader
+    prediction_svc --> schemas
 
     preprocessing --> feature_engineering
     preprocessing --> model_features
 
-    history_service --> config
+    history_repo --> config
 
     model_loader --> logging
 ```
@@ -490,7 +483,7 @@ flowchart TD
 | Feature names | `services/model_features.py` |
 | Nutrition defaults | `services/nutrition_defaults.py` |
 | API contract | `schemas/inference.py` |
-| Merge policy | `services/prediction_service.py` |
-| Firestore I/O | `services/history_service.py` |
+| Merge policy | `services/prediction/firestore_mapping.py` |
+| Firestore I/O | `services/history/repository.py` |
 | Model gates | `ml/model_loader.py` |
 | Settings | `config.py` |

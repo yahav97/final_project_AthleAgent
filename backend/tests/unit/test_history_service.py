@@ -1,28 +1,33 @@
-"""Unit tests for history_service rolling features and helpers."""
+"""Unit tests for history repository and rolling features."""
 
 from __future__ import annotations
 
 import pytest
 
-from services import history_service as hs
-from services.history.rolling_features import sleep_hours
+from services.history.repository import (
+    fetch_user_history,
+    get_history_window_context,
+    stable_athlete_numeric_id,
+)
+from services.history.rolling_features import compute_historical_derived_features, sleep_hours
+from services.nutrition_defaults import apply_nutrition_population_defaults
 
 pytestmark = pytest.mark.unit
 
 
 class TestStableAthleteId:
     def test_deterministic_for_same_uid(self):
-        assert hs.stable_athlete_numeric_id("firebase-uid-abc") == hs.stable_athlete_numeric_id(
+        assert stable_athlete_numeric_id("firebase-uid-abc") == stable_athlete_numeric_id(
             "firebase-uid-abc"
         )
 
     def test_different_uids_produce_different_ids(self):
-        a = hs.stable_athlete_numeric_id("athlete-a")
-        b = hs.stable_athlete_numeric_id("athlete-b")
+        a = stable_athlete_numeric_id("athlete-a")
+        b = stable_athlete_numeric_id("athlete-b")
         assert a != b
 
     def test_always_positive(self):
-        assert hs.stable_athlete_numeric_id("") > 0
+        assert stable_athlete_numeric_id("") > 0
 
 
 class TestSleepHours:
@@ -37,11 +42,11 @@ class TestSleepHours:
 
 class TestHistoricalDerivedFeatures:
     def test_returns_none_for_empty_history(self):
-        assert hs.compute_historical_derived_features([]) is None
+        assert compute_historical_derived_features([]) is None
 
     def test_single_day_produces_valid_features(self):
         rows = [{"date_key": "2026-05-01", "distanceMeters": 8000, "sleepMinutes": 420, "hrvRmssd": 60}]
-        out = hs.compute_historical_derived_features(rows)
+        out = compute_historical_derived_features(rows)
         assert out is not None
         assert 0.35 <= out["acwr_ratio"] <= 2.8
         assert out["acute_load_7d"] >= 0
@@ -57,16 +62,11 @@ class TestHistoricalDerivedFeatures:
             for i in range(1, 8)
         ]
 
-        def _fetch_user_history(
-            user_id: str,
-            date_key: str,
-            lookback_days: int = 7,
-            include_target_day: bool = True,
-        ) -> list[dict]:
-            return rows
-
-        monkeypatch.setattr("services.history.repository.fetch_user_history", _fetch_user_history)
-        ctx = hs.get_history_window_context("u1", "2026-05-07")
+        monkeypatch.setattr(
+            "services.history.repository.fetch_user_history",
+            lambda *args, **kwargs: rows,
+        )
+        ctx = get_history_window_context("u1", "2026-05-07")
         assert ctx["confidence"] == "high"
         assert ctx["days_count"] == 7
         assert ctx["features"] is not None
@@ -81,16 +81,11 @@ class TestHistoricalDerivedFeatures:
             for i in range(1, day_count + 1)
         ]
 
-        def _fetch_user_history(
-            user_id: str,
-            date_key: str,
-            lookback_days: int = 7,
-            include_target_day: bool = True,
-        ) -> list[dict]:
-            return rows
-
-        monkeypatch.setattr("services.history.repository.fetch_user_history", _fetch_user_history)
-        ctx = hs.get_history_window_context("u1", "2026-05-09")
+        monkeypatch.setattr(
+            "services.history.repository.fetch_user_history",
+            lambda *args, **kwargs: rows,
+        )
+        ctx = get_history_window_context("u1", "2026-05-09")
         assert ctx["confidence"] == expected_confidence
 
 
@@ -137,7 +132,7 @@ class TestFetchUserHistory:
                 return _Users()
 
         monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
-        rows = hs.fetch_user_history("u1", "2026-05-03", lookback_days=7, include_target_day=True)
+        rows = fetch_user_history("u1", "2026-05-03", lookback_days=7, include_target_day=True)
 
         assert len(rows) == 1
         assert rows[0]["date_key"] == "2026-05-03"
@@ -147,9 +142,9 @@ class TestFetchUserHistory:
         assert ("daily_health", "2026-05-03") in get_calls
 
 
-class TestMergeNutritionWithHistory:
+class TestNutritionDefaults:
     def test_empty_primary_gets_population_defaults_and_imputed_flag(self):
-        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", {})
+        out, imputed = apply_nutrition_population_defaults({})
         assert imputed is True
         assert out["totalProtein"] == 130
         assert out["totalCarbs"] == 300
@@ -158,13 +153,13 @@ class TestMergeNutritionWithHistory:
 
     def test_yesterday_values_preserved_when_present(self):
         primary = {"totalProtein": 140, "totalCarbs": 310, "mealsLoggedCount": 4, "totalCalories": 2700}
-        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        out, imputed = apply_nutrition_population_defaults(primary)
         assert imputed is False
         assert out == primary
 
     def test_partial_yesterday_sets_imputed_flag(self):
         primary = {"totalProtein": 150, "totalCalories": 2600}
-        out, imputed = hs.merge_nutrition_with_history("u1", "2026-06-16", primary)
+        out, imputed = apply_nutrition_population_defaults(primary)
         assert imputed is True
         assert out["totalProtein"] == 150
         assert out["totalCalories"] == 2600

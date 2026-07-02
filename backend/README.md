@@ -153,7 +153,7 @@ Shared fixtures live in `tests/conftest.py`. Unit tests are under `tests/unit/`.
 
 ## Data storage
 
-- Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history_service.py`). There is **no** PostgreSQL layer in this backend.
+- Daily athlete data and prediction outputs are read/written via **Firestore** (see `services/history/repository.py`). There is **no** PostgreSQL layer in this backend.
 - After `POST /predict/daily`, merged fields on `daily_health/{date}` include **`finalRiskScore`**, **`riskLevel`**, **`predictionConfidence`**, **`predictionUpdatedAt`** (see `save_daily_prediction_result`).
 
 ## Notes for Evaluation

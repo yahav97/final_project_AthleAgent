@@ -57,8 +57,8 @@ flowchart TB
     end
 
     subgraph Services["Service Layer"]
-        PS[prediction_service]
-        HS[history_service]
+        PS[prediction/service]
+        HS[history/repository]
         PP[preprocessing]
         FE[feature_engineering]
         MF[model_features]
@@ -151,8 +151,8 @@ flowchart TB
 sequenceDiagram
     participant Client as Android
     participant API as predict.py
-    participant PS as prediction_service
-    participant HS as history_service
+    participant PS as prediction/service
+    participant HS as history/repository
     participant ML as XGBoost
     participant FS as Firestore
 

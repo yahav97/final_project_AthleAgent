@@ -9,7 +9,7 @@ from schemas.inference import (
     InjuryPredictionResponse,
     SimpleData,
 )
-from services.prediction_service import (
+from services.prediction.service import (
     persist_prediction_result_or_raise,
     predict_injury_risk_from_firestore,
 )

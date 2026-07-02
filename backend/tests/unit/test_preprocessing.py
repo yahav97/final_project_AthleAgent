@@ -63,15 +63,14 @@ class TestDataQualityScore:
     def test_full_payload_scores_high(self, sample_prediction_request):
         q = calculate_data_quality_score(sample_prediction_request)
         assert q["score"] == pytest.approx(1.0)
-        assert q["has_hard_blocker"] is False
-        assert q["hard_missing"] == []
+        assert q["weak_fields"] == []
 
-    def test_missing_user_and_date_does_not_hard_block(self):
+    def test_missing_user_and_date_still_scores(self):
         req = InjuryPredictionRequest(sleepMinutes=420, steps=5000)
         q = calculate_data_quality_score(req)
-        assert q["has_hard_blocker"] is False
+        assert float(q["score"]) < 1.0
 
-    def test_zero_steps_reduces_confidence_not_blocks(self):
+    def test_zero_steps_reduces_confidence(self):
         req = InjuryPredictionRequest(
             userId="u1",
             date="2026-04-30",
@@ -82,7 +81,6 @@ class TestDataQualityScore:
             energyLevel=70,
         )
         q = calculate_data_quality_score(req)
-        assert q["has_hard_blocker"] is False
         assert "steps" in q["weak_fields"]
         assert float(q["score"]) < 1.0
 
@@ -134,7 +132,6 @@ class TestDataQualityScore:
             energyLevel=70,
         )
         q = calculate_data_quality_score(req)
-        assert q["has_hard_blocker"] is False
         assert "steps" in q["weak_fields"]
         assert "activeCalories" not in q["weak_fields"]
 

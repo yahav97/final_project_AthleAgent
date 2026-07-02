@@ -9,7 +9,7 @@ from services.field_transforms import (
     age_from_profile,
     daily_distance_km,
     daily_distance_km_from_doc,
-    injured_yesterday_from_doc,
+    injured_yesterday_from_docs,
     parse_injured_yesterday_flag,
     resolve_model_age,
     resting_hr,
@@ -102,9 +102,9 @@ class TestInjuredYesterday:
         ("raw", "expected"),
         [(True, 1), (False, 0), (1, 1), (0, 0), (None, None)],
     )
-    def test_injured_yesterday_from_doc(self, raw, expected):
+    def test_injured_yesterday_from_docs(self, raw, expected):
         doc = {} if raw is None else {"injuredYesterday": raw}
-        assert injured_yesterday_from_doc(doc) == expected
+        assert injured_yesterday_from_docs(doc) == expected
 
 
 class TestHrvScore:

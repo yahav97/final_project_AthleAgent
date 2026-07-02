@@ -174,15 +174,15 @@ sequenceDiagram
 
 | שלב | פונקציה | קובץ |
 |-----|---------|------|
-| 1. שליפה | `fetch_daily_firestore_snapshot` | `history_service.py` |
-| 2. בניית בקשה | `injury_prediction_request_from_firestore_snapshot` | `prediction_service.py` |
-| 3. מיזוג תזונה | `merge_nutrition_with_history` | `history_service.py` |
+| 1. שליפה | `fetch_daily_firestore_snapshot` | `history/repository.py` |
+| 2. בניית בקשה | `injury_prediction_request_from_firestore_snapshot` | `prediction/firestore_mapping.py` |
+| 3. מיזוג תזונה | `apply_nutrition_population_defaults` | `nutrition_defaults.py` |
 | 4. DataFrame | `injury_request_to_model_dataframe` | `preprocessing/` |
-| 5. היסטוריה | `_apply_history_confidence_fallback` | `prediction/` |
+| 5. היסטוריה | `apply_history_confidence_fallback` | `prediction/confidence.py` |
 | 6. איכות | `calculate_data_quality_score` | `preprocessing/quality.py` |
 | 7. ולידציה | `validate_feature_vector_for_model` | `preprocessing/` |
-| 8. חיזוי | `model.predict_proba` | `prediction/` |
-| 9. שמירה | `save_daily_prediction_result` | `history_service.py` |
+| 8. חיזוי | `model.predict_proba` | `prediction/service.py` |
+| 9. שמירה | `save_daily_prediction_result` | `history/repository.py` |
 
 ### מתי האפליקציה מפעילה חיזוי?
 
@@ -545,7 +545,7 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
   finalRiskScore = round(risk_score × 100, 2)     # 0 – 100
 ```
 
-קוד (`history_service.save_daily_prediction_result`):
+קוד (`history/repository.save_daily_prediction_result`):
 
 ```python
 risk_score = float(result.get("risk_score") or 0.0)
@@ -1005,18 +1005,14 @@ prediction_confidence = round((0.6 × history_score + 0.4 × quality_score) × 1
 
 | אירוע | השפעה |
 |-------|--------|
-| כל שדה **רגיש** חסר | **−0.12** |
-| תזונה ממוצעת (`nutritionImputed`) | **−0.12** (כמו שדה רגיש) |
-| חסר אות עומס (`steps` / `distanceMeters` / `activeCalories` כולם ≤0) | `hard_missing` → מקסימום **0.25** |
-| חסר אות התאוששות (`sleepMinutes` **או** `stressLevel`+`muscleSoreness`) | `hard_missing` → מקסימום **0.25** |
+| כל שדה מדידה חסר / אפס / NaN | **−0.08** לכל שדה ב-`MEASUREMENT_FIELDS` |
+| תזונה ממוצעת (`nutritionImputed`) | **−0.12** |
+| שדות פרופיל שנשלחו כ-0 או NaN | **−0.08** לכל שדה ב-`PROFILE_FIELDS` |
 
-**שדות רגישים (SENSITIVE):**  
-`sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`
+**שדות מדידה (MEASUREMENT_FIELDS):**  
+`sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
 
-**אות עומס (Load signal):** חובה `steps` **או** `distanceMeters` **או** `activeCalories` **> 0**  
-**אות התאוששות (Recovery signal):** חובה `sleepMinutes` **או** (`stressLevel` **ו**-`muscleSoreness`)
-
-> **חשוב:** `has_hard_blocker` מחושב ונרשם בלוג, אך **לא חוסם** את החיזוי בקוד הנוכחי — רק מוריד `prediction_confidence`.
+> **חשוב:** חיזוי **לא נחסם** בגלל שדות חסרים — רק `prediction_confidence` יורד.
 
 ---
 

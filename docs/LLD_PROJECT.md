@@ -438,13 +438,13 @@ cd backend && python -m pytest tests/ -v
 | זרימה | Android | Backend |
 |-------|---------|---------|
 | Login | `LoginActivity.kt` | — |
-| Sync | `WearableSyncActivity.kt` | `history_service.py` |
+| Sync | `WearableSyncActivity.kt` | `history/repository.py` |
 | Check-in | `DailyCheckInActivity.kt` | — |
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
-| Inference | — | `prediction_service.py` |
+| Inference | — | `prediction/service.py` |
 | Features | — | `preprocessing/`, `feature_engineering.py`, `model_features.py` |
-| Persist | — | `history_service.save_daily_prediction_result` |
+| Persist | — | `history/repository.save_daily_prediction_result` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
 | Train | — | `ML_model/train_model.py` |

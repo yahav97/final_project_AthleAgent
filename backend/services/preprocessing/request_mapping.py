@@ -15,8 +15,10 @@ from services.field_transforms import (
     resolve_model_age,
     resting_hr as resolve_resting_hr,
 )
-from services.model_features import MODEL_FEATURE_COLUMNS
+from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.preprocessing.helpers import safe_float
+
+DEFAULT_BMI = float(DEFAULT_FEATURE_VALUES["bmi"])
 from services.preprocessing.scales import (
     energy_to_model_scale,
     soreness_to_model_scale,
@@ -86,8 +88,6 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     history_injury_count = 0.0
     hist_raw = payload_dict.get("historyInjuryCount")
-    if hist_raw is None:
-        hist_raw = payload_dict.get("history_injury_count")
     if hist_raw is not None:
         try:
             history_injury_count = float(int(hist_raw))

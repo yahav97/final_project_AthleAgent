@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Any
 
 from schemas.inference import InjuryPredictionRequest
-from services.field_transforms import age_from_profile, parse_injured_yesterday_flag
-from services.history.date_utils import to_date_key
-from services.history.repository import merge_nutrition_with_history
-
-
-def firestore_doc_heartrate_avg(doc: dict[str, Any]) -> Any:
-    """Prefer ``heartRateAvg``; Firestore samples also used ``avgHeartRate``."""
-    if not doc:
-        return None
-    value = doc.get("heartRateAvg")
-    if value is not None:
-        return value
-    return doc.get("avgHeartRate")
+from services.field_transforms import (
+    age_from_profile,
+    first_doc_value,
+    heart_rate_avg_from_doc,
+    injured_yesterday_from_docs,
+)
+from services.nutrition_defaults import apply_nutrition_population_defaults
 
 
 def field_from_docs(
@@ -61,20 +54,7 @@ def injury_prediction_request_from_firestore_snapshot(
     health_yesterday = snapshot.get("daily_health_yesterday") or {}
     checkins = snapshot.get("daily_checkins") or {}
     nutrition_raw = snapshot.get("daily_nutrition_yesterday") or {}
-    yesterday_key = (to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
-    nutrition, nutrition_imputed = merge_nutrition_with_history(user_id, yesterday_key, nutrition_raw)
-
-    hist_profile = profile.get("historyInjuryCount")
-    if hist_profile is None:
-        hist_profile = profile.get("history_injury_count")
-
-    injured_raw = checkins.get("injuredYesterday")
-    if injured_raw is None:
-        injured_raw = checkins.get("injured_yesterday")
-    if injured_raw is None:
-        injured_raw = health_today.get("injuredYesterday")
-    if injured_raw is None:
-        injured_raw = health_today.get("injured_yesterday")
+    nutrition, nutrition_imputed = apply_nutrition_population_defaults(nutrition_raw)
 
     def today_only(field_options: list[str]) -> Any:
         return field_from_docs(health_today, {}, field_options, prefer_primary=True)
@@ -82,20 +62,18 @@ def injury_prediction_request_from_firestore_snapshot(
     def yesterday_only(field_options: list[str]) -> Any:
         return field_from_docs(health_yesterday, {}, field_options, prefer_primary=True)
 
-    hr_avg = firestore_doc_heartrate_avg(health_yesterday)
-
     return InjuryPredictionRequest(
         userId=user_id,
         date=date_key,
         age=age_from_profile(profile, as_of_date=date_key),
-        historyInjuryCount=hist_profile,
-        injuredYesterday=parse_injured_yesterday_flag(injured_raw),
+        historyInjuryCount=first_doc_value(profile, "historyInjuryCount", "history_injury_count"),
+        injuredYesterday=injured_yesterday_from_docs(checkins, health_today),
         sleepMinutes=today_only(["sleepMinutes", "sleep_minutes"]),
         steps=yesterday_only(["steps", "daily_steps"]),
         distanceMeters=yesterday_only(["distanceMeters", "distance_meters", "daily_distance_meters"]),
         activeCalories=yesterday_only(["activeCalories", "active_calories", "active_calories_burned"]),
         totalCalories=yesterday_only(["totalCalories", "total_calories", "daily_calories"]),
-        heartRateAvg=hr_avg,
+        heartRateAvg=heart_rate_avg_from_doc(health_yesterday),
         heartRateMax=yesterday_only(["heartRateMax", "heart_rate_max"]),
         heartRateMin=yesterday_only(["heartRateMin", "heart_rate_min"]),
         weightKg=yesterday_only(["weightKg", "weight_kg"]),

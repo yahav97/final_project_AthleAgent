@@ -5,9 +5,11 @@ Defaults align with medians in ``ML_model/athlete_injury_data.csv`` (synthetic t
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from config import settings
+from schemas.inference import InjuryPredictionRequest
 
 
 def nutrition_population_defaults() -> dict[str, int | float]:
@@ -28,18 +30,50 @@ NUTRITION_FIELD_KEYS: tuple[str, ...] = (
 )
 
 
+def is_weak_nutrition_value(value: object) -> bool:
+    """True when nutrition input is missing, null, zero, or non-finite."""
+    if value is None:
+        return True
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return True
+    return not math.isfinite(num) or num == 0.0
+
+
 def apply_nutrition_population_defaults(primary: dict[str, Any] | None) -> tuple[dict[str, Any], bool]:
     """
-    Fill missing nutrition aggregates from population averages (no history scan).
+    Fill missing or zero nutrition aggregates from population averages (no history scan).
 
     Returns ``(merged_doc, imputed)`` where ``imputed`` is True when any field was
-    missing from ``primary`` (yesterday had no complete meal log).
+    weak in ``primary`` (yesterday had no usable meal log).
     """
     defaults = nutrition_population_defaults()
     source = dict(primary or {})
-    imputed = any(source.get(key) is None for key in NUTRITION_FIELD_KEYS)
+    imputed = any(is_weak_nutrition_value(source.get(key)) for key in NUTRITION_FIELD_KEYS)
     out = dict(source)
     for key in NUTRITION_FIELD_KEYS:
-        if out.get(key) is None:
+        if is_weak_nutrition_value(out.get(key)):
             out[key] = defaults[key]
     return out, imputed
+
+
+def resolve_request_nutrition(payload: InjuryPredictionRequest) -> InjuryPredictionRequest:
+    """Apply population nutrition defaults on the inference request when values are weak."""
+    nutrition, imputed = apply_nutrition_population_defaults(
+        {
+            "totalProtein": payload.totalProtein,
+            "totalCarbs": payload.totalCarbs,
+            "mealsLoggedCount": payload.mealsLoggedCount,
+            "totalCalories": payload.nutritionTotalCalories,
+        }
+    )
+    return payload.model_copy(
+        update={
+            "totalProtein": int(nutrition["totalProtein"]),
+            "totalCarbs": int(nutrition["totalCarbs"]),
+            "mealsLoggedCount": int(nutrition["mealsLoggedCount"]),
+            "nutritionTotalCalories": float(nutrition["totalCalories"]),
+            "nutritionImputed": bool(imputed or payload.nutritionImputed),
+        }
+    )

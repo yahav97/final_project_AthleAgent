@@ -24,7 +24,8 @@ def _doc_float(doc: Mapping[str, Any], key: str, default: float = 0.0) -> float:
     return float(doc.get(key) or default)
 
 
-def _first_doc_value(doc: Mapping[str, Any], *keys: str) -> object | None:
+def first_doc_value(doc: Mapping[str, Any], *keys: str) -> object | None:
+    """Return the first non-null field from a Firestore doc (camelCase / snake_case)."""
     for key in keys:
         value = doc.get(key)
         if value is not None:
@@ -54,7 +55,7 @@ def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) ->
 
 def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> float | None:
     """Compute model age from Firestore profile ``birth_date`` (or ``birthDate``)."""
-    birth_raw = _first_doc_value(profile, "birth_date", "birthDate")
+    birth_raw = first_doc_value(profile, "birth_date", "birthDate")
     if birth_raw is None:
         return None
     return age_from_birth_date(birth_raw, as_of_date=as_of_date)
@@ -98,13 +99,18 @@ def parse_injured_yesterday_flag(raw: object) -> int | None:
     return None
 
 
-def injured_yesterday_from_doc(data: Mapping[str, Any]) -> int | None:
-    """Read injuredYesterday from a Firestore doc; invalid values → 0."""
-    raw = _first_doc_value(data, "injuredYesterday", "injured_yesterday")
-    if raw is None:
-        return None
-    parsed = parse_injured_yesterday_flag(raw)
-    return 0 if parsed is None else parsed
+def injured_yesterday_from_docs(*docs: Mapping[str, Any]) -> int | None:
+    """Read injuredYesterday from the first doc that has it (checkins, then health)."""
+    for doc in docs:
+        raw = first_doc_value(doc, "injuredYesterday", "injured_yesterday")
+        if raw is not None:
+            return parse_injured_yesterday_flag(raw)
+    return None
+
+
+def heart_rate_avg_from_doc(doc: Mapping[str, Any]) -> object | None:
+    """Prefer ``heartRateAvg``; Firestore samples also used ``avgHeartRate``."""
+    return first_doc_value(doc, "heartRateAvg", "avgHeartRate")
 
 
 def daily_distance_km(distance_meters: float, steps: float) -> float:

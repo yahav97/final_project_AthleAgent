@@ -14,7 +14,7 @@ from services.preprocessing.helpers import is_absent_or_weak, is_explicit_zero_o
 
 def calculate_data_quality_score(
     payload: InjuryPredictionRequest,
-) -> dict[str, float | list[str] | bool]:
+) -> dict[str, float | list[str]]:
     """
     Score same-day input strength for prediction confidence.
 
@@ -50,7 +50,4 @@ def calculate_data_quality_score(
     return {
         "score": float(score),
         "weak_fields": weak_fields,
-        "hard_missing": [],
-        "sensitive_missing": weak_fields,
-        "has_hard_blocker": False,
     }

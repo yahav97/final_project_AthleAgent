@@ -247,11 +247,11 @@ erDiagram
 | שירות | כיוון | שימוש | מיקום בקוד |
 |-------|-------|-------|------------|
 | **Firebase Auth** | Client → Google | Login, Register, role routing | `LoginActivity.kt` |
-| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | כל הנתונים | Activities, `history_service.py` |
+| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | כל הנתונים | Activities, `history/repository.py` |
 | **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
 | **Gemini API** | Client → Google | meal vision, coaching text | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
 | **FastAPI Backend** | Client → Server | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/` |
-| **XGBoost** | Server (in-process) | injury probability | `prediction_service.py` |
+| **XGBoost** | Server (in-process) | injury probability | `prediction/service.py` |
 
 ### 7.1 הרצה מקומית (Backend + ML)
 

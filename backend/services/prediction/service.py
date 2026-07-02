@@ -41,12 +41,11 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     score = quality["score"]
     quality_score = float(score) if isinstance(score, (int, float)) else 0.0
     logger.info(
-        "predict_data_quality userId=%s date=%s quality=%.3f sensitive_missing_fields=%s hard_missing=%s",
+        "predict_data_quality userId=%s date=%s quality=%.3f weak_fields=%s",
         payload.userId,
         payload.date,
         quality_score,
-        quality.get("sensitive_missing", []),
-        quality.get("hard_missing", []),
+        quality.get("weak_fields", []),
         extra={"event": "predict_data_quality"},
     )
     prediction_confidence = prediction_confidence_0_100(history_confidence, quality_score)

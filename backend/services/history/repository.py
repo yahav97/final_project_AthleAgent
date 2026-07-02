@@ -30,7 +30,7 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
     """
     Fetch profile + wake-up day health/check-in + prior-day health and nutrition.
 
-    Serve-time merge policy is applied in ``prediction_service``:
+    Serve-time merge policy is applied in ``prediction/firestore_mapping``:
     sleep from ``daily_health/{date}``; physical from ``daily_health/{date-1}``;
     survey from ``daily_checkins/{date}``; nutrition from ``daily_nutrition/{date-1}``.
     """
@@ -70,30 +70,6 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
             nutrition_yesterday_doc.to_dict() if nutrition_yesterday_doc.exists else {}
         ),
     }
-
-
-def merge_nutrition_with_history(
-    user_id: str,
-    date_key: str,
-    primary: dict[str, Any],
-) -> tuple[dict[str, Any], bool]:
-    """
-    Fill missing nutrition aggregates from population averages.
-
-    Uses ``primary`` from ``daily_nutrition/{D-1}`` when present. Missing fields get
-    stable baseline values (not a multi-day Firestore backfill), so new athletes are
-    not imputed from empty or unrelated prior days.
-
-    ``user_id`` and ``date_key`` are kept for call-site compatibility.
-
-    Returns ``(merged_nutrition, imputed)`` — ``imputed`` is True when population
-    averages replaced missing yesterday fields.
-    """
-    from services.nutrition_defaults import apply_nutrition_population_defaults
-
-    _ = user_id
-    _ = date_key
-    return apply_nutrition_population_defaults(primary)
 
 
 def save_daily_prediction_result(
@@ -164,21 +140,6 @@ def fetch_user_history(
         row["date_key"] = key
         merged_rows.append(row)
     return merged_rows
-
-
-def fetch_historical_derived_features(
-    user_id: str,
-    date_key: str,
-    lookback_days: int = 7,
-    include_target_day: bool = True,
-) -> dict[str, float] | None:
-    rows = fetch_user_history(
-        user_id,
-        date_key,
-        lookback_days=lookback_days,
-        include_target_day=include_target_day,
-    )
-    return compute_historical_derived_features(rows)
 
 
 def get_history_window_context(

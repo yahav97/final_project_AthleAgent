@@ -81,7 +81,7 @@ def mock_firestore_snapshot(monkeypatch, firestore_snapshot: dict[str, Any]) -> 
 
 @pytest.fixture
 def mock_model_gate(monkeypatch) -> Callable[..., None]:
-    """Force model loader gate state inside prediction_service."""
+    """Force model loader gate state inside prediction.service."""
 
     def apply(*, live: bool, gate_reason: str = "none") -> None:
         if live:

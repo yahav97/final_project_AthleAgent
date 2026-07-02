@@ -1,66 +1,48 @@
-"""Additional edge-case inference tests for RC1 hardening."""
+"""HTTP-level inference edge cases."""
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
 from schemas.inference import InjuryPredictionRequest
-from services.prediction_service import predict_injury_risk
-from utils.exceptions import AthleAgentException
+from services.prediction.service import predict_injury_risk
+from utils.exceptions import ValidationError
 
 pytestmark = pytest.mark.integration
 
-
-def test_predict_extreme_sleep_zero_no_crash():
-    try:
-        out = predict_injury_risk(
-            InjuryPredictionRequest(
-                userId="edge_sleep",
-                date="2026-04-30",
-                sleepMinutes=0,
-                steps=9000,
-                distanceMeters=7000,
-                stressLevel=80,
-                muscleSoreness=5,
-            )
-        )
-    except AthleAgentException:
-        return
-    assert 0.0 <= float(out["risk_score"]) <= 1.0
+_BASE_PAYLOAD = dict(
+    userId="edge_case",
+    date="2026-04-30",
+    age=28,
+    sleepMinutes=420,
+    steps=9000,
+    distanceMeters=7000,
+    stressLevel=40,
+    muscleSoreness=3,
+    energyLevel=70,
+)
 
 
-def test_predict_extreme_distance_high_no_crash():
-    try:
+def test_predict_extreme_sleep_zero_raises_when_model_blocked(monkeypatch):
+    monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
+    monkeypatch.setattr(
+        "services.prediction.service.get_model_gate_reason",
+        lambda: "manifest_corrupted",
+    )
+    with pytest.raises(Exception, match="Model is not live"):
+        predict_injury_risk(InjuryPredictionRequest(**{**_BASE_PAYLOAD, "sleepMinutes": 0}))
+
+
+def test_predict_missing_age_raises_validation_error():
+    with pytest.raises(ValidationError, match="age is required"):
         predict_injury_risk(
             InjuryPredictionRequest(
-                userId="edge_load",
+                userId="minimal",
                 date="2026-04-30",
                 sleepMinutes=420,
-                steps=80000,
-                distanceMeters=50000,
-                stressLevel=75,
-                muscleSoreness=5,
+                steps=5000,
             )
         )
-    except AthleAgentException:
-        return
-
-
-def test_predict_response_json_schema_when_success():
-    try:
-        data = predict_injury_risk(
-            InjuryPredictionRequest(
-                userId="schema_ok",
-                date="2026-04-30",
-                sleepMinutes=480,
-                steps=8500,
-                stressLevel=30,
-                muscleSoreness=2,
-            )
-        )
-    except AthleAgentException:
-        return
-    assert {"risk_score", "risk_level", "prediction_confidence"} <= set(data.keys())
 
 
 def test_status_endpoint_multiple_calls_light_load():
@@ -70,10 +52,3 @@ def test_status_endpoint_multiple_calls_light_load():
             assert response.status_code == 200
             data = response.json()
             assert data["status"] in ("Live", "Blocked")
-
-
-def test_predict_missing_optional_fields_still_deterministic_error_or_success():
-    try:
-        predict_injury_risk(InjuryPredictionRequest(userId="minimal", date="2026-04-30"))
-    except AthleAgentException:
-        return

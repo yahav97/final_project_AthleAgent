@@ -144,7 +144,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | `mealsLoggedCount` | מספר ארוחות | fallback לאומדן קלוריות |
 | `totalCalories` | קלוריות **צריכה** (לא שריפה!) | `nutrition_intake_calories` |
 
-**ממוצעים כלליים:** אם שדות חסרים ב-`daily_nutrition/{D-1}`, `merge_nutrition_with_history` ממלא מ-`nutrition_defaults.py` (לא סריקת 14 ימים). דגל פנימי `nutritionImputed` מוריד `quality_score` ב-**0.12** (~**4.8** נקודות confidence בהיסטוריה high).
+**ממוצעים כלליים:** אם שדות חסרים ב-`daily_nutrition/{D-1}`, `apply_nutrition_population_defaults` ממלא מ-`nutrition_defaults.py` (לא סריקת 14 ימים). דגל פנימי `nutritionImputed` מוריד `quality_score` ב-**0.12** (~**4.8** נקודות confidence בהיסטוריה high).
 
 **הבחנה:** `daily_health.totalCalories` = **שריפה** (מקלוריות שעון). `daily_nutrition.totalCalories` = **צריכה** (ממזון).
 
@@ -373,17 +373,11 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 ### שדות קריטיים (חוסר בהם עשוי לחסום חיזוי)
 
-**אות עומס (Load)** — חובה אחד **> 0**: `steps`, `distanceMeters`, או `activeCalories`
+שדות מדידה חסרים / אפס / NaN → `weak_fields` → `quality_score` יורד (לא חוסם HTTP).
 
-**אות התאוששות (Recovery)** — חובה אחד מ:
-- `sleepMinutes`, או
-- `stressLevel` + `muscleSoreness`
+### שדות מדידה (הורדת ציון איכות)
 
-חסר load/recovery signal → `hard_missing` → `quality_score` מקסימום **0.25** (לא חוסם HTTP).
-
-### שדות רגישים (הורדת ציון איכות)
-
-`sleepMinutes`, `steps`, `distanceMeters`, `heartRateAvg`, `stressLevel`, `muscleSoreness`, `hrvRmssd`, `restingHeartRate`
+`MEASUREMENT_FIELDS`: `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
 
 בנוסף: `nutrition_imputed` (כשתזונת אתמול הושלמה ממוצעים) — **−0.12** כמו שדה רגיש אחד.
 
