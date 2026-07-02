@@ -26,7 +26,9 @@ Verify:
 |-------|-----|----------|
 | Liveness | http://localhost:8000/health | 200 OK |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
-| API docs | http://localhost:8000/docs | Swagger UI |
+| Pre-demo script | `python backend/scripts/verify_demo_readiness.py` | `Demo readiness: OK` |
+
+> **Security (demo):** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=demo`.
 
 From the Android emulator (unchanged): `http://10.0.2.2:8000/` — see `ApiClient.kt`.
 
@@ -61,7 +63,7 @@ The model loads **in-process** at startup (same as local `uvicorn`). No separate
 
 ## Android app
 
-No code changes required. With `8000:8000` published on the host, the emulator reaches the API at `10.0.2.2:8000`.
+No code changes required. With `127.0.0.1:8000:8000` published on the host, the emulator still reaches the API at `10.0.2.2:8000`.
 
 You still need on the app side (as today):
 

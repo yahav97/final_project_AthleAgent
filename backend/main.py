@@ -21,9 +21,16 @@ from api.routes.predict import router as predict_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load gated model on startup; log shutdown."""
-    from ml.model_loader import load_model
+    from ml.model_loader import get_model_status, load_model
 
     load_model(settings.MODEL_PATH)
+    model_status = get_model_status()
+    if model_status.get("status") != "Live":
+        logger.warning(
+            "Model is not Live at startup (gate_reason=%s). POST /predict/daily will return 503.",
+            model_status.get("gate_reason"),
+            extra={"event": "model_startup_blocked", "gate_reason": model_status.get("gate_reason")},
+        )
     logger.info(
         "Starting %s v%s (Firestore-backed inference)",
         settings.PROJECT_NAME,
@@ -34,11 +41,16 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down server", extra={"event": "server_shutdown"})
 
 
+_openapi_enabled = settings.APP_ENV == "development"
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Smart injury risk prediction system using ML",
     lifespan=lifespan,
+    docs_url="/docs" if _openapi_enabled else None,
+    redoc_url="/redoc" if _openapi_enabled else None,
+    openapi_url="/openapi.json" if _openapi_enabled else None,
 )
 
 app.add_middleware(

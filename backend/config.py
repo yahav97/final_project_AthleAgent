@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Feature flags
     # -------------------------------------------------------------------------
+    APP_ENV: Literal["development", "demo", "production"] = "development"
     ENABLE_TEST_PREDICT_ENDPOINT: bool = False
 
     # -------------------------------------------------------------------------

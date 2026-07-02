@@ -29,6 +29,7 @@ class ModelGateReason(str, Enum):
     MANIFEST_INVALID_POLICY_RECALL_HARD_MIN = "manifest_invalid_policy_recall_hard_min"
     MANIFEST_RECALL_BELOW_POLICY_HARD_MIN = "manifest_recall_below_policy_hard_min"
     FALLBACK_BUNDLE_INVALID = "fallback_bundle_invalid"
+    UNGATED_FALLBACK_BLOCKED = "ungated_fallback_blocked"
     UNSUPPORTED_MODEL_FORMAT = "unsupported_model_format"
     MISSING_ESTIMATOR = "missing_estimator"
     MISSING_FEATURE_COLUMNS = "missing_feature_columns"

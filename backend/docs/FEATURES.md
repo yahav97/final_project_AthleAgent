@@ -9,9 +9,9 @@
 
 | פרט | ערך |
 |---|---|
-| **מודל** | **XGBoostDeep** |
+| **מודל** | **XGBoostCalibratedTuned** (run `20260629_184034`) |
 | **מספר פיצ'רים** | 35 (`model_features.py`) |
-| **סף אימון (manifest)** | **0.18** |
+| **סף אימון (manifest)** | **0.10** |
 | **רמות סיכון (production)** | Low ≤ 20% · Medium 21–70% · High > 70% (`risk_levels.py`, תואם Android) |
 | **חלון היסטוריה מקסימלי** | 7 ימים אחורה |
 

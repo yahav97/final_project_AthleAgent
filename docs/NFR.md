@@ -66,17 +66,17 @@
 
 ### 3.1 מדדי איכות ML (offline)
 
-מודל production: **XGBoostDeep**, **35 פיצ'רים**. סף החלטה במודל (manifest): **0.18**; רמות UI/API: Low ≤20%, Medium 21–70%, High >70%.
+מודל production: **XGBoostCalibratedTuned**, **35 פיצ'רים**. סף החלטה במודל (manifest): **0.10**; רמות UI/API: Low ≤20%, Medium 21–70%, High >70%.
 
 
 | מדד                 | יעד (gate)      | Baseline (holdout) | מקור                                                   |
 | ------------------- | --------------- | ------------------ | ------------------------------------------------------ |
-| Recall@Threshold    | ≥ 0.80          | **0.887**          | `ML_model/artifacts/20260629_113445/run_manifest.json` |
-| ROC-AUC             | ≥ 0.68          | **0.791**          | אותו manifest                                          |
-| Precision@Threshold | ≥ 0.13 (policy) | **0.246**          | אותו manifest                                          |
-| F1@Threshold        | ≥ 0.22 (policy) | **0.385**          | אותו manifest                                          |
-| Brier Score         | ≤ 0.15          | **0.129**          | אותו manifest                                          |
-| FPR@Threshold       | ≤ 0.70 (policy) | **0.565**          | אותו manifest                                          |
+| Recall@Threshold    | ≥ 0.80          | **0.811**          | `ML_model/artifacts/20260629_184034/run_manifest.json` |
+| ROC-AUC             | ≥ 0.68          | **0.793**          | אותו manifest                                          |
+| Precision@Threshold | ≥ 0.13 (policy) | **0.287**          | אותו manifest                                          |
+| F1@Threshold        | ≥ 0.22 (policy) | **0.425**          | אותו manifest                                          |
+| Brier Score         | ≤ 0.15          | **0.113**          | אותו manifest                                          |
+| FPR@Threshold       | ≤ 0.70 (policy) | **0.417**          | אותו manifest                                          |
 
 
 **Calibration (risk bins):**

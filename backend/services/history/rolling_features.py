@@ -90,11 +90,15 @@ def compute_historical_derived_features(
     frame["sleep_debt_3d"] = (sleep_target - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
     frame["hrv_rolling_7d"] = frame["hrv_score"].rolling(7, min_periods=1).mean()
     frame["hrv_drop"] = (frame["hrv_score"] - frame["hrv_rolling_7d"]).clip(lower=-15.0, upper=15.0)
+    frame["acwr_ratio_ma7"] = frame["acwr_ratio"].rolling(7, min_periods=1).mean()
+    frame["sleep_hours_ma7"] = frame["sleep_hours"].rolling(7, min_periods=1).mean()
 
     latest = frame.iloc[-1]
     return {
         "acute_load_7d": float(latest["acute_load_7d"]),
         "acwr_ratio": float(latest["acwr_ratio"]),
+        "acwr_ratio_ma7": float(latest["acwr_ratio_ma7"]),
+        "sleep_hours_ma7": float(latest["sleep_hours_ma7"]),
         "sleep_debt_3d": float(latest["sleep_debt_3d"]),
         "hrv_drop": float(latest["hrv_drop"]),
     }

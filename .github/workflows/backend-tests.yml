@@ -5,13 +5,13 @@ on:
     branches: [main]
     paths:
       - "backend/**"
-      - "ML_model/artifacts/**"
+      - "ML_model/**"
       - ".github/workflows/backend-tests.yml"
   pull_request:
     branches: [main]
     paths:
       - "backend/**"
-      - "ML_model/artifacts/**"
+      - "ML_model/**"
       - ".github/workflows/backend-tests.yml"
 
 jobs:
@@ -33,8 +33,39 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Verify promoted model artifact
+        run: python backend/scripts/verify_demo_readiness.py
+
       - name: Run pytest
         working-directory: backend
         env:
           ATHLEAGENT_DISABLE_FILE_LOGGING: "1"
         run: python -m pytest tests/ -v --tb=short
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: pytest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Smoke test container health endpoint
+        run: |
+          IMAGE_ID=$(docker compose images -q backend)
+          docker run --rm -d -p 8000:8000 --name athle-backend "$IMAGE_ID"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              curl -fsS http://127.0.0.1:8000/status/ml
+              docker stop athle-backend
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs athle-backend
+          docker stop athle-backend || true
+          exit 1

@@ -140,7 +140,7 @@ class InjuryPredictionRequest(BaseModel):
 class DailyPredictionTriggerRequest(BaseModel):
     """Minimal trigger contract: backend loads full daily snapshot from Firestore."""
 
-    userId: str = Field(..., description="Firebase Auth uid")
+    userId: str = Field(..., min_length=1, max_length=128, description="Firebase Auth uid")
     date: str = Field(..., description="Day key yyyy-MM-dd")
 
     @field_validator("date", mode="before")

@@ -60,7 +60,14 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
         health_yesterday_doc = read_firestore_document(health_yesterday_ref)
         checkin_doc = read_firestore_document(checkin_ref)
         nutrition_yesterday_doc = read_firestore_document(nutrition_yesterday_ref)
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "fetch_daily_firestore_snapshot failed for user_id=%s date=%s: %s",
+            user_id,
+            date_key,
+            exc,
+            exc_info=True,
+        )
         return {}
 
     return {
@@ -97,7 +104,14 @@ def save_daily_prediction_result(
             merge=True,
         )
         return True
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "save_daily_prediction_result failed for user_id=%s date=%s: %s",
+            user_id,
+            date_key,
+            exc,
+            exc_info=True,
+        )
         return False
 
 
@@ -136,7 +150,14 @@ def fetch_user_history(
         user_ref = db.collection("users").document(user_id)
         health_ref = user_ref.collection("daily_health")
         checkin_ref = user_ref.collection("daily_checkins")
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "fetch_user_history client setup failed for user_id=%s date=%s: %s",
+            user_id,
+            date_key,
+            exc,
+            exc_info=True,
+        )
         return []
 
     merged_rows: list[dict[str, Any]] = []

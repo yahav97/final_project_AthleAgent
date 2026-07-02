@@ -2,7 +2,7 @@
 
 > **מסמך זה:** הסבר מלא בעברית על איך נבנה ציון הסיכון, מאיזה ימים, אילו פרמטרים, מה חוזר לפרונט, ואילו ספים חלים.  
 > **קוד אמת:** `services/prediction/` · `services/preprocessing/` · `services/history/` · `data/model_feature_contract.json`  
-> **מודל פרודקשן:** **XGBoostDeep** — `ML_model/artifacts/promoted.json` (run `20260629_113445`)  
+> **מודל פרודקשן:** **XGBoostCalibratedTuned** — `ML_model/artifacts/promoted.json` (run `20260629_184034`)  
 > **חוזה שדות Firestore:** [`FEATURES.md`](FEATURES.md)  
 > **קונפיג ML:** [`MODEL.md`](MODEL.md)
 
@@ -335,8 +335,8 @@ resting_hr         = restingHeartRate  →  heartRateMin  →  heartRateAvg
 | `calorie_balance` | `daily_calories − total_calories_burned` | — |
 | `load_recovery_imbalance` | `acwr_ratio × sleep_debt_3d` | — |
 | `speed_intensity_ratio` | `min(5, max_speed / (avg_speed + 0.1))` | — |
-| `acwr_ratio_ma7` | `= acwr_ratio` (זמנית) | מוחלף רק אם היסטוריה low |
-| `sleep_hours_ma7` | `= sleep_hours` (זמנית) | מוחלף רק אם היסטוריה low |
+| `acwr_ratio_ma7` | `= acwr_ratio` לפני העשרת היסטוריה; **ממוצע 7 ימים** מ-`rolling_features.py` כש-confidence medium/high | proxy → rolling |
+| `sleep_hours_ma7` | `= sleep_hours` לפני העשרת היסטוריה; **ממוצע 7 ימים** מ-`rolling_features.py` כש-confidence medium/high | proxy → rolling |
 
 ### 7.3 ACWR — מה זה אומר בעברית?
 
@@ -451,7 +451,7 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 
 | פרמטר | ערך |
 |--------|-----|
-| אלגוריתם | **XGBoostDeep** (Gradient Boosted Trees) |
+| אלגוריתם | **XGBoostCalibratedTuned** (Gradient Boosted Trees + sigmoid calibration) |
 | פיצ'רים | 35 |
 | פלט | `predict_proba` — הסתברות למחלקה 1 (פציעה) |
 | קובץ | `ML_model/artifacts/.../injury_model.pkl` |
@@ -479,15 +479,15 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 ב־`run_manifest.json` של המודל המקודם:
 
 ```json
-"threshold": 0.18
+"threshold": 0.10
 ```
 
-| מטריקה @ 0.18 | ערך |
+| מטריקה @ 0.10 | ערך |
 |---------------|-----|
-| Recall | ~88.7% |
-| Precision | ~24.6% |
-| F1 | ~38.5% |
-| ROC-AUC | ~79.1% |
+| Recall | ~81.1% |
+| Precision | ~28.7% |
+| F1 | ~42.5% |
+| ROC-AUC | ~79.3% |
 
 סף זה נבחר באימון כדי **למקסם Recall** (לתפוס כמה שיותר פציעות) תוך הגבלת False Positive Rate.  
 **הוא נשמר ב-bundle** אך **לא משמש כרגע** לקביעת `risk_level` בשרת (ראו סעיף 12).

@@ -8,7 +8,7 @@
 # Docker (reviewers):
 #   docker compose up --build   — see docs/DOCKER.md
 #
-# ML stack loads the promoted artifact (XGBoostDeep) via joblib:
+# ML stack loads the promoted artifact (XGBoostCalibratedTuned) via joblib:
 #   ML_model/artifacts/promoted.json  →  injury_model.pkl
 #
 # Tested with Python 3.11+ (also verified on 3.14):

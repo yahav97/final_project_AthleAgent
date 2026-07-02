@@ -125,7 +125,23 @@ class TestPromotedPointerResolution:
 
         monkeypatch.setattr(model_loader, "_project_root", lambda: project_root)
         monkeypatch.setattr(model_loader, "_fallback_model_path", lambda: fallback_model)
+        monkeypatch.setattr("ml.model_loader.settings.APP_ENV", "development")
         result = model_loader.load_model()
         assert result is not None
         assert model_loader.get_model_gate_reason() == "none"
         assert model_loader.get_model_status()["status"] == "Live"
+
+    def test_blocks_ungated_fallback_outside_development(self, monkeypatch, tmp_path):
+        project_root = tmp_path / "proj"
+        project_root.mkdir()
+        backend_dir = project_root / "backend"
+        backend_dir.mkdir()
+        fallback_model, manifest_path = _write_valid_bundle(backend_dir)
+        manifest_path.unlink()
+
+        monkeypatch.setattr(model_loader, "_project_root", lambda: project_root)
+        monkeypatch.setattr(model_loader, "_fallback_model_path", lambda: fallback_model)
+        monkeypatch.setattr("ml.model_loader.settings.APP_ENV", "demo")
+        result = model_loader.load_model(fallback_model)
+        assert result is None
+        assert model_loader.get_model_gate_reason() == "ungated_fallback_blocked"

@@ -70,3 +70,13 @@ class TestExceptionHandlers:
             response = client.get("/invalid-features")
         assert response.status_code == 422
         assert "NaN" in response.json()["detail"]
+
+    def test_unhandled_exception_maps_to_500(self, exception_app):
+        @exception_app.get("/boom")
+        def boom() -> None:
+            raise RuntimeError("unexpected")
+
+        with TestClient(exception_app, raise_server_exceptions=False) as client:
+            response = client.get("/boom")
+        assert response.status_code == 500
+        assert response.json()["code"] == "internal_error"

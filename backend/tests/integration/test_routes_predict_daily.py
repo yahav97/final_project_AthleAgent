@@ -33,10 +33,9 @@ class TestPredictDailyValidation:
         )
         assert response.status_code == 422
 
-    def test_empty_user_id_still_accepted_by_schema(self, api_client, mock_daily_prediction_pipeline):
-        mock_daily_prediction_pipeline()
+    def test_empty_user_id_rejected_by_schema(self, api_client):
         response = api_client.post("/predict/daily", json={"userId": "", "date": "2026-05-09"})
-        assert response.status_code == 200
+        assert response.status_code == 422
 
 
 class TestPredictDailySuccess:

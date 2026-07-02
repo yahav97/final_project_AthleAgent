@@ -19,6 +19,10 @@ class TestDateKeyValidation:
         req = DailyPredictionTriggerRequest(userId="u1", date="2026-04-30")
         assert req.date == "2026-04-30"
 
+    def test_rejects_empty_user_id(self):
+        with pytest.raises(ValidationError):
+            DailyPredictionTriggerRequest(userId="", date="2026-04-30")
+
     def test_rejects_invalid_calendar_date(self):
         with pytest.raises(ValidationError):
             DailyPredictionTriggerRequest(userId="u1", date="2026-13-40")

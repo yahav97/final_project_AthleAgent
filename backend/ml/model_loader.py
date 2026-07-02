@@ -184,6 +184,16 @@ def load_model(
 
     if not manifest_candidate.is_file():
         if using_fallback:
+            if settings.APP_ENV != "development":
+                logger.warning(
+                    "Ungated fallback model blocked outside development (APP_ENV=%s).",
+                    settings.APP_ENV,
+                )
+                _estimator = None
+                _model_gate_reason = ModelGateReason.UNGATED_FALLBACK_BLOCKED.value
+                _model_live = False
+                _active_manifest = {}
+                return None
             bundle = _load_bundle_without_manifest(path)
             if bundle is None:
                 _estimator = None

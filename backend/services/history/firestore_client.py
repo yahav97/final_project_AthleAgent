@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from config import settings
+from utils.logging import logger
 
 
 def get_firestore_client():
@@ -10,7 +11,8 @@ def get_firestore_client():
     try:
         import firebase_admin
         from firebase_admin import credentials, firestore
-    except Exception:
+    except Exception as exc:
+        logger.warning("firebase_admin import failed: %s", exc, exc_info=True)
         return None
 
     if not firebase_admin._apps:
@@ -21,9 +23,11 @@ def get_firestore_client():
                 firebase_admin.initialize_app(cred)
             else:
                 firebase_admin.initialize_app()
-        except Exception:
+        except Exception as exc:
+            logger.warning("firebase_admin initialize_app failed: %s", exc, exc_info=True)
             return None
     try:
         return firestore.client()
-    except Exception:
+    except Exception as exc:
+        logger.warning("firestore.client() failed: %s", exc, exc_info=True)
         return None

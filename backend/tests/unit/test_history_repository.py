@@ -112,6 +112,8 @@ class TestHistoricalDerivedFeatures:
         assert out is not None
         assert 0.35 <= out["acwr_ratio"] <= 2.8
         assert out["acute_load_7d"] >= 0
+        assert out["acwr_ratio_ma7"] == pytest.approx(out["acwr_ratio"])
+        assert out["sleep_hours_ma7"] == pytest.approx(sleep_hours(rows[0]))
 
     def test_seven_day_window_high_confidence_context(self, monkeypatch):
         rows = [
@@ -134,6 +136,8 @@ class TestHistoricalDerivedFeatures:
         assert ctx["confidence"] == "high"
         assert ctx["days_count"] == 7
         assert ctx["features"] is not None
+        assert "acwr_ratio_ma7" in ctx["features"]
+        assert "sleep_hours_ma7" in ctx["features"]
 
     @pytest.mark.parametrize(
         ("day_count", "expected_confidence"),

@@ -11,6 +11,22 @@
 
 ---
 
+## ✅ צ'קליסט לפני תערוכה (שלב 1)
+
+הרץ **לפני** הדמו החי:
+
+| # | בדיקה | פקודה / מיקום | תוצאה צפויה |
+|---|--------|---------------|-------------|
+| 1 | מודל promoted זמין | `python backend/scripts/verify_demo_readiness.py` | `Demo readiness: OK` |
+| 2 | Backend רץ (Docker) | `docker compose up --build` | `/status/ml` → `"status": "Live"` |
+| 3 | Backend לא חשוף לרשת | `docker-compose.yml` → `127.0.0.1:8000:8000` | נגיש רק מ-localhost / emulator |
+| 4 | Firebase key | `backend/firebase-key.json` קיים | אין שגיאת credentials |
+| 5 | Android מחובר | Emulator → `10.0.2.2:8000` | check-in מפעיל ML |
+
+**מספרים לשאלות על המודל (מ-manifest, לא מהפוסטר):** XGBoostCalibratedTuned @ 0.10 · Recall **81.1%** · ROC-AUC **79.3%** · run `20260629_184034`.
+
+---
+
 ## חלק א׳ — פתיחה (30 שניות)
 
 ### Elevator pitch
