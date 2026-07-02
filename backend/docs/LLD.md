@@ -170,8 +170,8 @@ All fields optional — service applies defaults.
 | `firestore_mapping.injury_prediction_request_from_firestore_snapshot` | Firestore dict → Pydantic request |
 | `service.predict_injury_risk` | Core inference logic |
 | `confidence.apply_history_confidence_fallback` | 7-day rolling enrichment |
-| `bundle.resolve_model_bundle` | Parse joblib dict contract |
-| `confidence.prediction_confidence_0_100` | 0.6×history + 0.4×quality |
+| `bundle.resolve_model_bundle` | Parse joblib dict → ``ResolvedModelBundle`` |
+| `confidence.compute_prediction_confidence_percent` | 0.6×history + 0.4×quality |
 | `service.persist_prediction_result_or_raise` | Write or raise |
 
 #### Inference Logic (`predict_injury_risk`)
@@ -361,8 +361,8 @@ MIN_AUC_FOR_LIVE = 0.68
 }
 ```
 
-**Measurement fields** (`MEASUREMENT_FIELDS`): missing, null, zero, or NaN → penalty **−0.08** each.  
-**Profile fields** (`PROFILE_FIELDS`): penalized only when explicitly sent as 0 or NaN.  
+**Same-day measurement fields** (`SAME_DAY_MEASUREMENT_FIELDS`): missing, null, zero, or NaN → penalty **−0.08** each.
+**Optional profile fields** (`OPTIONAL_PROFILE_FIELDS`): penalized only when explicitly sent as 0 or NaN.
 **Imputation flag:** `nutritionImputed` → `nutrition_imputed` (−0.12).
 
 Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`

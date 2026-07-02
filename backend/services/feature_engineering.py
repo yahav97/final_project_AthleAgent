@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from config import settings
+
+DerivedFeatures = dict[str, float]
+
 
 def acwr_baseline_from_weekly_stats(weekly_mean: float, weekly_std: float = 0.0) -> float:
     """Internal ACWR denominator from 7-day distance mean/std (not a model feature)."""
@@ -26,38 +30,53 @@ def acwr_ratio_bounded(acute_load_7d: float, baseline: float) -> float:
     return float(min(2.8, max(0.35, acute_load_7d / baseline)))
 
 
-def compute_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
+def _active_calories_from_row(row: Mapping[str, Any]) -> float:
+    return float(
+        row.get("active_calories_burned")
+        or row.get("_active_calories")  # legacy test key
+        or 0.0
+    )
+
+
+def _bmr_calories_from_row(row: Mapping[str, Any]) -> float:
+    return float(row.get("bmr_calories") or row.get("_bmr_calories") or 0.0)
+
+
+def compute_derived_features(row: Mapping[str, Any]) -> DerivedFeatures:
     """
     Compute acute/chronic load, ACWR, sleep debt proxy, HRV drop proxy,
     and total_calories_burned from active + BMR.
 
-    ``row`` is a flat dict of *model-side* names already mapped from the request
-    (e.g. daily_distance_km, sleep_hours, stress_level, …). Missing keys should be
-    None or numeric; callers normalize before/after.
+    ``row`` uses model-side names from ``base_model_features_from_request``
+    (e.g. daily_distance_km, sleep_hours, active_calories_burned, bmr_calories).
 
     ACWR proxy (single day, no athlete history):
         - acute_load_7d: combines distance and active calories as acute exposure.
         - acwr_ratio: acute / internal baseline (capped 0.35–2.8).
     """
     daily_distance_km = float(row.get("daily_distance_km") or 0.0)
-    active_cal = float(row.get("active_calories_burned") or row.get("_active_calories") or 0.0)
+    active_calories = _active_calories_from_row(row)
     sleep_hours = float(row.get("sleep_hours") or 7.0)
     hrv_score = float(row.get("hrv_score") or 62.0)
     resting_hr = float(row.get("resting_hr") or 54.0)
-    bmr_cal = float(row.get("_bmr_calories") or 0.0)
+    bmr_calories = _bmr_calories_from_row(row)
 
-    acute_load_7d = max(0.05, daily_distance_km * 0.95 + active_cal / 450.0)
+    acute_load_7d = max(0.05, daily_distance_km * 0.95 + active_calories / 450.0)
     baseline = acwr_baseline_from_acute_proxy(acute_load_7d)
     acwr_ratio = acwr_ratio_bounded(acute_load_7d, baseline)
 
-    sleep_debt_3d = float(max(0.0, (8.0 - sleep_hours) * 1.25))
+    sleep_target = float(settings.SLEEP_TARGET_HOURS)
+    sleep_debt_scale = float(settings.SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE)
+    sleep_debt_3d = float(max(0.0, (sleep_target - sleep_hours) * sleep_debt_scale))
 
     baseline_hrv = 62.0
-    hrv_drop = float(max(-15.0, min(15.0, baseline_hrv - hrv_score + (resting_hr - 54.0) * 0.15)))
+    hrv_drop = float(
+        max(-15.0, min(15.0, baseline_hrv - hrv_score + (resting_hr - 54.0) * 0.15))
+    )
 
     total_calories_burned = float(row.get("total_calories_burned") or 0.0)
-    if total_calories_burned <= 0 and (active_cal > 0 or bmr_cal > 0):
-        total_calories_burned = active_cal + bmr_cal
+    if total_calories_burned <= 0 and (active_calories > 0 or bmr_calories > 0):
+        total_calories_burned = active_calories + bmr_calories
 
     return {
         "acute_load_7d": acute_load_7d,

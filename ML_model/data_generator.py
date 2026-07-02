@@ -29,6 +29,8 @@ import os
 import numpy as np
 import pandas as pd
 
+from policy_config import DEFAULT_SLEEP_TARGET_HOURS
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -89,7 +91,9 @@ def compute_training_reference_features(
         0.35,
         2.8,
     )
-    sleep_debt_3d = float(sum(max(0.0, 8.0 - s) for s in sleep_history_hours[-3:]))
+    sleep_debt_3d = float(
+        sum(max(0.0, DEFAULT_SLEEP_TARGET_HOURS - s) for s in sleep_history_hours[-3:])
+    )
     hrv_drop = float(
         max(-15.0, min(15.0, hrv_history_scores[-1] - _rolling_mean(hrv_history_scores, 7)))
     )
@@ -469,7 +473,10 @@ def generate_synthetic_data(
                 3.0,
             )
             recovery_state = _bounded(
-                0.68 * recovery_state + 0.22 * (sleep_hours / 8.0) - 0.11 * (daily_distance / 10.0) + rng.normal(0, 0.17),
+                0.68 * recovery_state
+                + 0.22 * (sleep_hours / DEFAULT_SLEEP_TARGET_HOURS)
+                - 0.11 * (daily_distance / 10.0)
+                + rng.normal(0, 0.17),
                 -1.8,
                 2.6,
             )
@@ -506,9 +513,10 @@ def generate_synthetic_data(
     # Energy balance (calories in - calories out)
     df['calorie_balance'] = df['daily_calories'] - df['total_calories_burned']
     
-    # Sleep debt - cumulative sleep deficit over 3 days (assuming 8h ideal)
+    # Sleep debt - cumulative sleep deficit over 3 days (see policy_config.py)
+    sleep_target = DEFAULT_SLEEP_TARGET_HOURS
     df['sleep_debt_3d'] = df.groupby('athlete_id')['sleep_hours'].transform(
-        lambda x: (8 - x).clip(lower=0).rolling(3).sum()
+        lambda x: (sleep_target - x).clip(lower=0).rolling(3).sum()
     )
     
     # HRV rolling average (7-day baseline)

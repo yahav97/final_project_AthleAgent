@@ -1,7 +1,8 @@
-"""Single source of truth for ML model-selection policy gates.
+"""Single source of truth for ML policy gates and feature-engineering defaults.
 
-Used by training (`train_model.py`), validation (`validate_metrics.py`),
-the presentation notebook, and as defaults for backend serving gates.
+Used by training (`train_model.py`, `data_generator.py`), validation
+(`validate_metrics.py`), the presentation notebook, and as defaults for
+backend serving gates (`backend/config.py`).
 
 Runtime overrides (notebook demo): call ``apply_policy_overrides(...)`` then
 re-run training — a different candidate may win.
@@ -20,6 +21,10 @@ DEFAULT_TARGET_RECALL: float = 0.80
 DEFAULT_TARGET_PRECISION: float = 0.13
 DEFAULT_TARGET_F1: float = 0.22
 DEFAULT_THRESHOLD: float = 0.18
+
+# Feature-engineering defaults — backend/config.py imports these for serve-time settings.
+DEFAULT_SLEEP_TARGET_HOURS: float = 8.0
+DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = 1.25
 
 POLICY_FIELD_NAMES: tuple[str, ...] = (
     "THRESHOLD",

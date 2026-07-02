@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
+import pandas as pd
+
 from config import settings
 from schemas.enums import HistoryConfidence
 from schemas.inference import InjuryPredictionRequest
 from services.history.repository import get_history_window_context
 from services.model_features import DEFAULT_FEATURE_VALUES
 
-ROLLING_FEATURE_COLUMNS: tuple[str, ...] = (
+# Rolling features filled from Firestore history or population defaults when history is thin.
+HISTORY_ROLLING_FEATURES: tuple[str, ...] = (
     "acute_load_7d",
     "acwr_ratio",
     "acwr_ratio_ma7",
@@ -20,7 +23,8 @@ ROLLING_FEATURE_COLUMNS: tuple[str, ...] = (
 )
 
 
-def _coerce_history_confidence(confidence: HistoryConfidence | str) -> HistoryConfidence:
+def parse_history_confidence(confidence: HistoryConfidence | str) -> HistoryConfidence:
+    """Normalize API / Firestore confidence label to HistoryConfidence enum."""
     if isinstance(confidence, HistoryConfidence):
         return confidence
     try:
@@ -30,9 +34,9 @@ def _coerce_history_confidence(confidence: HistoryConfidence | str) -> HistoryCo
 
 
 def apply_history_confidence_fallback(
-    frame,
+    feature_frame: pd.DataFrame,
     payload: InjuryPredictionRequest,
-) -> tuple[Any, HistoryConfidence]:
+) -> tuple[pd.DataFrame, HistoryConfidence]:
     """
     Enrich row with historical rolling features and return confidence label.
 
@@ -42,7 +46,7 @@ def apply_history_confidence_fallback(
     """
     confidence = HistoryConfidence.LOW
     if not (payload.userId and payload.date):
-        return frame, confidence
+        return feature_frame, confidence
 
     context = get_history_window_context(
         payload.userId,
@@ -51,23 +55,23 @@ def apply_history_confidence_fallback(
         include_target_day=False,
     )
     confidence_raw = context.get("confidence") or HistoryConfidence.LOW.value
-    confidence = _coerce_history_confidence(confidence_raw)
+    confidence = parse_history_confidence(confidence_raw)
     features = context.get("features") or {}
 
     if confidence in (HistoryConfidence.HIGH, HistoryConfidence.MEDIUM) and features:
         for column, value in features.items():
-            if column in frame.columns:
-                frame.at[frame.index[0], column] = float(value)
-        return frame, confidence
+            if column in feature_frame.columns:
+                feature_frame.at[feature_frame.index[0], column] = float(value)
+        return feature_frame, confidence
 
-    for column in ROLLING_FEATURE_COLUMNS:
-        if column in frame.columns:
-            frame.at[frame.index[0], column] = float(DEFAULT_FEATURE_VALUES[column])
-    return frame, confidence
+    for column in HISTORY_ROLLING_FEATURES:
+        if column in feature_frame.columns:
+            feature_frame.at[feature_frame.index[0], column] = float(DEFAULT_FEATURE_VALUES[column])
+    return feature_frame, confidence
 
 
 def history_score_from_confidence(confidence: HistoryConfidence | str) -> float:
-    level = _coerce_history_confidence(confidence)
+    level = parse_history_confidence(confidence)
     if level == HistoryConfidence.HIGH:
         return settings.CONFIDENCE_SCORE_HIGH
     if level == HistoryConfidence.MEDIUM:
@@ -75,8 +79,11 @@ def history_score_from_confidence(confidence: HistoryConfidence | str) -> float:
     return settings.CONFIDENCE_SCORE_LOW
 
 
-def prediction_confidence_0_100(confidence: HistoryConfidence | str, quality_score: float) -> float:
-    """Blend history-window confidence with same-day input completeness (0–1) → 0–100."""
+def compute_prediction_confidence_percent(
+    confidence: HistoryConfidence | str,
+    quality_score: float,
+) -> float:
+    """Blend history-window confidence with same-day input completeness → 0–100."""
     history_score = history_score_from_confidence(confidence)
     combined = (
         settings.CONFIDENCE_HISTORY_WEIGHT * history_score
@@ -85,12 +92,17 @@ def prediction_confidence_0_100(confidence: HistoryConfidence | str, quality_sco
     return round(min(100.0, max(0.0, combined * 100.0)), 2)
 
 
-def count_defaulted_critical_features(frame) -> int:
+# Backward-compatible alias.
+prediction_confidence_0_100 = compute_prediction_confidence_percent
+
+
+def count_defaulted_critical_features(feature_frame: pd.DataFrame) -> int:
+    """How many rolling features still match population defaults (thin history signal)."""
     count = 0
-    for column in ROLLING_FEATURE_COLUMNS:
-        if column not in frame.columns:
+    for column in HISTORY_ROLLING_FEATURES:
+        if column not in feature_frame.columns:
             continue
-        observed = float(frame[column].iloc[0])
+        observed = float(feature_frame[column].iloc[0])
         default = float(DEFAULT_FEATURE_VALUES[column])
         if abs(observed - default) < 1e-9:
             count += 1

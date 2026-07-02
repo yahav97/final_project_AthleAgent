@@ -28,7 +28,7 @@ def test_training_and_serving_derived_features_parity_within_tolerance():
     serving_out = compute_derived_features(
         {
             "daily_distance_km": distance_history[-1],
-            "_active_calories": distance_history[-1] * 65.0,
+            "active_calories_burned": distance_history[-1] * 65.0,
             "sleep_hours": sleep_history[-1],
             "hrv_score": hrv_history[-1],
             "resting_hr": 55.0,
@@ -49,7 +49,7 @@ def test_serving_proxy_direction_matches_training_signal_trends():
     low_recovery_serving = compute_derived_features(
         {
             "daily_distance_km": 12.8,
-            "_active_calories": 820.0,
+            "active_calories_burned": 820.0,
             "sleep_hours": 5.9,
             "hrv_score": 51.0,
             "resting_hr": 60.0,
@@ -64,7 +64,7 @@ def test_serving_proxy_direction_matches_training_signal_trends():
     high_recovery_serving = compute_derived_features(
         {
             "daily_distance_km": 4.4,
-            "_active_calories": 280.0,
+            "active_calories_burned": 280.0,
             "sleep_hours": 8.2,
             "hrv_score": 73.0,
             "resting_hr": 49.0,

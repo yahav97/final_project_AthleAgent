@@ -32,20 +32,35 @@ def _project_root() -> Path:
     return _BACKEND_DIR.parent
 
 
-def _ml_policy_serving_defaults() -> tuple[float, float]:
-    """Load ML serving gate defaults from ML_model/policy_config.py."""
+def _ml_policy_config_defaults() -> tuple[float, float, float, float]:
+    """Load ML policy and feature-engineering defaults from ML_model/policy_config.py."""
     ml_root = str(_project_root() / "ML_model")
     if ml_root not in sys.path:
         sys.path.insert(0, ml_root)
     try:
-        from policy_config import DEFAULT_MIN_AUC_FOR_LIVE, DEFAULT_MIN_RECALL_HARD
+        from policy_config import (
+            DEFAULT_MIN_AUC_FOR_LIVE,
+            DEFAULT_MIN_RECALL_HARD,
+            DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
+            DEFAULT_SLEEP_TARGET_HOURS,
+        )
 
-        return DEFAULT_MIN_RECALL_HARD, DEFAULT_MIN_AUC_FOR_LIVE
+        return (
+            DEFAULT_MIN_RECALL_HARD,
+            DEFAULT_MIN_AUC_FOR_LIVE,
+            DEFAULT_SLEEP_TARGET_HOURS,
+            DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
+        )
     except ImportError:
-        return 0.80, 0.68
+        return 0.80, 0.68, 8.0, 1.25
 
 
-_ML_DEFAULT_RECALL_HARD, _ML_DEFAULT_AUC_FOR_LIVE = _ml_policy_serving_defaults()
+(
+    _ML_DEFAULT_RECALL_HARD,
+    _ML_DEFAULT_AUC_FOR_LIVE,
+    _ML_DEFAULT_SLEEP_TARGET_HOURS,
+    _ML_DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
+) = _ml_policy_config_defaults()
 
 
 def _default_log_dir() -> Path:
@@ -89,6 +104,13 @@ class Settings(BaseSettings):
     HISTORY_LOOKBACK_DAYS: int = 7
     HISTORY_CONFIDENCE_HIGH_MIN_DAYS: int = 7
     HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS: int = 4
+
+    # -------------------------------------------------------------------------
+    # Sleep / recovery feature engineering (see ML_model/policy_config.py)
+    # -------------------------------------------------------------------------
+    # Defaults synced with training; override via .env for staging experiments.
+    SLEEP_TARGET_HOURS: float = _ML_DEFAULT_SLEEP_TARGET_HOURS
+    SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = _ML_DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE
 
     # -------------------------------------------------------------------------
     # Prediction confidence scoring (history window × input completeness)

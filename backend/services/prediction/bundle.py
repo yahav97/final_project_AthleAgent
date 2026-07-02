@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from schemas.enums import BundleResolutionMode, ModelGateReason
 
 
-def resolve_model_bundle(
-    loaded_model: Any,
-) -> tuple[Any | None, list[str] | None, float | None, float | None, str, str]:
+class ResolvedModelBundle(NamedTuple):
+    """Result of parsing the joblib artifact for live inference."""
+
+    estimator: Any | None
+    feature_columns: list[str] | None
+    injury_threshold: float | None
+    medium_risk_threshold: float | None
+    model_name: str
+    gate_status: str
+
+
+def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
     """
     Enforce a single model contract for serving.
 
@@ -22,9 +31,16 @@ def resolve_model_bundle(
       }
     """
     if loaded_model is None:
-        return None, None, None, None, BundleResolutionMode.FALLBACK_DEMO.value, ModelGateReason.MODEL_NOT_LOADED.value
+        return ResolvedModelBundle(
+            None,
+            None,
+            None,
+            None,
+            BundleResolutionMode.FALLBACK_DEMO.value,
+            ModelGateReason.MODEL_NOT_LOADED.value,
+        )
     if not isinstance(loaded_model, dict):
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -37,10 +53,10 @@ def resolve_model_bundle(
     feature_columns = loaded_model.get("feature_columns")
     threshold_raw = loaded_model.get("threshold")
     medium_threshold_raw = loaded_model.get("medium_threshold")
-    winner = str(loaded_model.get("winner") or "live_model")
+    model_name = str(loaded_model.get("winner") or "live_model")
 
     if estimator is None:
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -49,7 +65,7 @@ def resolve_model_bundle(
             ModelGateReason.MISSING_ESTIMATOR.value,
         )
     if not isinstance(feature_columns, list) or not feature_columns:
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -58,7 +74,7 @@ def resolve_model_bundle(
             ModelGateReason.MISSING_FEATURE_COLUMNS.value,
         )
     if threshold_raw is None:
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -67,9 +83,9 @@ def resolve_model_bundle(
             ModelGateReason.INVALID_THRESHOLD.value,
         )
     try:
-        threshold = float(threshold_raw)
+        injury_threshold = float(threshold_raw)
     except (TypeError, ValueError):
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -78,13 +94,13 @@ def resolve_model_bundle(
             ModelGateReason.INVALID_THRESHOLD.value,
         )
     try:
-        medium_threshold = (
+        medium_risk_threshold = (
             float(medium_threshold_raw)
             if medium_threshold_raw is not None
-            else max(0.15, threshold * 0.6)
+            else max(0.15, injury_threshold * 0.6)
         )
     except (TypeError, ValueError):
-        return (
+        return ResolvedModelBundle(
             None,
             None,
             None,
@@ -93,11 +109,11 @@ def resolve_model_bundle(
             ModelGateReason.INVALID_MEDIUM_THRESHOLD.value,
         )
 
-    return (
+    return ResolvedModelBundle(
         estimator,
         [str(column) for column in feature_columns],
-        threshold,
-        medium_threshold,
-        winner,
+        injury_threshold,
+        medium_risk_threshold,
+        model_name,
         ModelGateReason.NONE.value,
     )

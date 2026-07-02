@@ -13,14 +13,14 @@ DAYS_PER_YEAR = 365.0
 DEFAULT_RESTING_HR = 0.0
 
 
-def _parse_date_key(value: str) -> date | None:
+def parse_date_key(value: str) -> date | None:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
 
 
-def _doc_float(doc: Mapping[str, Any], key: str, default: float = 0.0) -> float:
+def float_from_doc(doc: Mapping[str, Any], key: str, default: float = 0.0) -> float:
     return float(doc.get(key) or default)
 
 
@@ -40,11 +40,11 @@ def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) ->
     birth_str = str(birth_date).strip()
     if not birth_str:
         return None
-    birth = _parse_date_key(birth_str[:10])
+    birth = parse_date_key(birth_str[:10])
     if birth is None:
         return None
 
-    ref = _parse_date_key(as_of_date) if as_of_date else date.today()
+    ref = parse_date_key(as_of_date) if as_of_date else date.today()
     if ref is None:
         ref = date.today()
 
@@ -122,8 +122,8 @@ def daily_distance_km(distance_meters: float, steps: float) -> float:
 
 def daily_distance_km_from_doc(doc: Mapping[str, Any]) -> float:
     return daily_distance_km(
-        _doc_float(doc, "distanceMeters"),
-        _doc_float(doc, "steps"),
+        float_from_doc(doc, "distanceMeters"),
+        float_from_doc(doc, "steps"),
     )
 
 
@@ -146,9 +146,9 @@ def resting_hr(
 
 def resting_hr_from_doc(doc: Mapping[str, Any]) -> float:
     return resting_hr(
-        _doc_float(doc, "restingHeartRate"),
-        _doc_float(doc, "heartRateMin"),
-        _doc_float(doc, "heartRateAvg"),
+        float_from_doc(doc, "restingHeartRate"),
+        float_from_doc(doc, "heartRateMin"),
+        float_from_doc(doc, "heartRateAvg"),
     )
 
 

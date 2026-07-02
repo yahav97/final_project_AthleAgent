@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config import settings
 from services.feature_engineering import (
     acwr_baseline_from_weekly_stats,
     acwr_ratio_bounded,
@@ -17,22 +18,36 @@ from services.field_transforms import (
     resting_hr_from_doc,
 )
 
+HistoricalRollingFeatures = dict[str, float]
 
-def sleep_hours(doc: dict[str, Any]) -> float:
+
+def sleep_hours_from_doc(doc: dict[str, Any]) -> float:
+    """Sleep duration in hours from a merged history row (defaults to 7h when missing)."""
     sleep_minutes = float(doc.get("sleepMinutes") or 0.0)
     if sleep_minutes <= 0:
         return 7.0
     return max(3.0, min(12.0, sleep_minutes / 60.0))
 
 
-def hrv_score(doc: dict[str, Any], resting_hr: float) -> float:
+# Backward-compatible alias.
+sleep_hours = sleep_hours_from_doc
+
+
+def hrv_score_from_doc(doc: dict[str, Any], resting_hr: float) -> float:
+    """Model HRV score from RMSSD on the doc, or a resting-HR proxy when missing."""
     hrv_rmssd = float(doc.get("hrvRmssd") or 0.0)
     if hrv_rmssd > 0:
         return float(max(30.0, min(105.0, hrv_rmssd)))
     return hrv_proxy_from_resting_hr(resting_hr)
 
 
-def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> dict[str, float] | None:
+# Backward-compatible alias.
+hrv_score = hrv_score_from_doc
+
+
+def compute_historical_derived_features(
+    history_rows: list[dict[str, Any]],
+) -> HistoricalRollingFeatures | None:
     """Compute weekly-history rolling features from merged historical daily rows."""
     if not history_rows:
         return None
@@ -71,7 +86,8 @@ def compute_historical_derived_features(history_rows: list[dict[str, Any]]) -> d
         for acute, base in zip(frame["acute_load_7d"], baseline, strict=True)
     ]
 
-    frame["sleep_debt_3d"] = (8.0 - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
+    sleep_target = float(settings.SLEEP_TARGET_HOURS)
+    frame["sleep_debt_3d"] = (sleep_target - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
     frame["hrv_rolling_7d"] = frame["hrv_score"].rolling(7, min_periods=1).mean()
     frame["hrv_drop"] = (frame["hrv_score"] - frame["hrv_rolling_7d"]).clip(lower=-15.0, upper=15.0)
 

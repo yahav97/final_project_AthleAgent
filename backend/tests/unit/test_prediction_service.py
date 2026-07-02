@@ -9,15 +9,16 @@ from schemas.inference import InjuryPredictionRequest
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
+    compute_prediction_confidence_percent,
     count_defaulted_critical_features,
     history_score_from_confidence,
-    prediction_confidence_0_100,
 )
 from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import (
     field_from_docs,
     heart_rate_avg_from_doc,
     injury_prediction_request_from_firestore_snapshot,
+    read_first_matching_field,
 )
 from services.prediction.service import (
     persist_prediction_result_or_raise,
@@ -33,50 +34,50 @@ pytestmark = pytest.mark.unit
 
 class TestResolveModelBundle:
     def test_returns_none_when_model_not_loaded(self):
-        est, cols, thr, med, winner, status = resolve_model_bundle(None)
-        assert est is None
-        assert status == "model_not_loaded"
-        assert winner == "fallback_demo"
+        bundle = resolve_model_bundle(None)
+        assert bundle.estimator is None
+        assert bundle.gate_status == "model_not_loaded"
+        assert bundle.model_name == "fallback_demo"
 
     def test_rejects_non_dict_bundle(self):
-        est, *_rest, status = resolve_model_bundle("not-a-dict")
-        assert est is None
-        assert status == "unsupported_model_format"
+        bundle = resolve_model_bundle("not-a-dict")
+        assert bundle.estimator is None
+        assert bundle.gate_status == "unsupported_model_format"
 
     def test_rejects_missing_estimator(self):
-        bundle = {"feature_columns": ["age"], "threshold": 0.35}
-        est, *_rest, status = resolve_model_bundle(bundle)
-        assert est is None
-        assert status == "missing_estimator"
+        payload = {"feature_columns": ["age"], "threshold": 0.35}
+        bundle = resolve_model_bundle(payload)
+        assert bundle.estimator is None
+        assert bundle.gate_status == "missing_estimator"
 
     def test_rejects_empty_feature_columns(self):
-        bundle = {"estimator": object(), "feature_columns": [], "threshold": 0.35}
-        est, *_rest, status = resolve_model_bundle(bundle)
-        assert est is None
-        assert status == "missing_feature_columns"
+        payload = {"estimator": object(), "feature_columns": [], "threshold": 0.35}
+        bundle = resolve_model_bundle(payload)
+        assert bundle.estimator is None
+        assert bundle.gate_status == "missing_feature_columns"
 
     def test_rejects_invalid_threshold(self):
-        bundle = {"estimator": object(), "feature_columns": ["age"], "threshold": "bad"}
-        est, *_rest, status = resolve_model_bundle(bundle)
-        assert est is None
-        assert status == "invalid_threshold"
+        payload = {"estimator": object(), "feature_columns": ["age"], "threshold": "bad"}
+        bundle = resolve_model_bundle(payload)
+        assert bundle.estimator is None
+        assert bundle.gate_status == "invalid_threshold"
 
     def test_derives_medium_threshold_when_absent(self, mock_model_bundle):
         del mock_model_bundle["medium_threshold"]
         mock_model_bundle["threshold"] = 0.40
-        _est, _cols, thr, med, winner, status = resolve_model_bundle(mock_model_bundle)
-        assert status == "none"
-        assert thr == pytest.approx(0.40)
-        assert med == pytest.approx(max(0.15, 0.40 * 0.6))
+        bundle = resolve_model_bundle(mock_model_bundle)
+        assert bundle.gate_status == "none"
+        assert bundle.injury_threshold == pytest.approx(0.40)
+        assert bundle.medium_risk_threshold == pytest.approx(max(0.15, 0.40 * 0.6))
 
     def test_valid_bundle_returns_all_fields(self, mock_model_bundle):
-        est, cols, thr, med, winner, status = resolve_model_bundle(mock_model_bundle)
-        assert est is mock_model_bundle["estimator"]
-        assert cols == MODEL_FEATURE_COLUMNS
-        assert thr == pytest.approx(0.35)
-        assert med == pytest.approx(0.20)
-        assert winner == "ExtraTrees"
-        assert status == "none"
+        bundle = resolve_model_bundle(mock_model_bundle)
+        assert bundle.estimator is mock_model_bundle["estimator"]
+        assert bundle.feature_columns == MODEL_FEATURE_COLUMNS
+        assert bundle.injury_threshold == pytest.approx(0.35)
+        assert bundle.medium_risk_threshold == pytest.approx(0.20)
+        assert bundle.model_name == "ExtraTrees"
+        assert bundle.gate_status == "none"
 
 
 class TestConfidenceScoring:
@@ -89,12 +90,12 @@ class TestConfidenceScoring:
 
     def test_prediction_confidence_blends_history_and_quality(self):
         # 0.6 * 0.95 + 0.4 * 0.8 = 0.89 → 89.0
-        score = prediction_confidence_0_100("high", 0.8)
+        score = compute_prediction_confidence_percent("high", 0.8)
         assert score == pytest.approx(89.0)
 
     def test_prediction_confidence_clamped_to_0_100(self):
-        assert prediction_confidence_0_100("low", 0.0) == pytest.approx(27.0)
-        assert prediction_confidence_0_100("high", 1.0) == pytest.approx(97.0)
+        assert compute_prediction_confidence_percent("low", 0.0) == pytest.approx(27.0)
+        assert compute_prediction_confidence_percent("high", 1.0) == pytest.approx(97.0)
 
 
 class TestDefaultedCriticalFeatures:
@@ -130,19 +131,26 @@ class TestFirestoreFieldHelpers:
     def test_heart_rate_avg_falls_back_to_avg_heart_rate(self):
         assert heart_rate_avg_from_doc({"avgHeartRate": 62}) == 62
 
-    def test_field_from_docs_prefers_primary_non_zero(self):
+    def test_read_first_matching_field_prefers_primary_non_zero(self):
         primary = {"steps": 0, "distanceMeters": 5000}
         fallback = {"steps": 9000}
-        val = field_from_docs(
-            primary, fallback, ["steps", "distanceMeters"], prefer_primary=True
+        value = read_first_matching_field(
+            primary, fallback, ("steps", "distanceMeters"), prefer_primary=True
         )
-        assert val == 5000
+        assert value == 5000
 
-    def test_field_from_docs_falls_back_when_primary_missing(self):
+    def test_read_first_matching_field_falls_back_when_primary_missing(self):
         primary = {}
         fallback = {"steps": 7400}
-        val = field_from_docs(primary, fallback, ["steps"], prefer_primary=True)
-        assert val == 7400
+        value = read_first_matching_field(primary, fallback, ("steps",), prefer_primary=True)
+        assert value == 7400
+
+    def test_field_from_docs_alias_matches_read_first_matching_field(self):
+        primary = {"steps": 7400}
+        fallback = {}
+        assert field_from_docs(primary, fallback, ["steps"], prefer_primary=True) == read_first_matching_field(
+            primary, fallback, ("steps",), prefer_primary=True
+        )
 
 
 class TestFirestoreSnapshotMapping:

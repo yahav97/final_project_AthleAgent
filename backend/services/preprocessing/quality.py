@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from schemas.inference import InjuryPredictionRequest
 from services.preprocessing.constants import (
-    MEASUREMENT_FIELDS,
+    NUTRITION_IMPUTED_FLAG,
     NUTRITION_IMPUTED_PENALTY,
-    PROFILE_FIELDS,
+    OPTIONAL_PROFILE_FIELDS,
+    SAME_DAY_MEASUREMENT_FIELDS,
     ZERO_OR_MISSING_PENALTY,
 )
 from services.preprocessing.helpers import is_absent_or_weak, is_explicit_zero_or_nan
@@ -27,22 +28,22 @@ def calculate_data_quality_score(
     payload_dict = payload.model_dump()
     weak_fields: list[str] = []
 
-    for field in MEASUREMENT_FIELDS:
+    for field in SAME_DAY_MEASUREMENT_FIELDS:
         if is_absent_or_weak(payload_dict.get(field)):
             weak_fields.append(field)
 
-    for field in PROFILE_FIELDS:
+    for field in OPTIONAL_PROFILE_FIELDS:
         raw = payload_dict.get(field)
         if raw is not None and is_explicit_zero_or_nan(raw):
             weak_fields.append(field)
 
     if payload_dict.get("nutritionImputed"):
-        weak_fields.append("nutrition_imputed")
+        weak_fields.append(NUTRITION_IMPUTED_FLAG)
 
     penalty = ZERO_OR_MISSING_PENALTY * sum(
-        1 for field in weak_fields if field != "nutrition_imputed"
+        1 for field in weak_fields if field != NUTRITION_IMPUTED_FLAG
     )
-    if "nutrition_imputed" in weak_fields:
+    if NUTRITION_IMPUTED_FLAG in weak_fields:
         penalty += NUTRITION_IMPUTED_PENALTY
 
     score = max(0.0, min(1.0, 1.0 - penalty))

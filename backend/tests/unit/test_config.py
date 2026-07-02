@@ -56,6 +56,27 @@ class TestDomainDefaults:
         assert s.HISTORY_CONFIDENCE_HIGH_MIN_DAYS == 7
         assert s.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS == 4
 
+    def test_sleep_feature_defaults_match_training_constants(self):
+        import sys
+        from pathlib import Path
+
+        ml_root = str(Path(__file__).resolve().parents[2] / "ML_model")
+        if ml_root not in sys.path:
+            sys.path.insert(0, ml_root)
+        from policy_config import (
+            DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
+            DEFAULT_SLEEP_TARGET_HOURS,
+        )
+
+        s = Settings()
+        assert s.SLEEP_TARGET_HOURS == DEFAULT_SLEEP_TARGET_HOURS
+        assert s.SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE == DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE
+
+    def test_sleep_target_hours_env_override(self, monkeypatch):
+        monkeypatch.setenv("SLEEP_TARGET_HOURS", "7.5")
+        s = Settings()
+        assert s.SLEEP_TARGET_HOURS == pytest.approx(7.5)
+
     def test_feature_flags_default_off(self):
         s = Settings()
         assert s.ENABLE_TEST_PREDICT_ENDPOINT is False

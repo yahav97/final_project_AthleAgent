@@ -16,7 +16,7 @@ from services.history.rolling_features import compute_historical_derived_feature
 from utils.logging import logger
 
 
-def _sync_document_get(doc_ref: Any) -> Any:
+def read_firestore_document(doc_ref: Any) -> Any:
     """Sync Firestore document read (firebase_admin client, not async client)."""
     return doc_ref.get()
 
@@ -55,11 +55,11 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
             checkin_ref.path,
             nutrition_yesterday_ref.path,
         )
-        user_doc = _sync_document_get(user_ref)
-        health_doc = _sync_document_get(health_ref)
-        health_yesterday_doc = _sync_document_get(health_yesterday_ref)
-        checkin_doc = _sync_document_get(checkin_ref)
-        nutrition_yesterday_doc = _sync_document_get(nutrition_yesterday_ref)
+        user_doc = read_firestore_document(user_ref)
+        health_doc = read_firestore_document(health_ref)
+        health_yesterday_doc = read_firestore_document(health_yesterday_ref)
+        checkin_doc = read_firestore_document(checkin_ref)
+        nutrition_yesterday_doc = read_firestore_document(nutrition_yesterday_ref)
     except Exception:
         return {}
 
@@ -142,9 +142,9 @@ def fetch_user_history(
     merged_rows: list[dict[str, Any]] = []
     for wake_up_key in date_keys_in_range(start_day, end_inclusive):
         physical_key = (to_date_key(wake_up_key) - timedelta(days=1)).strftime("%Y-%m-%d")
-        physical_doc = _sync_document_get(health_ref.document(physical_key))
-        wake_doc = _sync_document_get(health_ref.document(wake_up_key))
-        checkin_doc = _sync_document_get(checkin_ref.document(wake_up_key))
+        physical_doc = read_firestore_document(health_ref.document(physical_key))
+        wake_doc = read_firestore_document(health_ref.document(wake_up_key))
+        checkin_doc = read_firestore_document(checkin_ref.document(wake_up_key))
         row = merge_wake_up_day_row(
             wake_up_key,
             physical_doc.to_dict() if physical_doc.exists else None,
@@ -156,10 +156,10 @@ def fetch_user_history(
     return merged_rows
 
 
-def _history_confidence_from_usable_days(usable_days: int) -> HistoryConfidence:
-    if usable_days >= settings.HISTORY_CONFIDENCE_HIGH_MIN_DAYS:
+def history_confidence_from_quality_days(quality_days: int) -> HistoryConfidence:
+    if quality_days >= settings.HISTORY_CONFIDENCE_HIGH_MIN_DAYS:
         return HistoryConfidence.HIGH
-    if usable_days >= settings.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS:
+    if quality_days >= settings.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS:
         return HistoryConfidence.MEDIUM
     return HistoryConfidence.LOW
 
@@ -194,7 +194,7 @@ def get_history_window_context(
     days_count = len(rows)
     quality_days_count = count_quality_history_days(rows)
     features = compute_historical_derived_features(rows)
-    confidence = _history_confidence_from_usable_days(quality_days_count)
+    confidence = history_confidence_from_quality_days(quality_days_count)
     return {
         "days_count": days_count,
         "quality_days_count": quality_days_count,

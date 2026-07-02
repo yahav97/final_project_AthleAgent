@@ -12,8 +12,8 @@ from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
     apply_history_confidence_fallback,
+    compute_prediction_confidence_percent,
     count_defaulted_critical_features,
-    prediction_confidence_0_100,
 )
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
 from services.preprocessing import (
@@ -46,7 +46,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         quality.get("weak_fields", []),
         extra={"event": "predict_data_quality"},
     )
-    prediction_confidence = prediction_confidence_0_100(history_confidence, quality_score)
+    prediction_confidence = compute_prediction_confidence_percent(history_confidence, quality_score)
     defaulted_critical_count = count_defaulted_critical_features(frame)
     logger.info(
         "predict_confidence_summary userId=%s prediction_confidence=%.2f defaulted_critical=%d",
@@ -57,19 +57,12 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     )
 
     loaded_model = get_model()
-    (
-        model,
-        bundle_feature_columns,
-        _model_threshold,
-        _medium_threshold,
-        _model_version,
-        model_status,
-    ) = resolve_model_bundle(loaded_model)
-    if model is None:
+    bundle = resolve_model_bundle(loaded_model)
+    if bundle.estimator is None:
         gate_reason = get_model_gate_reason()
         blocked_reason = (
-            model_status
-            if model_status != ModelGateReason.MODEL_NOT_LOADED.value
+            bundle.gate_status
+            if bundle.gate_status != ModelGateReason.MODEL_NOT_LOADED.value
             else gate_reason
         )
         logger.warning(
@@ -84,10 +77,10 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
             code=f"model_not_live:{blocked_reason}",
         )
 
-    model_contract = {"estimator": model, "feature_columns": bundle_feature_columns}
+    model_contract = {"estimator": bundle.estimator, "feature_columns": bundle.feature_columns}
     features = validate_feature_vector_for_model(frame, model_contract)
 
-    probability = float(model.predict_proba(features)[0, 1])
+    probability = float(bundle.estimator.predict_proba(features)[0, 1])
     return {
         "risk_level": classify_risk_level(probability),
         "risk_score": round(probability, 4),

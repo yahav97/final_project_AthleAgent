@@ -12,7 +12,7 @@ pytestmark = pytest.mark.unit
 def test_acwr_ratio_bounded():
     row = {
         "daily_distance_km": 12.0,
-        "_active_calories": 800.0,
+        "active_calories_burned": 800.0,
         "sleep_hours": 6.0,
         "hrv_score": 55.0,
         "resting_hr": 58.0,
@@ -28,7 +28,7 @@ def test_acwr_ratio_bounded():
 def test_rest_day_low_acute():
     row = {
         "daily_distance_km": 0.0,
-        "_active_calories": 0.0,
+        "active_calories_burned": 0.0,
         "sleep_hours": 8.5,
         "hrv_score": 65.0,
         "resting_hr": 52.0,
