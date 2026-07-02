@@ -22,7 +22,6 @@ from services.prediction.service import (
     persist_prediction_result_or_raise,
     predict_injury_risk,
     predict_injury_risk_from_firestore,
-    training_base_feature_dict_from_request,
 )
 
 __all__ = [
@@ -42,5 +41,4 @@ __all__ = [
     "predict_injury_risk_from_firestore",
     "resolve_model_bundle",
     "save_daily_prediction_result",
-    "training_base_feature_dict_from_request",
 ]

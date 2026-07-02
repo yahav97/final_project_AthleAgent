@@ -28,7 +28,7 @@
 | זיהוי מוקדם של סיכון פציעה | ציון יומי 0–100 + רמת Low/Medium/High |
 | הפחתת עומס ידני | סנכרון אוטומטי משעון + ניתוח ארוחות ב-AI |
 | שקיפות למאמן | דשבורד קבוצתי בזמן אמת |
-| שיפור מתמשך | pipeline אימון מחדש + Firestore export |
+| שיפור מתמשך | `run_pipeline.py` — אימון מחדש על דאטה סינתטי + promote |
 
 ### 2.2 דרישות לא-פונקציונליות
 
@@ -294,7 +294,6 @@ erDiagram
 | Quality gates | `validate_metrics.py`, `model_loader.py` | Recall ≥ 0.80, AUC ≥ 0.68 |
 | Promotion | `run_pipeline.py` | `artifacts/promoted.json` |
 | Serving | `POST /predict/daily` | probability → risk bands |
-| Retraining | `build_training_dataset_from_firestore.py` | CSV from real Firestore |
 
 > פירוט ML: [backend/docs/MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)
 

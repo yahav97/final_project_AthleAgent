@@ -28,6 +28,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -48,6 +49,10 @@ from policy_config import (
 # Model-selection gates: ML_model/policy_config.py (notebook can override live).
 # Backend serving gate defaults: backend/config.py → ML_MIN_RECALL_HARD, ML_MIN_AUC_FOR_LIVE.
 RANDOM_STATE = 42
+DATASET_FILENAME = "athlete_injury_data.csv"
+BENCHMARK_FILENAME = "benchmark_holdout.csv"
+# Repeated athlete holdouts for stability (same value in notebook + run_pipeline).
+ATHLETE_CV_SPLITS = 2
 THRESHOLDS_TO_EVAL = sorted(
     {
         round(x, 2)
@@ -471,6 +476,12 @@ class TrainSplit:
 
 
 @dataclass
+class AthleteCvResult:
+    fold_details: pd.DataFrame
+    summary: pd.DataFrame
+
+
+@dataclass
 class TrainResult:
     results_df: pd.DataFrame
     threshold_rows: list[dict[str, float | str]]
@@ -556,6 +567,102 @@ def make_train_split(
         feature_columns=feature_columns,
         holdout_athlete_ids=holdout_ids,
     )
+
+
+def cross_validate_by_athlete(
+    df: pd.DataFrame,
+    *,
+    n_splits: int = ATHLETE_CV_SPLITS,
+    holdout_ratio: float = 0.2,
+    base_seed: int = RANDOM_STATE,
+    model_names: list[str] | None = None,
+    verbose: bool = True,
+) -> AthleteCvResult:
+    """Repeated random athlete holdouts — stability check before the fixed final split."""
+    if n_splits < 1:
+        raise ValueError("n_splits must be >= 1")
+    catalog = model_catalog()
+    if model_names is not None:
+        missing = [name for name in model_names if name not in catalog]
+        if missing:
+            raise ValueError(f"Unknown model names: {missing}")
+        catalog = {name: catalog[name] for name in model_names}
+
+    policy = get_policy()
+    fold_rows: list[dict[str, float | int | str]] = []
+    for fold in range(n_splits):
+        seed = base_seed + fold
+        split = make_train_split(df, holdout_ratio=holdout_ratio, seed=seed)
+        if verbose:
+            print(
+                f"\nAthlete CV fold {fold + 1}/{n_splits} "
+                f"(seed={seed}, holdout_athletes={len(split.holdout_athlete_ids)})"
+            )
+        for model_name, model in catalog.items():
+            if verbose:
+                print(f"  Training {model_name}...")
+            fitted = clone(model)
+            fitted.fit(split.X_train, split.y_train)
+            y_proba = fitted.predict_proba(split.X_test)[:, 1]
+            metrics = evaluate_with_threshold(split.y_test, y_proba, policy.THRESHOLD)
+            pr_precision, pr_recall, _ = precision_recall_curve(split.y_test, y_proba)
+            fold_rows.append(
+                {
+                    "fold": fold + 1,
+                    "seed": seed,
+                    "Model": model_name,
+                    "holdout_athletes": len(split.holdout_athlete_ids),
+                    "ROC-AUC": float(roc_auc_score(split.y_test, y_proba)),
+                    "PR-AUC": float(auc(pr_recall, pr_precision)),
+                    "Recall@Threshold": float(metrics["Recall@Threshold"]),
+                    "Precision@Threshold": float(metrics["Precision@Threshold"]),
+                    "F1@Threshold": float(metrics["F1@Threshold"]),
+                    "FPR@Threshold": float(metrics["FPR@Threshold"]),
+                }
+            )
+
+    fold_details = pd.DataFrame(fold_rows)
+    summary = (
+        fold_details.groupby("Model", as_index=False)
+        .agg(
+            folds=("fold", "count"),
+            ROC_AUC_mean=("ROC-AUC", "mean"),
+            ROC_AUC_std=("ROC-AUC", "std"),
+            Recall_mean=("Recall@Threshold", "mean"),
+            Recall_std=("Recall@Threshold", "std"),
+            F1_mean=("F1@Threshold", "mean"),
+            F1_std=("F1@Threshold", "std"),
+            FPR_mean=("FPR@Threshold", "mean"),
+            FPR_std=("FPR@Threshold", "std"),
+        )
+        .sort_values(by=["F1_mean", "Recall_mean", "ROC_AUC_mean"], ascending=[False, False, False])
+        .reset_index(drop=True)
+    )
+    return AthleteCvResult(fold_details=fold_details, summary=summary)
+
+
+def assess_cv_holdout_agreement(cv_result: AthleteCvResult, holdout_winner: str) -> dict[str, str | bool]:
+    """Compare CV stability leader with the fixed-holdout policy winner."""
+    cv_top = str(cv_result.summary.iloc[0]["Model"])
+    return {
+        "cv_top_model": cv_top,
+        "holdout_winner": holdout_winner,
+        "agreement": cv_top == holdout_winner,
+    }
+
+
+def refit_winner_for_serving(df: pd.DataFrame, model_name: str) -> tuple[object, pd.DataFrame | None]:
+    """Refit the policy winner on the full dataset for production serving.
+
+    Holdout metrics in the manifest stay from the evaluation split; only the
+    serialized estimator uses all rows.
+    """
+    if model_name not in model_catalog():
+        raise ValueError(f"Unknown model: {model_name}")
+    _, y, model_df, feature_columns = prepare_model_frames(df)
+    model = clone(model_catalog()[model_name])
+    model.fit(model_df, y)
+    return model, extract_feature_importance(model, feature_columns)
 
 
 def train_and_compare(
@@ -650,13 +757,18 @@ def save_training_artifacts(
     project_root: str | Path,
     benchmark_path: str | Path | None = None,
     dataset_rows: int | None = None,
+    cv_result: AthleteCvResult | None = None,
+    serving_estimator: object | None = None,
+    serving_importance_df: pd.DataFrame | None = None,
+    cv_agreement: dict[str, str | bool] | None = None,
 ) -> Path:
     artifacts_dir = Path(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     run_id = artifacts_dir.name
     output_model_path = artifacts_dir / "injury_model.pkl"
+    estimator_for_serving = serving_estimator if serving_estimator is not None else result.best_model
     model_bundle = {
-        "estimator": result.best_model,
+        "estimator": estimator_for_serving,
         "feature_columns": split.feature_columns,
         "threshold": result.best_operating_threshold,
         "medium_threshold": max(0.15, result.best_operating_threshold * 0.6),
@@ -688,6 +800,13 @@ def save_training_artifacts(
         "threshold": result.best_operating_threshold,
         "policy": model_bundle["policy"],
         "winner": result.best_model_name,
+        "athlete_cv_splits": ATHLETE_CV_SPLITS if cv_result is not None else None,
+        "selection_protocol": {
+            "athlete_cv_splits": ATHLETE_CV_SPLITS if cv_result is not None else None,
+            "metrics_source": "fixed_holdout_evaluation",
+            "serving_model_fit": "full_dataset_refit" if serving_estimator is not None else "holdout_train_only",
+            "cv_holdout_agreement": cv_agreement,
+        },
         "winner_metrics": {
             "Recall@Threshold": float(result.winner_operating_metrics["Recall@Threshold"]),
             "Precision@Threshold": float(result.winner_operating_metrics["Precision@Threshold"]),
@@ -712,59 +831,103 @@ def save_training_artifacts(
 
     if result.importance_df is not None:
         result.importance_df.to_csv(artifacts_dir / "feature_importance.csv", index=False)
+    if serving_importance_df is not None:
+        serving_importance_df.to_csv(artifacts_dir / "feature_importance_serving.csv", index=False)
+    if cv_result is not None:
+        cv_result.fold_details.to_csv(artifacts_dir / "athlete_cv_folds.csv", index=False)
+        cv_result.summary.to_csv(artifacts_dir / "athlete_cv_summary.csv", index=False)
 
     return artifacts_dir
 
 
-def main() -> None:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    dataset_path = os.path.join(script_dir, "athlete_injury_data.csv")
-    benchmark_path = os.path.join(script_dir, "benchmark_holdout.csv")
-    if not os.path.exists(dataset_path):
+def run_training_pipeline(
+    *,
+    ml_dir: str | Path | None = None,
+    verbose: bool = True,
+) -> Path:
+    """Full training flow: athlete CV → holdout selection → refit → artifacts."""
+    ml_dir = Path(ml_dir or Path(__file__).resolve().parent)
+    project_root = ml_dir.parent
+    dataset_path = ml_dir / DATASET_FILENAME
+    benchmark_path = ml_dir / BENCHMARK_FILENAME
+    if not dataset_path.is_file():
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
+    benchmark_file = benchmark_path if benchmark_path.is_file() else None
 
     df = load_dataset(dataset_path)
-    split = make_train_split(
-        df,
-        benchmark_path=benchmark_path if os.path.exists(benchmark_path) else None,
-    )
-    result = train_and_compare(split, verbose=True)
+    if verbose:
+        print(f"Training dataset: {dataset_path} ({len(df):,} rows)")
+        print(f"Athlete CV stability check ({ATHLETE_CV_SPLITS} random holdouts)...")
+    cv_result = cross_validate_by_athlete(df, base_seed=RANDOM_STATE, verbose=verbose)
+    if verbose:
+        print("\nAthlete CV summary (mean ± std @ policy threshold):")
+        print(cv_result.summary.to_string(index=False))
 
-    print("\nModel comparison:")
-    print(result.results_df.to_string(index=False))
-    print("\nThreshold sweep summary:")
-    print(pd.DataFrame(result.threshold_rows).sort_values(by=["Model", "Threshold"]).to_string(index=False))
-    print("\nBest operating points per model:")
-    print(result.best_points.to_string(index=False))
-    print(f"\nSelected winner: {result.best_model_name}")
-    print(
-        f"  @ threshold {result.best_operating_threshold:.2f}: "
-        f"Recall={result.winner_operating_metrics['Recall@Threshold']:.3f}, "
-        f"Precision={result.winner_operating_metrics['Precision@Threshold']:.3f}, "
-        f"F1={result.winner_operating_metrics['F1@Threshold']:.3f}, "
-        f"FPR={result.winner_operating_metrics['FPR@Threshold']:.3f}"
-    )
+    split = make_train_split(df, benchmark_path=benchmark_file, seed=RANDOM_STATE)
+    if verbose:
+        print("\nFinal model selection on fixed benchmark holdout...")
+    result = train_and_compare(split, verbose=verbose)
 
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    artifacts_dir = os.path.join(script_dir, "artifacts", run_id)
+    cv_agreement = assess_cv_holdout_agreement(cv_result, result.best_model_name)
+    if verbose:
+        if cv_agreement["agreement"]:
+            print(
+                f"\nCV stability: top CV model ({cv_agreement['cv_top_model']}) "
+                f"matches holdout winner."
+            )
+        else:
+            print(
+                f"\nCV stability WARNING: top CV model ({cv_agreement['cv_top_model']}) "
+                f"≠ holdout winner ({cv_agreement['holdout_winner']}). "
+                "Holdout policy selection stands; review athlete_cv_summary.csv."
+            )
+        print(f"\nRefitting {result.best_model_name} on full dataset for serving...")
+    serving_model, serving_importance = refit_winner_for_serving(df, result.best_model_name)
+
+    if verbose:
+        print("\nModel comparison:")
+        print(result.results_df.to_string(index=False))
+        print("\nThreshold sweep summary:")
+        print(pd.DataFrame(result.threshold_rows).sort_values(by=["Model", "Threshold"]).to_string(index=False))
+        print("\nBest operating points per model:")
+        print(result.best_points.to_string(index=False))
+        print(f"\nSelected winner: {result.best_model_name}")
+        print(
+            f"  @ threshold {result.best_operating_threshold:.2f}: "
+            f"Recall={result.winner_operating_metrics['Recall@Threshold']:.3f}, "
+            f"Precision={result.winner_operating_metrics['Precision@Threshold']:.3f}, "
+            f"F1={result.winner_operating_metrics['F1@Threshold']:.3f}, "
+            f"FPR={result.winner_operating_metrics['FPR@Threshold']:.3f}"
+        )
+
+    out_dir = ml_dir / "artifacts" / datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     save_training_artifacts(
         result,
         split,
-        artifacts_dir=artifacts_dir,
+        artifacts_dir=out_dir,
         dataset_path=dataset_path,
         project_root=project_root,
-        benchmark_path=benchmark_path if os.path.exists(benchmark_path) else None,
+        benchmark_path=benchmark_file,
         dataset_rows=len(df),
+        cv_result=cv_result,
+        serving_estimator=serving_model,
+        serving_importance_df=serving_importance,
+        cv_agreement=cv_agreement,
     )
 
-    print(f"\nSaved model bundle: {os.path.join(artifacts_dir, 'injury_model.pkl')}")
-    print(f"Saved comparison: {os.path.join(artifacts_dir, 'model_comparison.csv')}")
-    print(f"Saved calibration data: {os.path.join(artifacts_dir, 'calibration_curve_data.csv')}")
-    print(f"Saved threshold sweep: {os.path.join(artifacts_dir, 'threshold_sweep.csv')}")
-    print(f"Saved best operating points: {os.path.join(artifacts_dir, 'best_operating_points.csv')}")
-    print(f"Saved risk bins summary: {os.path.join(artifacts_dir, 'risk_bins_summary.csv')}")
-    print(f"Saved run manifest: {os.path.join(artifacts_dir, 'run_manifest.json')}")
+    if verbose:
+        print(f"\nSaved model bundle: {out_dir / 'injury_model.pkl'}")
+        print(f"Saved comparison: {out_dir / 'model_comparison.csv'}")
+        print(f"Saved calibration data: {out_dir / 'calibration_curve_data.csv'}")
+        print(f"Saved threshold sweep: {out_dir / 'threshold_sweep.csv'}")
+        print(f"Saved best operating points: {out_dir / 'best_operating_points.csv'}")
+        print(f"Saved risk bins summary: {out_dir / 'risk_bins_summary.csv'}")
+        print(f"Saved run manifest: {out_dir / 'run_manifest.json'}")
+    return out_dir
+
+
+def main() -> None:
+    run_training_pipeline(verbose=True)
 
 
 if __name__ == "__main__":

@@ -90,6 +90,21 @@ def main() -> int:
         print(ranked.to_string(index=False))
         top = ranked.iloc[0].to_dict()
 
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+            protocol = manifest.get("selection_protocol") or {}
+            cv_agreement = protocol.get("cv_holdout_agreement")
+            if cv_agreement and cv_agreement.get("agreement") is False:
+                print(
+                    "\nNOTE: CV top model "
+                    f"({cv_agreement.get('cv_top_model')}) differs from holdout winner "
+                    f"({cv_agreement.get('holdout_winner')}). Holdout metrics govern promotion."
+                )
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            pass
+
     policy = get_policy()
     recall_value = float(top["Recall@Threshold"])
     recall_hard_gate_ok = recall_value >= policy.MIN_RECALL_HARD

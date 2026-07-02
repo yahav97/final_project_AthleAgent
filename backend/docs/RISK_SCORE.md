@@ -132,8 +132,6 @@ lookback_days=7           →  התחלה = D-7
 |-----|------------|--------|
 | `daily_checkins/{D}.injuredYesterday` | סקר של **היום D** | "האם נפצעתי **אתמול** (D−1)?" → פיצ'ר `injured_yesterday` |
 
-> **לאימון מחדש בלבד:** כדי לדעת "האם הייתה פציעה ביום D", הסקריפט קורא `injuredYesterday` מ־`daily_checkins/{D+1}`. בפרודקשן (חיזוי בוקר) — **לא** משתמשים ב-D+1.
-
 ### 3.5 מדיניות מיזוג לשדות שעון (בוקר, יום D)
 
 ב־`injury_prediction_request_from_firestore_snapshot`:

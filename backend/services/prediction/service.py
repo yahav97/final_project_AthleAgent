@@ -6,7 +6,6 @@ from typing import Any
 
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
-from services.model_features import TRAINING_BASE_FEATURE_COLUMNS
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
     apply_history_confidence_fallback,
@@ -22,16 +21,6 @@ from services.preprocessing import (
 from services.risk_levels import classify_risk_level
 from utils.exceptions import DatabaseError, MLModelError
 from utils.logging import logger
-
-
-def training_base_feature_dict_from_request(payload: InjuryPredictionRequest) -> dict[str, float]:
-    """
-    One training CSV row (base features only): same inference row as production, then drop columns
-    recomputed in ``ML_model/train_model.add_sequential_features``.
-    """
-    frame = injury_request_to_model_dataframe(payload)
-    frame, _ = apply_history_confidence_fallback(frame, payload)
-    return {column: float(frame[column].iloc[0]) for column in TRAINING_BASE_FEATURE_COLUMNS}
 
 
 def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:

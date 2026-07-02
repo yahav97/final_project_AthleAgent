@@ -5,7 +5,6 @@ from services.history.firestore_client import get_firestore_client as _get_fires
 from services.history.repository import (
     fetch_daily_firestore_snapshot,
     fetch_historical_derived_features,
-    fetch_injury_today_label,
     fetch_user_history,
     get_history_window_context,
     merge_nutrition_with_history,
@@ -26,7 +25,6 @@ __all__ = [
     "compute_historical_derived_features",
     "fetch_daily_firestore_snapshot",
     "fetch_historical_derived_features",
-    "fetch_injury_today_label",
     "fetch_user_history",
     "get_history_window_context",
     "merge_nutrition_with_history",

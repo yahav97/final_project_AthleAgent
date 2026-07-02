@@ -1,0 +1,56 @@
+{
+  "created_at_utc": "2026-07-01T09:35:44.625982+00:00",
+  "run_id": "20260701_093544",
+  "artifacts_dir": "ML_model/artifacts/20260701_093544",
+  "dataset_path": "ML_model/fixtures/athlete_injury_demo.csv",
+  "dataset_rows": 17280,
+  "benchmark_path": null,
+  "threshold": 0.24,
+  "policy": {
+    "recall_hard_min": 0.8,
+    "recall_min": 0.8,
+    "fpr_max_operating": 0.55,
+    "precision_min": 0.13,
+    "f1_min": 0.22,
+    "auc_min_for_live": 0.68,
+    "fixed_comparison_threshold": 0.18
+  },
+  "winner": "RandomForest",
+  "athlete_cv_splits": 2,
+  "selection_protocol": {
+    "athlete_cv_splits": 2,
+    "metrics_source": "fixed_holdout_evaluation",
+    "serving_model_fit": "full_dataset_refit",
+    "cv_holdout_agreement": {
+      "cv_top_model": "GradientBoosting",
+      "holdout_winner": "RandomForest",
+      "agreement": false
+    }
+  },
+  "winner_metrics": {
+    "Recall@Threshold": 0.8171206225680934,
+    "Precision@Threshold": 0.2556299452221546,
+    "F1@Threshold": 0.3894297635605007,
+    "FPR@Threshold": 0.4157036029911625,
+    "BrierScore": 0.1197357613907476,
+    "ROC-AUC": 0.7942610310358236,
+    "LogLoss": 0.396166803023678
+  },
+  "risk_bins": [
+    {
+      "bin": "green_0_20",
+      "samples": 1405,
+      "injury_rate": 0.04199288256227758
+    },
+    {
+      "bin": "yellow_20_50",
+      "samples": 1681,
+      "injury_rate": 0.15407495538370017
+    },
+    {
+      "bin": "red_50_100",
+      "samples": 370,
+      "injury_rate": 0.5297297297297298
+    }
+  ]
+}

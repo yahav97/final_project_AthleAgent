@@ -135,8 +135,6 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 נמשך מ-`daily_checkins/{D}` ביום החיזוי (אין fallback לאתמול ב-backend).
 
-**רק לאימון מחדש (לא בחיזוי בוקר):** כדי לבנות תיוג היסטורי "האם הייתה פציעה ביום D", הסקריפט `build_training_dataset_from_firestore` קורא `injuredYesterday` מ-`daily_checkins/{D+1}` — כי בבוקר של D+1 המשתמש מדווח על אתמול (יום D). ב-production לא משתמשים ב-D+1.
-
 #### 4. תזונה (`users/{uid}/daily_nutrition/{date}`)
 
 | שדה | סוג | פיצ'ר במודל |

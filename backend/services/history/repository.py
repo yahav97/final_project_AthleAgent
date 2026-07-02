@@ -9,7 +9,6 @@ from typing import Any
 from config import settings
 from schemas.enums import HistoryConfidence
 from services.history.date_utils import date_keys_in_range, to_date_key
-from services.field_transforms import injured_yesterday_from_doc
 from services.history.rolling_features import compute_historical_derived_features
 from utils.logging import logger
 
@@ -31,35 +30,6 @@ def stable_athlete_numeric_id(user_id: str) -> int:
     digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
     numeric_id = int(digest[:12], 16) % (2**31 - 1)
     return numeric_id if numeric_id > 0 else 1
-
-
-def fetch_injury_today_label(user_id: str, date_key: str) -> int | None:
-    """
-    Training label for row ``(user_id, date_key)`` → ``injury_today``.
-
-    On ``users/{uid}/daily_checkins/{D+1}``, ``injuredYesterday`` indicates injury on calendar day ``D``.
-    Falls back to the same field on ``daily_health/{D+1}`` for legacy data.
-    """
-    db = _firestore_client()
-    if db is None:
-        return None
-    try:
-        next_key = (to_date_key(date_key) + timedelta(days=1)).strftime("%Y-%m-%d")
-        user_ref = db.collection("users").document(user_id)
-        checkin_doc = _sync_document_get(user_ref.collection("daily_checkins").document(next_key))
-        if checkin_doc.exists:
-            parsed = injured_yesterday_from_doc(checkin_doc.to_dict() or {})
-            return 0 if parsed is None else parsed
-        health_doc = _sync_document_get(user_ref.collection("daily_health").document(next_key))
-    except Exception:
-        logger.exception("fetch_injury_today_label failed user_id=%s date=%s", user_id, date_key)
-        return None
-    if not health_doc.exists:
-        return None
-    parsed = injured_yesterday_from_doc(health_doc.to_dict() or {})
-    if parsed is not None:
-        return parsed
-    return 0
 
 
 def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any]:

@@ -315,13 +315,9 @@ flowchart LR
 | Recall@Threshold | ≥ 0.80 |
 | ROC-AUC | ≥ 0.68 |
 
-### 4.4 Retraining from Firestore
+### 4.4 Promotion
 
-`backend/scripts/build_training_dataset_from_firestore.py`:
-1. Iterate `users/*/daily_*` subcollections
-2. Build feature row per (user, date)
-3. Label: `injuredYesterday` on day D+1
-4. Export CSV → `train_model.py`
+After `run_pipeline.py`, `artifacts/promoted.json` points at the latest `injury_model.pkl`. Restart the backend to load it.
 
 ---
 

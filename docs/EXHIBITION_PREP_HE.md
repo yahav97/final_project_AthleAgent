@@ -99,7 +99,9 @@ Gradient boosting על עצי החלטה — מתאים לטאבלארי, מטפ
 - **סטרס גבוה** + עומס — אפקט מכפיל
 - **Cooldown** אחרי פציעה
 
-Pipeline: `data_generator.py` → `train_model.py` (5 מועמדים) → `run_pipeline.py` → `artifacts/promoted.json`
+Pipeline: `data_generator.py` → `create_benchmark_set.py` → `train_model.py` (CV×2 → 5 מועמדים → benchmark holdout → refit מלא) → `run_pipeline.py` → `artifacts/promoted.json`
+
+פרוטוקול מלא: [`ML_model/docs/MODEL_SELECTION.md`](../ML_model/docs/MODEL_SELECTION.md)
 
 ---
 
@@ -252,7 +254,6 @@ sequenceDiagram
 **הפתרון:**
 - `data_generator.py` — 1,000 ספורטאים × 365 יום, hazard model מבוסס מחקר
 - תיוג: `injury_today` — פציעה ביום D
-- **עתיד:** `build_training_dataset_from_firestore.py` — ייצוא נתונים אמיתיים מ-Firestore לאימון מחדש
 
 ---
 
@@ -382,16 +383,15 @@ speed_intensity_ratio
 | **"למה אין auth על API?"** | מגבלת scope בפרויקט גמר. מתועד ב-[HLD_PROJECT.md](HLD_PROJECT.md) §8. Roadmap: Firebase ID Token בבקאנד. |
 | **"MVVM?"** | כיוון עיצובי בפוסטר; מימוש Activity-centric. Roadmap: Repository layer. |
 | **"מה ההבדל מ-Whoop/Oura?"** | הם מתמקדים בספורטאי בודד; AthleAgent מוסיף **מאמן + קבוצה** + מודל ML משלנו + תזונה מצילום. |
-| **"האם הדאטה אמיתי?"** | אימון על דאטה סינתטי מבוסס מחקר; אפשר לאמן מחדש על Firestore אמיתי. |
+| **"האם הדאטה אמיתי?"** | אימון על דאטה **סינתטי** מבוסס מחקר (ACWR, שינה, HRV). האפליקציה שומרת נתונים אמיתיים ב-Firestore לשימוש בחיזוי. |
 
 ### Roadmap (מעבר לפוסטר)
 
 1. Auth על API (Firebase token middleware)
 2. Firestore Security Rules מחמירות
 3. Deploy בקאנד ל-Cloud Run / Render
-4. אימון על נתונים אמיתיים מ-Firestore
-5. Repository layer ב-Android
-6. Trigger gate בפרונט — בדיקת עומס `{D-1}` לפני חיזוי
+4. Repository layer ב-Android
+5. Trigger gate בפרונט — בדיקת עומס `{D-1}` לפני חיזוי
 
 ### מסמכים לקריאה לפני התערוכה
 

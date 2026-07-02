@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 import pandas as pd
 
 DEFAULT_HOLDOUT_RATIO = 0.2
 DEFAULT_SEED = 42
+DATASET_FILENAME = "athlete_injury_data.csv"
+BENCHMARK_FILENAME = "benchmark_holdout.csv"
 
 
 def main() -> int:
@@ -20,8 +21,8 @@ def main() -> int:
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
-    dataset_path = script_dir / "athlete_injury_data.csv"
-    benchmark_path = script_dir / "benchmark_holdout.csv"
+    dataset_path = script_dir / DATASET_FILENAME
+    benchmark_path = script_dir / BENCHMARK_FILENAME
     if benchmark_path.exists() and not args.force:
         print(f"Benchmark already exists: {benchmark_path}")
         return 0

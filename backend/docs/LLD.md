@@ -174,7 +174,6 @@ All fields optional — service applies defaults.
 | `bundle.resolve_model_bundle` | Parse joblib dict contract |
 | `confidence.prediction_confidence_0_100` | 0.6×history + 0.4×quality |
 | `service.persist_prediction_result_or_raise` | Write or raise |
-| `service.training_base_feature_dict_from_request` | Export path for retraining |
 
 > `prediction_service.py` re-exports the above for backward compatibility and test monkeypatching.
 
@@ -215,8 +214,7 @@ All fields optional — service applies defaults.
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
 | `repository.save_daily_prediction_result` | Merge write to daily_health |
 | `repository.merge_nutrition_with_history` | אתמול + ממוצעים כלליים; מחזיר `(doc, imputed)` |
-| `repository.fetch_injury_today_label` | Training label (`injury_today`) from D+1 checkin |
-| `repository.stable_athlete_numeric_id` | SHA256 → int for CSV export |
+| `repository.stable_athlete_numeric_id` | SHA256 → deterministic int id |
 
 > `history_service.py` re-exports the above (including `_get_firestore_client` alias).
 
@@ -394,7 +392,6 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | Script | Purpose |
 |--------|---------|
 | `seed_demo_athlete_firestore.py` | Demo data for testing |
-| `build_training_dataset_from_firestore.py` | Export CSV for retraining |
 | `trace_request.sh` | Trace unified logs by `request_id` / event / source |
 
 ---
