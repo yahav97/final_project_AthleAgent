@@ -4,21 +4,19 @@ from __future__ import annotations
 
 import pytest
 
-from services import history_service as hs
 from services.field_transforms import (
     age_from_birth_date,
     age_from_profile,
     daily_distance_km,
     daily_distance_km_from_doc,
-    injured_yesterday_as_feature,
-    injured_yesterday_for_request,
     injured_yesterday_from_doc,
+    parse_injured_yesterday_flag,
     resolve_model_age,
     resting_hr,
     resting_hr_from_doc,
 )
+from services.history.rolling_features import compute_historical_derived_features, hrv_score
 from utils.exceptions import ValidationError
-from services.model_features import DEFAULT_FEATURE_VALUES
 
 pytestmark = pytest.mark.unit
 
@@ -95,17 +93,10 @@ class TestRestingHr:
 class TestInjuredYesterday:
     @pytest.mark.parametrize(
         ("raw", "expected"),
-        [(None, 0.0), (True, 1.0), (False, 0.0), (0, 0.0), (1, 1.0)],
+        [(None, None), (True, 1), (False, 0), (0, 0), (1, 1), ("bad", None)],
     )
-    def test_injured_yesterday_as_feature(self, raw, expected):
-        assert injured_yesterday_as_feature(raw) == pytest.approx(expected)
-
-    @pytest.mark.parametrize(
-        ("raw", "expected"),
-        [(True, 1), (False, 0), (1, 1), (0, 0), (None, None), ("bad", None)],
-    )
-    def test_injured_yesterday_for_request(self, raw, expected):
-        assert injured_yesterday_for_request(raw) == expected
+    def test_parse_injured_yesterday_flag(self, raw, expected):
+        assert parse_injured_yesterday_flag(raw) == expected
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -119,11 +110,11 @@ class TestInjuredYesterday:
 class TestHrvScore:
     def test_uses_rmssd_when_present(self):
         doc = {"hrvRmssd": 72.0, "heartRateAvg": 60}
-        assert hs._hrv_score(doc, resting_hr=54.0) == pytest.approx(72.0)
+        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(72.0)
 
     def test_falls_back_to_proxy(self):
         doc = {"heartRateAvg": 60}
-        assert hs._hrv_score(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
+        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
 
     def test_historical_hrv_drop_uses_real_hrv_series(self):
         rows = [
@@ -131,6 +122,6 @@ class TestHrvScore:
             {"date_key": "2026-05-02", "hrvRmssd": 60.0, "distanceMeters": 1000, "sleepMinutes": 420},
             {"date_key": "2026-05-03", "hrvRmssd": 45.0, "distanceMeters": 1000, "sleepMinutes": 420},
         ]
-        out = hs.compute_historical_derived_features(rows)
+        out = compute_historical_derived_features(rows)
         assert out is not None
         assert out["hrv_drop"] == pytest.approx(-10.0)

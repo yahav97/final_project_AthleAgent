@@ -9,15 +9,9 @@ from typing import Any
 from config import settings
 from schemas.enums import HistoryConfidence
 from services.history.date_utils import date_keys_in_range, to_date_key
+from services.history.firestore_client import get_firestore_client
 from services.history.rolling_features import compute_historical_derived_features
 from utils.logging import logger
-
-
-def _firestore_client():
-    """Resolve client at call time so tests can monkeypatch services.history_service."""
-    import services.history_service as history_service_module
-
-    return history_service_module._get_firestore_client()
 
 
 def _sync_document_get(doc_ref: Any) -> Any:
@@ -40,7 +34,7 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
     sleep from ``daily_health/{date}``; physical from ``daily_health/{date-1}``;
     survey from ``daily_checkins/{date}``; nutrition from ``daily_nutrition/{date-1}``.
     """
-    db = _firestore_client()
+    db = get_firestore_client()
     if db is None:
         return {}
     try:
@@ -108,7 +102,7 @@ def save_daily_prediction_result(
     result: dict[str, Any],
 ) -> bool:
     """Persist prediction output under users/{uid}/daily_health/{date} using merge."""
-    db = _firestore_client()
+    db = get_firestore_client()
     if db is None:
         return False
     try:
@@ -147,7 +141,7 @@ def fetch_user_history(
         end_inclusive = end_day - timedelta(days=1)
         start_day = end_inclusive - timedelta(days=lookback_days - 1)
 
-    db = _firestore_client()
+    db = get_firestore_client()
     if db is None:
         return []
 
@@ -204,9 +198,7 @@ def get_history_window_context(
     resolved_lookback = (
         settings.HISTORY_LOOKBACK_DAYS if lookback_days is None else lookback_days
     )
-    import services.history_service as history_service_module
-
-    rows = history_service_module.fetch_user_history(
+    rows = fetch_user_history(
         user_id,
         date_key,
         lookback_days=resolved_lookback,

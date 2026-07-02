@@ -9,7 +9,7 @@ from services.preprocessing.constants import (
     PROFILE_FIELDS,
     ZERO_OR_MISSING_PENALTY,
 )
-from services.preprocessing.helpers import is_explicit_zero_or_nan
+from services.preprocessing.helpers import is_absent_or_weak, is_explicit_zero_or_nan
 
 
 def calculate_data_quality_score(
@@ -19,15 +19,19 @@ def calculate_data_quality_score(
     Score same-day input strength for prediction confidence.
 
     Policy:
-    - Frontend payloads are trusted; absent fields are not penalized.
-    - Fields explicitly sent as 0 or NaN reduce confidence.
+    - Required measurements must be present and non-zero; missing/null/0/NaN reduce confidence.
+    - Optional profile metrics are penalized only when sent as 0 or NaN.
     - Imputed nutrition history is flagged separately.
     - Historical gaps are handled in ``confidence`` (not here).
     """
     payload_dict = payload.model_dump()
     weak_fields: list[str] = []
 
-    for field in MEASUREMENT_FIELDS + PROFILE_FIELDS:
+    for field in MEASUREMENT_FIELDS:
+        if is_absent_or_weak(payload_dict.get(field)):
+            weak_fields.append(field)
+
+    for field in PROFILE_FIELDS:
         raw = payload_dict.get(field)
         if raw is not None and is_explicit_zero_or_nan(raw):
             weak_fields.append(field)

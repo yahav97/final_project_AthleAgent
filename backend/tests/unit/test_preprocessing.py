@@ -10,13 +10,15 @@ import pytest
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import MODEL_FEATURE_COLUMNS
 from services.preprocessing import (
-    _energy_to_model_scale,
-    _safe_float,
-    _soreness_to_model_scale,
-    _stress_to_model_scale,
     calculate_data_quality_score,
     injury_request_to_model_dataframe,
     validate_feature_vector_for_model,
+)
+from services.preprocessing.helpers import safe_float
+from services.preprocessing.scales import (
+    energy_to_model_scale,
+    soreness_to_model_scale,
+    stress_to_model_scale,
 )
 from utils.exceptions import ValidationError
 
@@ -29,32 +31,32 @@ class TestScaleMapping:
         [(80, 8.0), (5, 5.0), (150, 10.0)],
     )
     def test_stress_to_model_scale(self, raw, expected):
-        assert _stress_to_model_scale(raw) == pytest.approx(expected)
+        assert stress_to_model_scale(raw) == pytest.approx(expected)
 
     @pytest.mark.parametrize(
         ("raw", "expected_approx"),
         [(3, 5.5), (5, 9.5)],
     )
     def test_soreness_to_model_scale(self, raw, expected_approx):
-        assert _soreness_to_model_scale(raw) == pytest.approx(expected_approx)
+        assert soreness_to_model_scale(raw) == pytest.approx(expected_approx)
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [(70, 7.0), (100, 10.0)],
     )
     def test_energy_to_model_scale(self, raw, expected):
-        assert _energy_to_model_scale(raw) == pytest.approx(expected)
+        assert energy_to_model_scale(raw) == pytest.approx(expected)
 
 
 class TestSafeFloat:
     def test_converts_valid_numeric(self):
-        assert _safe_float("42.5") == pytest.approx(42.5)
+        assert safe_float("42.5") == pytest.approx(42.5)
 
     def test_returns_fallback_on_invalid(self):
-        assert _safe_float("not-a-number", fallback=7.0) == pytest.approx(7.0)
+        assert safe_float("not-a-number", fallback=7.0) == pytest.approx(7.0)
 
     def test_returns_fallback_on_non_finite(self):
-        assert _safe_float(float("inf"), fallback=3.0) == pytest.approx(3.0)
+        assert safe_float(float("inf"), fallback=3.0) == pytest.approx(3.0)
 
 
 class TestDataQualityScore:
@@ -84,7 +86,7 @@ class TestDataQualityScore:
         assert "steps" in q["weak_fields"]
         assert float(q["score"]) < 1.0
 
-    def test_missing_optional_fields_not_penalized(self):
+    def test_missing_measurement_fields_reduce_score(self):
         req = InjuryPredictionRequest(
             userId="u1",
             date="2026-04-30",
@@ -95,8 +97,30 @@ class TestDataQualityScore:
             energyLevel=70,
         )
         q = calculate_data_quality_score(req)
-        assert q["score"] == pytest.approx(1.0)
-        assert q["weak_fields"] == []
+        assert float(q["score"]) < 1.0
+        assert "heartRateAvg" in q["weak_fields"]
+        assert "hrvRmssd" in q["weak_fields"]
+
+    def test_null_measurement_field_reduces_score(self):
+        req = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=8000,
+            distanceMeters=6000,
+            activeCalories=350,
+            totalCalories=2800,
+            bmrCalories=1650,
+            heartRateAvg=None,
+            hrvRmssd=65.0,
+            restingHeartRate=52,
+            totalProtein=120,
+            totalCarbs=280,
+            nutritionTotalCalories=2400.0,
+        )
+        q = calculate_data_quality_score(req)
+        assert "heartRateAvg" in q["weak_fields"]
+        assert float(q["score"]) == pytest.approx(0.92)
 
     def test_active_calories_without_steps_still_scores(self):
         req = InjuryPredictionRequest(
@@ -121,12 +145,18 @@ class TestDataQualityScore:
             sleepMinutes=420,
             steps=8000,
             distanceMeters=6000,
+            activeCalories=520,
             heartRateAvg=58,
             stressLevel=30,
             muscleSoreness=3,
             energyLevel=70,
             hrvRmssd=65.0,
             restingHeartRate=52,
+            totalCalories=2800,
+            bmrCalories=1650,
+            totalProtein=120,
+            totalCarbs=280,
+            nutritionTotalCalories=2400.0,
         )
         without = calculate_data_quality_score(base)
         with_imputed = calculate_data_quality_score(

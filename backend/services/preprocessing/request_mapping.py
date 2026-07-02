@@ -24,10 +24,6 @@ from services.preprocessing.scales import (
 )
 
 
-def _num(raw: object, *, default: float = 0.0) -> float:
-    return safe_float(raw, fallback=default)
-
-
 def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.DataFrame:
     """
     Build one model-ready row: Android-shaped request → engineered DataFrame.
@@ -44,24 +40,24 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     injured_yesterday = float(injured_flag if injured_flag is not None else 0)
 
     sleep_minutes = payload_dict.get("sleepMinutes")
-    sleep_hours = _num(sleep_minutes) / 60.0 if sleep_minutes is not None else 0.0
+    sleep_hours = safe_float(sleep_minutes) / 60.0 if sleep_minutes is not None else 0.0
 
-    steps = _num(payload_dict.get("steps"))
-    distance_m = _num(payload_dict.get("distanceMeters"))
+    steps = safe_float(payload_dict.get("steps"))
+    distance_m = safe_float(payload_dict.get("distanceMeters"))
     daily_distance_km_val = float(daily_distance_km(distance_m, steps))
 
-    active_cal = _num(payload_dict.get("activeCalories"))
-    total_burned_health = _num(payload_dict.get("totalCalories"))
-    bmr = _num(payload_dict.get("bmrCalories"))
+    active_cal = safe_float(payload_dict.get("activeCalories"))
+    total_burned_health = safe_float(payload_dict.get("totalCalories"))
+    bmr = safe_float(payload_dict.get("bmrCalories"))
     total_burned = (
         total_burned_health
         if total_burned_health > 0
         else (bmr + active_cal if (bmr > 0 or active_cal > 0) else 0.0)
     )
 
-    protein_g = _num(payload_dict.get("totalProtein"))
-    carbs_g = _num(payload_dict.get("totalCarbs"))
-    intake_sum_logged = _num(payload_dict.get("nutritionTotalCalories"))
+    protein_g = safe_float(payload_dict.get("totalProtein"))
+    carbs_g = safe_float(payload_dict.get("totalCarbs"))
+    intake_sum_logged = safe_float(payload_dict.get("nutritionTotalCalories"))
     macro_energy = protein_g * 4.0 + carbs_g * 4.0
     nutrition_intake_calories = (
         intake_sum_logged if intake_sum_logged > 0 else (macro_energy * 1.2 if macro_energy > 0 else 0.0)
@@ -70,7 +66,7 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     workout_intensity = daily_distance_km_val * 5.5 + active_cal / 40.0
 
-    sensor_cadence = _num(payload_dict.get("avgCadence"))
+    sensor_cadence = safe_float(payload_dict.get("avgCadence"))
     if sensor_cadence > 0:
         avg_cadence = sensor_cadence
     elif steps > 0 and daily_distance_km_val > 0:
@@ -81,9 +77,9 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
 
     weight_kg = payload_dict.get("weightKg")
     height_cm = payload_dict.get("heightCm")
-    height_m = _num(height_cm, default=175.0) / 100.0 if _num(height_cm) > 0 else 1.75
+    height_m = safe_float(height_cm, fallback=175.0) / 100.0 if safe_float(height_cm) > 0 else 1.75
     bmi = 0.0
-    if weight_kg is not None and _num(weight_kg) > 0 and height_m > 0:
+    if weight_kg is not None and safe_float(weight_kg) > 0 and height_m > 0:
         bmi = float(weight_kg) / (height_m**2)
 
     age_val = resolve_model_age(payload_dict.get("age"))
@@ -98,24 +94,24 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         except (TypeError, ValueError):
             history_injury_count = 0.0
 
-    hr_avg = _num(payload_dict.get("heartRateAvg"))
+    hr_avg = safe_float(payload_dict.get("heartRateAvg"))
     resting_hr_val = resolve_resting_hr(
-        _num(payload_dict.get("restingHeartRate")),
-        _num(payload_dict.get("heartRateMin")),
+        safe_float(payload_dict.get("restingHeartRate")),
+        safe_float(payload_dict.get("heartRateMin")),
         hr_avg,
         default=0.0,
     )
 
-    hrv_rmssd = _num(payload_dict.get("hrvRmssd"))
+    hrv_rmssd = safe_float(payload_dict.get("hrvRmssd"))
     hrv_score = hrv_rmssd if hrv_rmssd > 0 else 0.0
 
-    body_fat_pct = _num(payload_dict.get("bodyFatPct"))
-    vo2_max = _num(payload_dict.get("vo2Max"))
-    elevation_gained = _num(payload_dict.get("elevationGainedMeters"))
-    floors_climbed = _num(payload_dict.get("floorsClimbed"))
+    body_fat_pct = safe_float(payload_dict.get("bodyFatPct"))
+    vo2_max = safe_float(payload_dict.get("vo2Max"))
+    elevation_gained = safe_float(payload_dict.get("elevationGainedMeters"))
+    floors_climbed = safe_float(payload_dict.get("floorsClimbed"))
 
-    sensor_avg_speed = _num(payload_dict.get("avgSpeed"))
-    sensor_max_speed = _num(payload_dict.get("maxSpeed"))
+    sensor_avg_speed = safe_float(payload_dict.get("avgSpeed"))
+    sensor_max_speed = safe_float(payload_dict.get("maxSpeed"))
     if sensor_avg_speed > 0:
         avg_speed = sensor_avg_speed
     elif daily_distance_km_val > 0 and workout_intensity > 0:
@@ -124,9 +120,9 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
         avg_speed = 0.0
     max_speed = sensor_max_speed if sensor_max_speed > 0 else avg_speed * 1.3
 
-    avg_power = _num(payload_dict.get("avgPower"))
-    respiratory_rate = _num(payload_dict.get("respiratoryRate"))
-    spo2 = _num(payload_dict.get("oxygenSaturation"))
+    avg_power = safe_float(payload_dict.get("avgPower"))
+    respiratory_rate = safe_float(payload_dict.get("respiratoryRate"))
+    spo2 = safe_float(payload_dict.get("oxygenSaturation"))
 
     partial: dict[str, float] = {
         "bmi": float(bmi),

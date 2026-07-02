@@ -20,6 +20,18 @@ def _parse_date_key(value: str) -> date | None:
         return None
 
 
+def _doc_float(doc: Mapping[str, Any], key: str, default: float = 0.0) -> float:
+    return float(doc.get(key) or default)
+
+
+def _first_doc_value(doc: Mapping[str, Any], *keys: str) -> object | None:
+    for key in keys:
+        value = doc.get(key)
+        if value is not None:
+            return value
+    return None
+
+
 def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) -> float | None:
     """Compute decimal age in years from ``birth_date`` (yyyy-MM-dd) as of ``as_of_date``."""
     if birth_date is None:
@@ -42,9 +54,7 @@ def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) ->
 
 def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> float | None:
     """Compute model age from Firestore profile ``birth_date`` (or ``birthDate``)."""
-    birth_raw = profile.get("birth_date")
-    if birth_raw is None:
-        birth_raw = profile.get("birthDate")
+    birth_raw = _first_doc_value(profile, "birth_date", "birthDate")
     if birth_raw is None:
         return None
     return age_from_birth_date(birth_raw, as_of_date=as_of_date)
@@ -88,35 +98,9 @@ def parse_injured_yesterday_flag(raw: object) -> int | None:
     return None
 
 
-def injured_yesterday_for_request(raw: object) -> int | None:
-    """Coerce injuredYesterday for InjuryPredictionRequest (invalid → None)."""
-    if raw is None:
-        return None
-    if raw is True:
-        return 1
-    if raw is False:
-        return 0
-    if isinstance(raw, (int, float, str)):
-        try:
-            return int(raw)
-        except (TypeError, ValueError):
-            return None
-    return None
-
-
-def injured_yesterday_as_feature(raw: object) -> float:
-    """Model feature 0/1; missing or invalid → 0."""
-    parsed = parse_injured_yesterday_flag(raw)
-    if parsed is None:
-        return 0.0
-    return float(parsed)
-
-
 def injured_yesterday_from_doc(data: Mapping[str, Any]) -> int | None:
     """Read injuredYesterday from a Firestore doc; invalid values → 0."""
-    raw = data.get("injuredYesterday")
-    if raw is None:
-        raw = data.get("injured_yesterday")
+    raw = _first_doc_value(data, "injuredYesterday", "injured_yesterday")
     if raw is None:
         return None
     parsed = parse_injured_yesterday_flag(raw)
@@ -132,8 +116,8 @@ def daily_distance_km(distance_meters: float, steps: float) -> float:
 
 def daily_distance_km_from_doc(doc: Mapping[str, Any]) -> float:
     return daily_distance_km(
-        float(doc.get("distanceMeters") or 0.0),
-        float(doc.get("steps") or 0.0),
+        _doc_float(doc, "distanceMeters"),
+        _doc_float(doc, "steps"),
     )
 
 
@@ -156,9 +140,9 @@ def resting_hr(
 
 def resting_hr_from_doc(doc: Mapping[str, Any]) -> float:
     return resting_hr(
-        float(doc.get("restingHeartRate") or 0.0),
-        float(doc.get("heartRateMin") or 0.0),
-        float(doc.get("heartRateAvg") or 0.0),
+        _doc_float(doc, "restingHeartRate"),
+        _doc_float(doc, "heartRateMin"),
+        _doc_float(doc, "heartRateAvg"),
     )
 
 

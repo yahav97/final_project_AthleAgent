@@ -16,13 +16,6 @@ MEASUREMENT_FIELDS: tuple[str, ...] = (
     "totalCarbs",
 )
 
-# Survey scales: missing lowers confidence; 0 is a valid UI value.
-SURVEY_FIELDS: tuple[str, ...] = (
-    "stressLevel",
-    "muscleSoreness",
-    "energyLevel",
-)
-
 # Optional profile / body metrics.
 PROFILE_FIELDS: tuple[str, ...] = (
     "weightKg",
@@ -31,6 +24,6 @@ PROFILE_FIELDS: tuple[str, ...] = (
     "vo2Max",
 )
 
-# Per-field penalty when an explicitly sent value is zero or NaN (0–1 scale).
+# Per-field penalty for missing/null/zero measurements or weak profile values (0–1 scale).
 ZERO_OR_MISSING_PENALTY: float = 0.08
 NUTRITION_IMPUTED_PENALTY: float = 0.12

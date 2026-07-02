@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from services.model_features import DEFAULT_FEATURE_VALUES
-
 
 def acwr_baseline_from_weekly_stats(weekly_mean: float, weekly_std: float = 0.0) -> float:
     """Internal ACWR denominator from 7-day distance mean/std (not a model feature)."""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from services import history_service as hs
+from services.history.rolling_features import sleep_hours
 
 pytestmark = pytest.mark.unit
 
@@ -26,12 +27,12 @@ class TestStableAthleteId:
 
 class TestSleepHours:
     def test_default_when_missing(self):
-        assert hs._sleep_hours({}) == pytest.approx(7.0)
+        assert sleep_hours({}) == pytest.approx(7.0)
 
     def test_converts_minutes_and_clamps(self):
-        assert hs._sleep_hours({"sleepMinutes": 540}) == pytest.approx(9.0)
-        assert hs._sleep_hours({"sleepMinutes": 120}) == pytest.approx(3.0)
-        assert hs._sleep_hours({"sleepMinutes": 900}) == pytest.approx(12.0)
+        assert sleep_hours({"sleepMinutes": 540}) == pytest.approx(9.0)
+        assert sleep_hours({"sleepMinutes": 120}) == pytest.approx(3.0)
+        assert sleep_hours({"sleepMinutes": 900}) == pytest.approx(12.0)
 
 
 class TestHistoricalDerivedFeatures:
@@ -55,6 +56,7 @@ class TestHistoricalDerivedFeatures:
             }
             for i in range(1, 8)
         ]
+
         def _fetch_user_history(
             user_id: str,
             date_key: str,
@@ -63,7 +65,7 @@ class TestHistoricalDerivedFeatures:
         ) -> list[dict]:
             return rows
 
-        monkeypatch.setattr(hs, "fetch_user_history", _fetch_user_history)
+        monkeypatch.setattr("services.history.repository.fetch_user_history", _fetch_user_history)
         ctx = hs.get_history_window_context("u1", "2026-05-07")
         assert ctx["confidence"] == "high"
         assert ctx["days_count"] == 7
@@ -78,6 +80,7 @@ class TestHistoricalDerivedFeatures:
             {"date_key": f"2026-05-{i:02d}", "distanceMeters": 5000, "sleepMinutes": 420}
             for i in range(1, day_count + 1)
         ]
+
         def _fetch_user_history(
             user_id: str,
             date_key: str,
@@ -86,7 +89,7 @@ class TestHistoricalDerivedFeatures:
         ) -> list[dict]:
             return rows
 
-        monkeypatch.setattr(hs, "fetch_user_history", _fetch_user_history)
+        monkeypatch.setattr("services.history.repository.fetch_user_history", _fetch_user_history)
         ctx = hs.get_history_window_context("u1", "2026-05-09")
         assert ctx["confidence"] == expected_confidence
 
@@ -133,7 +136,7 @@ class TestFetchUserHistory:
 
                 return _Users()
 
-        monkeypatch.setattr(hs, "_get_firestore_client", lambda: _Db())
+        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
         rows = hs.fetch_user_history("u1", "2026-05-03", lookback_days=7, include_target_day=True)
 
         assert len(rows) == 1

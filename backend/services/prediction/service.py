@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from ml.model_loader import get_model, get_model_gate_reason
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
+from services.history.repository import fetch_daily_firestore_snapshot, save_daily_prediction_result
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
     apply_history_confidence_fallback,
@@ -30,11 +32,9 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     If ``injury_model.pkl`` is not present on the server, returns a conservative demo
     response so local development and CI still behave predictably.
 
-    Client is expected to send structurally valid payloads; explicit zeros or NaNs
-    only lower ``prediction_confidence`` (never HTTP rejection).
+    Client is expected to send complete measurement payloads; missing/null/zero
+    values lower ``prediction_confidence`` (never HTTP rejection).
     """
-    import services.prediction_service as prediction_service_module
-
     frame = injury_request_to_model_dataframe(payload)
     frame, history_confidence = apply_history_confidence_fallback(frame, payload)
     quality = calculate_data_quality_score(payload)
@@ -59,7 +59,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         extra={"event": "predict_confidence_summary"},
     )
 
-    loaded_model = prediction_service_module.get_model()
+    loaded_model = get_model()
     (
         model,
         bundle_feature_columns,
@@ -69,7 +69,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
         model_status,
     ) = resolve_model_bundle(loaded_model)
     if model is None:
-        gate_reason = prediction_service_module.get_model_gate_reason()
+        gate_reason = get_model_gate_reason()
         blocked_reason = (
             model_status
             if model_status != ModelGateReason.MODEL_NOT_LOADED.value
@@ -108,14 +108,12 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     - Survey: ``daily_checkins/{D}``.
     - Nutrition: ``daily_nutrition/{D-1}`` + population defaults for missing fields.
     """
-    import services.prediction_service as prediction_service_module
-
-    snapshot = prediction_service_module.fetch_daily_firestore_snapshot(user_id, date_key)
+    snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
     if not snapshot:
         raise DatabaseError("Firestore snapshot unavailable", code="firestore_snapshot_unavailable")
 
     payload = injury_prediction_request_from_firestore_snapshot(user_id, date_key, snapshot)
-    return prediction_service_module.predict_injury_risk(payload)
+    return predict_injury_risk(payload)
 
 
 def persist_prediction_result_or_raise(
@@ -123,8 +121,6 @@ def persist_prediction_result_or_raise(
     date_key: str,
     result: dict[str, Any],
 ) -> None:
-    import services.prediction_service as prediction_service_module
-
-    saved = prediction_service_module.save_daily_prediction_result(user_id, date_key, result)
+    saved = save_daily_prediction_result(user_id, date_key, result)
     if not saved:
         raise DatabaseError("Prediction persist failed", code="prediction_persist_failed")

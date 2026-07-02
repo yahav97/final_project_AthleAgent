@@ -6,8 +6,9 @@ from datetime import timedelta
 from typing import Any
 
 from schemas.inference import InjuryPredictionRequest
-from services.field_transforms import age_from_profile, injured_yesterday_for_request
-from services.history_service import _to_date_key, merge_nutrition_with_history
+from services.field_transforms import age_from_profile, parse_injured_yesterday_flag
+from services.history.date_utils import to_date_key
+from services.history.repository import merge_nutrition_with_history
 
 
 def firestore_doc_heartrate_avg(doc: dict[str, Any]) -> Any:
@@ -60,7 +61,7 @@ def injury_prediction_request_from_firestore_snapshot(
     health_yesterday = snapshot.get("daily_health_yesterday") or {}
     checkins = snapshot.get("daily_checkins") or {}
     nutrition_raw = snapshot.get("daily_nutrition_yesterday") or {}
-    yesterday_key = (_to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday_key = (to_date_key(date_key) - timedelta(days=1)).strftime("%Y-%m-%d")
     nutrition, nutrition_imputed = merge_nutrition_with_history(user_id, yesterday_key, nutrition_raw)
 
     hist_profile = profile.get("historyInjuryCount")
@@ -88,7 +89,7 @@ def injury_prediction_request_from_firestore_snapshot(
         date=date_key,
         age=age_from_profile(profile, as_of_date=date_key),
         historyInjuryCount=hist_profile,
-        injuredYesterday=injured_yesterday_for_request(injured_raw),
+        injuredYesterday=parse_injured_yesterday_flag(injured_raw),
         sleepMinutes=today_only(["sleepMinutes", "sleep_minutes"]),
         steps=yesterday_only(["steps", "daily_steps"]),
         distanceMeters=yesterday_only(["distanceMeters", "distance_meters", "daily_distance_meters"]),

@@ -18,7 +18,6 @@ from fastapi.testclient import TestClient
 from api.routes import predict as predict_routes
 from main import app
 from schemas.inference import InjuryPredictionRequest
-from services import prediction_service as ps
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 
 SUCCESSFUL_PREDICTION: dict[str, Any] = {
@@ -72,7 +71,10 @@ def mock_firestore_snapshot(monkeypatch, firestore_snapshot: dict[str, Any]) -> 
 
     def apply(snapshot: dict[str, Any] | None = None) -> None:
         data = snapshot if snapshot is not None else firestore_snapshot
-        monkeypatch.setattr(ps, "fetch_daily_firestore_snapshot", lambda uid, d: dict(data))
+        monkeypatch.setattr(
+            "services.prediction.service.fetch_daily_firestore_snapshot",
+            lambda uid, d: dict(data),
+        )
 
     return apply
 
@@ -83,11 +85,14 @@ def mock_model_gate(monkeypatch) -> Callable[..., None]:
 
     def apply(*, live: bool, gate_reason: str = "none") -> None:
         if live:
-            monkeypatch.setattr(ps, "get_model", lambda: object())
-            monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "none")
+            monkeypatch.setattr("services.prediction.service.get_model", lambda: object())
+            monkeypatch.setattr("services.prediction.service.get_model_gate_reason", lambda: "none")
         else:
-            monkeypatch.setattr(ps, "get_model", lambda: None)
-            monkeypatch.setattr(ps, "get_model_gate_reason", lambda: gate_reason)
+            monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
+            monkeypatch.setattr(
+                "services.prediction.service.get_model_gate_reason",
+                lambda: gate_reason,
+            )
 
     return apply
 
@@ -105,6 +110,7 @@ def sample_prediction_request() -> InjuryPredictionRequest:
         distanceMeters=6500,
         activeCalories=520,
         totalCalories=2800,
+        bmrCalories=1650,
         heartRateAvg=58,
         restingHeartRate=52,
         hrvRmssd=68.0,

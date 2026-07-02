@@ -7,6 +7,7 @@ from typing import Any
 from config import settings
 from schemas.enums import HistoryConfidence
 from schemas.inference import InjuryPredictionRequest
+from services.history.repository import get_history_window_context
 from services.model_features import DEFAULT_FEATURE_VALUES
 
 ROLLING_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -34,9 +35,7 @@ def apply_history_confidence_fallback(
     if not (payload.userId and payload.date):
         return frame, confidence
 
-    import services.prediction_service as prediction_service_module
-
-    context = prediction_service_module.get_history_window_context(
+    context = get_history_window_context(
         payload.userId,
         payload.date,
         lookback_days=settings.HISTORY_LOOKBACK_DAYS,

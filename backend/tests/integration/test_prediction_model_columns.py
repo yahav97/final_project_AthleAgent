@@ -25,11 +25,9 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
     from fastapi.testclient import TestClient
 
     from main import app
-    from services import prediction_service as ps
 
     monkeypatch.setattr(
-        ps,
-        "fetch_daily_firestore_snapshot",
+        "services.prediction.service.fetch_daily_firestore_snapshot",
         lambda uid, d: {
             "profile": {"birth_date": "1995-01-01"},
             "daily_health": {"sleepMinutes": 480},
@@ -57,10 +55,11 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
 
 
 def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monkeypatch):
-    from services import prediction_service as ps
-
-    monkeypatch.setattr(ps, "get_model", lambda: None)
-    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
+    monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
+    monkeypatch.setattr(
+        "services.prediction.service.get_model_gate_reason",
+        lambda: "manifest_corrupted",
+    )
     with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
         predict_injury_risk(
             InjuryPredictionRequest(
@@ -77,10 +76,11 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
 
 
 def test_predict_injury_risk_raises_when_model_missing(monkeypatch):
-    from services import prediction_service as ps
-
-    monkeypatch.setattr(ps, "get_model", lambda: None)
-    monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
+    monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
+    monkeypatch.setattr(
+        "services.prediction.service.get_model_gate_reason",
+        lambda: "manifest_corrupted",
+    )
     with pytest.raises(MLModelError):
         predict_injury_risk(
             InjuryPredictionRequest(
@@ -100,8 +100,7 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
     from services import prediction_service as ps
 
     monkeypatch.setattr(
-        ps,
-        "fetch_daily_firestore_snapshot",
+        "services.prediction.service.fetch_daily_firestore_snapshot",
         lambda user_id, date_key: {
             "profile": {},
             "daily_health": {"sleepMinutes": 470},
@@ -111,8 +110,7 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        ps,
-        "predict_injury_risk",
+        "services.prediction.service.predict_injury_risk",
         lambda payload: {
             "risk_level": "Low",
             "risk_score": 0.12,
@@ -127,7 +125,10 @@ def test_predict_injury_risk_from_firestore_maps_snapshot(monkeypatch):
 def test_persist_prediction_result_or_raise_raises_when_write_fails(monkeypatch):
     from services import prediction_service as ps
 
-    monkeypatch.setattr(ps, "save_daily_prediction_result", lambda user_id, date_key, result: False)
+    monkeypatch.setattr(
+        "services.prediction.service.save_daily_prediction_result",
+        lambda user_id, date_key, result: False,
+    )
     with pytest.raises(DatabaseError, match="Prediction persist failed"):
         ps.persist_prediction_result_or_raise(
             "u1",

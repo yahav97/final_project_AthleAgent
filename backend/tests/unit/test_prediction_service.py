@@ -7,8 +7,13 @@ import pytest
 
 from schemas.inference import InjuryPredictionRequest
 from services import prediction_service as ps
-from services.field_transforms import injured_yesterday_for_request
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
+from services.prediction.confidence import (
+    count_defaulted_critical_features,
+    history_score_from_confidence,
+    prediction_confidence_0_100,
+)
+from services.prediction.firestore_mapping import field_from_docs, firestore_doc_heartrate_avg
 from services.preprocessing import injury_request_to_model_dataframe
 from utils.exceptions import DatabaseError, MLModelError, ValidationError
 
@@ -70,16 +75,16 @@ class TestConfidenceScoring:
         [("high", 0.95), ("medium", 0.7), ("low", 0.45), ("unknown", 0.45)],
     )
     def test_history_score_from_confidence(self, confidence, expected):
-        assert ps._history_score_from_confidence(confidence) == pytest.approx(expected)
+        assert history_score_from_confidence(confidence) == pytest.approx(expected)
 
     def test_prediction_confidence_blends_history_and_quality(self):
         # 0.6 * 0.95 + 0.4 * 0.8 = 0.89 → 89.0
-        score = ps._prediction_confidence_0_100("high", 0.8)
+        score = prediction_confidence_0_100("high", 0.8)
         assert score == pytest.approx(89.0)
 
     def test_prediction_confidence_clamped_to_0_100(self):
-        assert ps._prediction_confidence_0_100("low", 0.0) == pytest.approx(27.0)
-        assert ps._prediction_confidence_0_100("high", 1.0) == pytest.approx(97.0)
+        assert prediction_confidence_0_100("low", 0.0) == pytest.approx(27.0)
+        assert prediction_confidence_0_100("high", 1.0) == pytest.approx(97.0)
 
 
 class TestDefaultedCriticalFeatures:
@@ -96,7 +101,7 @@ class TestDefaultedCriticalFeatures:
                 energyLevel=70,
             )
         )
-        count = ps._count_defaulted_critical_features(df)
+        count = count_defaulted_critical_features(df)
         assert count >= 0
         assert count <= 6
 
@@ -104,28 +109,21 @@ class TestDefaultedCriticalFeatures:
         df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
         df.at[df.index[0], "acwr_ratio"] = 1.85
         df.at[df.index[0], "hrv_drop"] = -3.2
-        count = ps._count_defaulted_critical_features(df)
+        count = count_defaulted_critical_features(df)
         assert count == 4  # only acwr_ratio and hrv_drop differ from defaults
 
 
 class TestFirestoreFieldHelpers:
-    def test_injured_yesterday_for_request_bool_and_int(self):
-        assert injured_yesterday_for_request(True) == 1
-        assert injured_yesterday_for_request(False) == 0
-        assert injured_yesterday_for_request(1) == 1
-        assert injured_yesterday_for_request(None) is None
-        assert injured_yesterday_for_request("bad") is None
-
     def test_firestore_doc_heartrate_avg_prefers_heart_rate_avg(self):
-        assert ps._firestore_doc_heartrate_avg({"heartRateAvg": 58, "avgHeartRate": 62}) == 58
+        assert firestore_doc_heartrate_avg({"heartRateAvg": 58, "avgHeartRate": 62}) == 58
 
     def test_firestore_doc_heartrate_avg_falls_back_to_avg_heart_rate(self):
-        assert ps._firestore_doc_heartrate_avg({"avgHeartRate": 62}) == 62
+        assert firestore_doc_heartrate_avg({"avgHeartRate": 62}) == 62
 
     def test_field_from_docs_prefers_primary_non_zero(self):
         primary = {"steps": 0, "distanceMeters": 5000}
         fallback = {"steps": 9000}
-        val = ps._field_from_docs(
+        val = field_from_docs(
             primary, fallback, ["steps", "distanceMeters"], prefer_primary=True
         )
         assert val == 5000
@@ -133,7 +131,7 @@ class TestFirestoreFieldHelpers:
     def test_field_from_docs_falls_back_when_primary_missing(self):
         primary = {}
         fallback = {"steps": 7400}
-        val = ps._field_from_docs(primary, fallback, ["steps"], prefer_primary=True)
+        val = field_from_docs(primary, fallback, ["steps"], prefer_primary=True)
         assert val == 7400
 
 
@@ -204,8 +202,11 @@ class TestPredictInjuryRisk:
         assert exc_info.value.code == "missing_age"
 
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):
-        monkeypatch.setattr(ps, "get_model", lambda: None)
-        monkeypatch.setattr(ps, "get_model_gate_reason", lambda: "manifest_corrupted")
+        monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
+        monkeypatch.setattr(
+            "services.prediction.service.get_model_gate_reason",
+            lambda: "manifest_corrupted",
+        )
         with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
             ps.predict_injury_risk(sample_prediction_request)
 
@@ -250,15 +251,21 @@ class TestPredictInjuryRisk:
         ) -> dict[str, object]:
             return {"confidence": "medium", "features": {}}
 
-        monkeypatch.setattr(ps, "get_model", lambda: bundle)
-        monkeypatch.setattr(ps, "get_history_window_context", _history_context)
+        monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
+        monkeypatch.setattr(
+            "services.prediction.confidence.get_history_window_context",
+            _history_context,
+        )
         out = ps.predict_injury_risk(sample_prediction_request)
         assert out["risk_level"] == expected_level
         assert out["risk_score"] == pytest.approx(probability, abs=1e-4)
 
 
     def test_from_firestore_raises_when_snapshot_empty(self, monkeypatch):
-        monkeypatch.setattr(ps, "fetch_daily_firestore_snapshot", lambda uid, d: {})
+        monkeypatch.setattr(
+            "services.prediction.service.fetch_daily_firestore_snapshot",
+            lambda uid, d: {},
+        )
         with pytest.raises(DatabaseError, match="Firestore snapshot unavailable"):
             ps.predict_injury_risk_from_firestore("u1", "2026-05-09")
 
@@ -266,6 +273,9 @@ class TestPredictInjuryRisk:
         def _save_failed(user_id: str, date_key: str, result: dict) -> bool:
             return False
 
-        monkeypatch.setattr(ps, "save_daily_prediction_result", _save_failed)
+        monkeypatch.setattr(
+            "services.prediction.service.save_daily_prediction_result",
+            _save_failed,
+        )
         with pytest.raises(DatabaseError, match="Prediction persist failed"):
             ps.persist_prediction_result_or_raise("u1", "2026-05-09", {"risk_score": 0.3})
