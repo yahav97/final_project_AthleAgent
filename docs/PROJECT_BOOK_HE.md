@@ -92,113 +92,154 @@
 
 | שחקן | תיאור | אינטראקציה עיקרית |
 |------|--------|-------------------|
-| **ספורטאי (Athlete)** | משתמש קצה שמזין נתונים וצופה בסיכון אישי | סנכרון שעון, סקר, ארוחה, דשבורד |
-| **מאמן (Coach)** | מנהל קבוצה ועוקב אחר סיכון הרשימה | יצירת קבוצה, אישור בקשות, דשבורד קבוצתי |
+| **ספורטאי (Athlete)** | משתמש קצה שמזין נתונים סובייקטיביים וצופה בסיכון אישי | סקר יומי, ארוחה, דשבורד, בקשת הצטרפות לקבוצה |
+| **מאמן (Coach)** | מנהל קבוצה ועוקב אחר סיכון הרשימה | יצירת קבוצה, אישור/דחיית בקשות, דשבורד קבוצתי |
 | **מערכת Firebase** | שירות ענן לאימות ואחסון | Auth + Firestore |
-| **Health Connect** | גשר Google לנתוני wearables | קריאת שינה, עומס, דופק, HRV |
+| **Health Connect** | גשר Google לנתוני wearables | שעונים מסנכרנים אליו **אוטומטית**; המערכת שואבת ממנו נתונים |
 | **Google Gemini** | מודל AI לראייה וטקסט | ניתוח ארוחות, המלצות בדשבורד ספורטאי ומאמן |
 | **שרת AthleAgent (Backend)** | שירות ML inference | `POST /predict/daily` |
 | **מערכת ML (Offline)** | pipeline אימון | `run_pipeline.py` — לא בזמן ריצה של האפליקציה |
 
-### 3.2 דיאגרמת Use Case
+### 3.2 רשימת Use Cases מלאה (מאומת מול הקוד)
+
+| מזהה | Use Case | שחקן יוזם | מטרה עסקית | מימוש (`Activity` / שירות) | מערכות חיצוניות |
+|------|----------|-----------|------------|------------------------------|------------------|
+| **UC-01** | **הרשמת משתמש** | ספורטאי, מאמן | יצירת חשבון + פרופיל (`role`, תאריך לידה ופציעות עבר לספורטאי) | `RegisterActivity` (+ השלמת פרופיל ב-Google Sign-In ראשון ב-`LoginActivity`) | Firebase Auth, Firestore |
+| **UC-02** | **התחברות** | ספורטאי, מאמן | כניסה למערכת וניתוב לפי תפקיד | `LoginActivity` (אימייל/סיסמה, Google) | Firebase Auth, Firestore |
+| **UC-03** | **מילוי סקר יומי** | ספורטאי | דיווח מצב גוף/נפש (אנרגיה, סטרס, כאב שרירים, פציעה אתמול) | `DailyCheckInActivity` | Firestore |
+| **UC-04** | **תיעוד ארוחה מתמונה** | ספורטאי | חילוץ קלוריות ומאקרו מתמונה ושמירה | `AnalyzingMealActivity` → `MealAnalysisActivity` | Gemini, Firestore |
+| **UC-05** | **צפייה בסיכון אישי, היסטוריה והמלצות** | ספורטאי | ציון יומי, `prediction_confidence`, גרף היסטוריה, המלצת AI | `AthleteDashboardActivity` | Firestore, Gemini |
+| **UC-06** | **בקשת הצטרפות לקבוצה** | ספורטאי | שליחת בקשה לפי קוד קבוצה | `JoinTeamActivity` | Firestore |
+| **UC-07** | **קליטת נתוני שעון אוטומטית** | *(ללא שחקן אנושי)* | שאיבת שינה/עומס/HRV מ-Health Connect ל-Firestore | `WearableSyncActivity` (ingestion) | Health Connect, Firestore |
+| **UC-08** | **חיזוי סיכון פציעה יומי** | *(מערכת — cross-trigger)* | הנדסת 35 פיצ'רים + XGBoost + שמירת `finalRiskScore` | `POST /predict/daily` (Backend) | Backend → Firestore |
+| **UC-09** | **יצירת קבוצת אימון** | מאמן | הגדרת שם קבוצה וקוד הצטרפות | `CreateTeamActivity` | Firestore |
+| **UC-10** | **ניהול בקשות הצטרפות** | מאמן | אישור או דחיית ספורטאים לרשימה | `CoachRequestsActivity` | Firestore |
+| **UC-11** | **מעקב סיכון קבוצתי ופרטי ספורטאי** | מאמן | רשימת ספורטאים, ציון יומי, גרף היסטוריה, המלצת AI | `CoachDashboardActivity` | Firestore, Gemini |
+
+**לא נכללו בדיאגרמה (לא use case עסקי מרכזי):**
+
+| פעולה | סיבה |
+|--------|------|
+| התנתקות (Logout) | סיום סשן — לא מטרה עסקית של המערכת |
+| מדיניות פרטיות | `PrivacyPolicyActivity` — תצוגת טקסט משפטי |
+| שכחתי סיסמה | תת-זרימה של UC-02, לא מטרה עצמאית |
+| מסכי Home (`HomeAthleteActivity`, `HomeCoachActivity`) | ניווט בלבד — לא use case |
+
+> **היסטוריה:** בדיאגרמת התכנון הראשונית "צפייה בהיסטוריה" הופיעה כ-UC נפרד; במימוש היא **חלק מ-UC-05** (ספורטאי) ומ-**UC-11** (מאמן — drill-down לספורטאי בודד), באותו מסך דשבורד.
+
+### 3.3 דיאגרמת Use Case
 
 ```mermaid
 usecaseDiagram
-    %% Primary Actors (Left Side)
+    %% Primary Actors
     actor Athlete as "ספורטאי\n(Athlete)"
     actor Coach as "מאמן\n(Coach)"
 
-    %% Secondary External Actors (Right Side)
+    %% Secondary External Actors
     actor Firebase as "Firebase Cloud\n(Auth & Firestore)"
     actor HealthConnect as "Google Health Connect\n(OS Wearables API)"
     actor GeminiAI as "Google Gemini API\n(LLM & Vision)"
     actor Backend as "AthleAgent Backend\n(FastAPI ML Inference)"
 
-    %% System Boundary
     rectangle "AthleAgent System Platform" {
-        %% Core Shared Use Cases
-        usecase UC_Auth as "הרשמה / התחברות\nוניתוב לפי תפקיד"
+        %% Shared — auth as separate purposeful actions
+        usecase UC_Register as "UC-01 הרשמת משתמש"
+        usecase UC_Login as "UC-02 התחברות"
 
-        %% Athlete Specific Use Cases
-        usecase UC_Sync as "סנכרון שעון חכם\n(Health Connect)"
-        usecase UC_Survey as "מילוי סקר יומי\n(Check-In)"
-        usecase UC_Meal as "צילום וניתוח ארוחה\n(Gemini Vision)"
-        usecase UC_Predict as "חיזוי סיכון פציעה יומי\n(ML Inference)"
-        usecase UC_Dash as "צפייה בציון סיכון\nוהמלצות (דשבורד)"
-        usecase UC_Join as "הצטרפות לקבוצה\n(קוד הצטרפות)"
+        %% Athlete-initiated
+        usecase UC_CheckIn as "UC-03 מילוי סקר יומי"
+        usecase UC_Meal as "UC-04 תיעוד ארוחה מתמונה"
+        usecase UC_AthleteDash as "UC-05 סיכון אישי\nהיסטוריה והמלצות"
+        usecase UC_Join as "UC-06 בקשת הצטרפות לקבוצה"
 
-        %% Coach Specific Use Cases
-        usecase UC_Team as "יצירת קבוצה\n(הפקת קוד)"
-        usecase UC_Approve as "אישור / דחיית בקשות\n(Roster)"
-        usecase UC_CoachDash as "דשבורד מאמן\n(סיכון קבוצתי)"
+        %% System-initiated (no human primary actor)
+        usecase UC_Sync as "UC-07 קליטת נתוני שעון\nאוטומטית"
+        usecase UC_Predict as "UC-08 חיזוי סיכון יומי\n(ML Inference)"
 
-        %% Conditional cross-trigger (not mandatory include)
+        %% Coach-initiated
+        usecase UC_CreateTeam as "UC-09 יצירת קבוצה"
+        usecase UC_ManageReq as "UC-10 ניהול בקשות הצטרפות"
+        usecase UC_CoachDash as "UC-11 מעקב סיכון קבוצתי"
+
         UC_Sync -.->|"cross-trigger"| UC_Predict
-        UC_Survey -.->|"cross-trigger"| UC_Predict
+        UC_CheckIn -.->|"cross-trigger"| UC_Predict
     }
 
-    %% Actor to Use Case Associations
-    Athlete --> UC_Auth
-    Athlete --> UC_Sync
-    Athlete --> UC_Survey
+    %% Athlete associations
+    Athlete --> UC_Register
+    Athlete --> UC_Login
+    Athlete --> UC_CheckIn
     Athlete --> UC_Meal
-    Athlete --> UC_Dash
+    Athlete --> UC_AthleteDash
     Athlete --> UC_Join
 
-    Coach --> UC_Auth
-    Coach --> UC_Team
-    Coach --> UC_Approve
+    %% Coach associations
+    Coach --> UC_Register
+    Coach --> UC_Login
+    Coach --> UC_CreateTeam
+    Coach --> UC_ManageReq
     Coach --> UC_CoachDash
 
-    %% Use Case to External Systems Associations
-    UC_Auth --> Firebase
+    %% Automatic ingestion — initiated by Health Connect, not Athlete
+    HealthConnect --> UC_Sync
 
-    UC_Sync --> HealthConnect
-    UC_Sync --> Firebase
+    %% External system links
+    UC_Register --> Firebase
+    UC_Login --> Firebase
 
-    UC_Survey --> Firebase
+    UC_CheckIn --> Firebase
 
     UC_Meal --> GeminiAI
     UC_Meal --> Firebase
 
-    UC_Predict --> Backend
-    Backend --> Firebase
-
-    UC_Dash --> Firebase
-    UC_Dash --> GeminiAI
+    UC_AthleteDash --> Firebase
+    UC_AthleteDash --> GeminiAI
 
     UC_Join --> Firebase
 
-    UC_Team --> Firebase
-    UC_Approve --> Firebase
+    UC_Sync --> HealthConnect
+    UC_Sync --> Firebase
+
+    UC_Predict --> Backend
+    Backend --> Firebase
+
+    UC_CreateTeam --> Firebase
+    UC_ManageReq --> Firebase
 
     UC_CoachDash --> Firebase
     UC_CoachDash --> GeminiAI
 ```
 
 > **הערות לדיאגרמה:**
-> - **cross-trigger** — חיזוי ML מופעל רק כאשר גם נתוני שעון וגם סקר יומי קיימים ותקינים; זה לא `<<include>>` חובה.
-> - **ארוחה** שומרת תזונה ב-Firestore בלבד — אינה מפעילה חיזוי ישירות.
-> - **Backend** מבצע inference (`POST /predict/daily`) וקורא/כותב Firestore; האפליקציה מציגה את `finalRiskScore` מ-Firestore.
+> - **UC-07 אוטומטי** — שעונים (Garmin, Samsung וכו') מסנכרנים ל-Health Connect **בלעדי הספורטאי**; המערכת שואבת משם. אין קישור `Athlete → UC-07`.
+> - **cross-trigger (UC-08)** — חיזוי ML מופעל רק כאשר גם נתוני שעון (UC-07) וגם סקר יומי (UC-03) קיימים ותקינים; זה לא `<<include>>` חובה.
+> - **UC-04 (ארוחה)** שומרת תזונה ב-Firestore בלבד — **אינה** מפעילה חיזוי ישירות.
+> - **UC-05 / UC-11** כוללים גרף היסטוריה — לא UC נפרד.
+> - **Backend** מבצע inference (`POST /predict/daily`) וקורא/כותב Firestore; התצוגה קוראת `finalRiskScore` מ-Firestore.
 > - **ML Pipeline offline** (`run_pipeline.py`) אינו מופיע — לא use case בזמן ריצה של האפליקציה.
 
-### 3.3 תרחישי שימוש עיקריים
+### 3.4 תרחישי שימוש עיקריים
 
-#### UC-01: זרימה יומית של ספורטאי
+#### תרחיש 1: זרימה יומית של ספורטאי
 
-1. סנכרון Health Connect בבוקר (שינה → היום, עומס → אתמול).
-2. מילוי סקר (אנרגיה, סטרס, כאב שרירים, פציעה אתמול).
-3. *(אופציונלי)* צילום ארוחה → Gemini מחלץ קלוריות ומאקרו.
-4. cross-trigger מפעיל `POST /predict/daily`.
+1. **UC-07** — נתוני שעון זורמים אוטומטית ל-Health Connect; המערכת שואבת ושומרת (שינה → היום, עומס → אתמול).
+2. **UC-03** — מילוי סקר (אנרגיה, סטרס, כאב שרירים, פציעה אתמול).
+3. *(אופציונלי)* **UC-04** — צילום ארוחה → Gemini מחלץ קלוריות ומאקרו.
+4. **UC-08** — cross-trigger מפעיל `POST /predict/daily` (כאשר UC-07 + UC-03 מוכנים).
 5. Backend קורא Firestore → 35 פיצ'רים → XGBoost → כותב `finalRiskScore`.
-6. דשבורד מציג ציון, גרף היסטוריה והמלצת Gemini.
+6. **UC-05** — דשבורד מציג ציון, גרף היסטוריה והמלצת Gemini.
 
-#### UC-02: ניהול קבוצה על ידי מאמן
+#### תרחיש 2: ניהול קבוצה על ידי מאמן
 
-1. מאמן יוצר קבוצה ומקבל קוד הצטרפות.
-2. ספורטאים שולחים בקשות הצטרפות.
-3. מאמן מאשר/דוחה.
-4. דשבורד מאמן מציג סיכון יומי לכל ספורטאי בקבוצה; Gemini מייצר המלצת אימון קצרה לפי נתוני הספורטאי (אם חסרה ב-Firestore).
+1. **UC-09** — מאמן יוצר קבוצה ומגדיר קוד הצטרפות.
+2. **UC-06** — ספורטאים שולחים בקשות הצטרפות.
+3. **UC-10** — מאמן מאשר או דוחה.
+4. **UC-11** — דשבורד מאמן מציג סיכון יומי, היסטוריה והמלצת Gemini לכל ספורטאי בקבוצה.
+
+#### תרחיש 3: כניסה למערכת
+
+1. **UC-01** — משתמש חדש נרשם (בחירת תפקיד Athlete/Coach).
+2. **UC-02** — משתמש קיים מתחבר; ניתוב ל-`HomeAthleteActivity` או `HomeCoachActivity` לפי `users.role`.
 
 ---
 
