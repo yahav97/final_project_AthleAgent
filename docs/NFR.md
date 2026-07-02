@@ -440,8 +440,8 @@
 
 | סוג         | דוגמאות                                                        |
 | ----------- | -------------------------------------------------------------- |
-| Unit        | `tests/unit/test_preprocessing.py`, `tests/unit/test_prediction_service.py`          |
-| Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py` |
+| Unit        | `tests/unit/test_preprocessing.py`, `tests/unit/test_prediction_service.py`, `tests/unit/test_field_transforms.py`, `tests/unit/test_history_service.py` |
+| Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py`, `tests/integration/test_prediction_model_columns.py` |
 | Gates       | `tests/unit/test_model_loader.py`                                    |
 | Contract    | `tests/unit/test_train_serve_parity.py`, `tests/integration/test_openapi_contract.py`       |
 

@@ -889,8 +889,8 @@ erDiagram
 
 | שכבה | Framework | דוגמאות |
 |------|-----------|---------|
-| Backend unit | pytest | `test_preprocessing`, `test_prediction_service`, `test_model_loader` |
-| Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract` |
+| Backend unit | pytest | `test_preprocessing`, `test_prediction_service`, `test_field_transforms`, `test_history_service`, `test_model_loader` |
+| Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
 | Train-serve | pytest | `test_train_serve_parity` |
 | Android | JUnit | `ExampleUnitTest` (placeholder) |
 
@@ -899,7 +899,7 @@ erDiagram
 cd backend && python -m pytest tests/ -v
 ```
 
-**ספירה:** ~150+ בדיקות backend.
+**ספירה:** ~197 בדיקות backend.
 
 ---
 

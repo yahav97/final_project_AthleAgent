@@ -77,12 +77,13 @@ def injury_request_to_model_dataframe(payload: InjuryPredictionRequest) -> pd.Da
     else:
         avg_cadence = 0.0
 
-    weight_kg = payload_dict.get("weightKg")
-    height_cm = payload_dict.get("heightCm")
-    height_m = safe_float(height_cm, fallback=175.0) / 100.0 if safe_float(height_cm) > 0 else 1.75
-    bmi = 0.0
-    if weight_kg is not None and safe_float(weight_kg) > 0 and height_m > 0:
-        bmi = float(weight_kg) / (height_m**2)
+    weight_kg = safe_float(payload_dict.get("weightKg"))
+    height_cm = safe_float(payload_dict.get("heightCm"))
+    if weight_kg > 0 and height_cm > 0:
+        height_m = height_cm / 100.0
+        bmi = weight_kg / (height_m**2)
+    else:
+        bmi = DEFAULT_BMI
 
     age_val = resolve_model_age(payload_dict.get("age"))
 

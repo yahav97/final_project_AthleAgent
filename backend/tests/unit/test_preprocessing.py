@@ -8,7 +8,8 @@ import pandas as pd
 import pytest
 
 from schemas.inference import InjuryPredictionRequest
-from services.model_features import MODEL_FEATURE_COLUMNS
+from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
+from services.nutrition_defaults import resolve_request_nutrition
 from services.preprocessing import (
     calculate_data_quality_score,
     injury_request_to_model_dataframe,
@@ -268,6 +269,53 @@ class TestInjuryRequestToDataframe:
         )
         df = injury_request_to_model_dataframe(req)
         assert df["sleep_hours"].iloc[0] == pytest.approx(0.0)
+
+    def test_bmi_uses_population_default_without_weight_and_height(self):
+        req = InjuryPredictionRequest(
+            age=28,
+            sleepMinutes=420,
+            steps=5000,
+            stressLevel=40,
+            muscleSoreness=3,
+            energyLevel=70,
+        )
+        df = injury_request_to_model_dataframe(req)
+        assert df["bmi"].iloc[0] == pytest.approx(DEFAULT_FEATURE_VALUES["bmi"])
+
+    def test_bmi_computed_when_weight_and_height_present(self):
+        req = InjuryPredictionRequest(
+            age=28,
+            sleepMinutes=420,
+            steps=5000,
+            weightKg=72.0,
+            heightCm=180.0,
+            stressLevel=40,
+            muscleSoreness=3,
+            energyLevel=70,
+        )
+        df = injury_request_to_model_dataframe(req)
+        assert df["bmi"].iloc[0] == pytest.approx(72.0 / (1.8**2))
+
+    def test_zero_nutrition_resolved_before_model_features(self):
+        req = resolve_request_nutrition(
+            InjuryPredictionRequest(
+                age=28,
+                sleepMinutes=420,
+                steps=5000,
+                totalProtein=0,
+                totalCarbs=0,
+                mealsLoggedCount=0,
+                nutritionTotalCalories=0,
+                stressLevel=40,
+                muscleSoreness=3,
+                energyLevel=70,
+            )
+        )
+        assert req.nutritionImputed is True
+        assert req.totalProtein == 130
+        df = injury_request_to_model_dataframe(req)
+        assert df["nutrition_intake_calories"].iloc[0] > 0.0
+        assert df["daily_calories"].iloc[0] > 0.0
 
     def test_all_values_finite(self, sample_prediction_request):
         df = injury_request_to_model_dataframe(sample_prediction_request)

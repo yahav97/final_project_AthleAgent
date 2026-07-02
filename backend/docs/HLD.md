@@ -473,7 +473,7 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 
 | סוג | קבצים |
 |-----|-------|
-| Unit | `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py`, `tests/unit/test_history_service.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_exceptions.py` |
+| Unit | `tests/unit/test_preprocessing.py`, `tests/unit/test_prediction_service.py`, `tests/unit/test_field_transforms.py`, `tests/unit/test_feature_engineering.py`, `tests/unit/test_history_service.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_exceptions.py` |
 | Integration | `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_inference_edge_cases.py`, `tests/integration/test_openapi_contract.py` |
 | Contract | `tests/unit/test_train_serve_parity.py`, `tests/integration/test_prediction_model_columns.py` |
 | Gates | `tests/unit/test_model_loader.py` |

@@ -165,3 +165,17 @@ class TestNutritionDefaults:
         assert out["totalCalories"] == 2600
         assert out["totalCarbs"] == 300
         assert out["mealsLoggedCount"] == 3
+
+    def test_zero_nutrition_values_get_population_defaults(self):
+        primary = {
+            "totalProtein": 0,
+            "totalCarbs": 0,
+            "mealsLoggedCount": 0,
+            "totalCalories": 0,
+        }
+        out, imputed = apply_nutrition_population_defaults(primary)
+        assert imputed is True
+        assert out["totalProtein"] == 130
+        assert out["totalCarbs"] == 300
+        assert out["mealsLoggedCount"] == 3
+        assert out["totalCalories"] == 2600

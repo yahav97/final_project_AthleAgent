@@ -14,6 +14,7 @@ from services.prediction.confidence import (
     count_defaulted_critical_features,
     prediction_confidence_0_100,
 )
+from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
 from services.preprocessing import (
     calculate_data_quality_score,
@@ -35,6 +36,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     Client is expected to send complete measurement payloads; missing/null/zero
     values lower ``prediction_confidence`` (never HTTP rejection).
     """
+    payload = resolve_request_nutrition(payload)
     frame = injury_request_to_model_dataframe(payload)
     frame, history_confidence = apply_history_confidence_fallback(frame, payload)
     quality = calculate_data_quality_score(payload)
