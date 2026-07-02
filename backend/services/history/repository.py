@@ -9,7 +9,9 @@ from typing import Any
 from config import settings
 from schemas.enums import HistoryConfidence
 from services.history.date_utils import date_keys_in_range, to_date_key
+from services.history.day_quality import count_quality_history_days
 from services.history.firestore_client import get_firestore_client
+from services.history.history_merge import merge_wake_up_day_row
 from services.history.rolling_features import compute_historical_derived_features
 from utils.logging import logger
 
@@ -105,7 +107,16 @@ def fetch_user_history(
     lookback_days: int = 7,
     include_target_day: bool = True,
 ) -> list[dict[str, Any]]:
-    """Repository layer: fetch merged daily history rows for user/date window."""
+    """
+    Fetch logical wake-up-day history rows for the prediction window.
+
+    Each row is keyed by wake-up day ``W`` and merged like production inference:
+    physical from ``daily_health/{W-1}``, sleep from ``daily_health/{W}``,
+    survey from ``daily_checkins/{W}``.
+
+    For prediction date ``D`` with ``include_target_day=False`` (rolling features),
+    wake-up days are ``D-7 … D-1``; physical docs ``D-8 … D-2`` are read as needed.
+    """
     try:
         end_day = to_date_key(date_key)
     except ValueError:
@@ -129,17 +140,28 @@ def fetch_user_history(
         return []
 
     merged_rows: list[dict[str, Any]] = []
-    for key in date_keys_in_range(start_day, end_inclusive):
-        health_doc = _sync_document_get(health_ref.document(key))
-        if not health_doc.exists:
-            continue
-        row = dict(health_doc.to_dict() or {})
-        checkin_doc = _sync_document_get(checkin_ref.document(key))
-        if checkin_doc.exists:
-            row.update(checkin_doc.to_dict() or {})
-        row["date_key"] = key
-        merged_rows.append(row)
+    for wake_up_key in date_keys_in_range(start_day, end_inclusive):
+        physical_key = (to_date_key(wake_up_key) - timedelta(days=1)).strftime("%Y-%m-%d")
+        physical_doc = _sync_document_get(health_ref.document(physical_key))
+        wake_doc = _sync_document_get(health_ref.document(wake_up_key))
+        checkin_doc = _sync_document_get(checkin_ref.document(wake_up_key))
+        row = merge_wake_up_day_row(
+            wake_up_key,
+            physical_doc.to_dict() if physical_doc.exists else None,
+            wake_doc.to_dict() if wake_doc.exists else None,
+            checkin_doc.to_dict() if checkin_doc.exists else None,
+        )
+        if row is not None:
+            merged_rows.append(row)
     return merged_rows
+
+
+def _history_confidence_from_usable_days(usable_days: int) -> HistoryConfidence:
+    if usable_days >= settings.HISTORY_CONFIDENCE_HIGH_MIN_DAYS:
+        return HistoryConfidence.HIGH
+    if usable_days >= settings.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS:
+        return HistoryConfidence.MEDIUM
+    return HistoryConfidence.LOW
 
 
 def get_history_window_context(
@@ -152,9 +174,13 @@ def get_history_window_context(
     Return historical feature context with quality metadata for fallback decisions.
 
     confidence policy (see config.settings):
-    - high:   HISTORY_CONFIDENCE_HIGH_MIN_DAYS+ days
-    - medium: HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS .. high-1 days
+    - high:   HISTORY_CONFIDENCE_HIGH_MIN_DAYS+ usable days
+    - medium: HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS .. high-1 usable days
     - low:    below medium threshold
+
+    Each history row is a merged wake-up day (physical@W-1, sleep/survey@W).
+    A day is usable when at least three watch-sync signal groups are present
+    on that merged row (load, sleep, heart, energy).
     """
     resolved_lookback = (
         settings.HISTORY_LOOKBACK_DAYS if lookback_days is None else lookback_days
@@ -166,15 +192,12 @@ def get_history_window_context(
         include_target_day=include_target_day,
     )
     days_count = len(rows)
+    quality_days_count = count_quality_history_days(rows)
     features = compute_historical_derived_features(rows)
-    if days_count >= settings.HISTORY_CONFIDENCE_HIGH_MIN_DAYS:
-        confidence = HistoryConfidence.HIGH
-    elif days_count >= settings.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS:
-        confidence = HistoryConfidence.MEDIUM
-    else:
-        confidence = HistoryConfidence.LOW
+    confidence = _history_confidence_from_usable_days(quality_days_count)
     return {
         "days_count": days_count,
+        "quality_days_count": quality_days_count,
         "confidence": confidence.value,
         "features": features,
         "recent_row": rows[-1] if rows else None,

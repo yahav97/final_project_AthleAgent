@@ -20,6 +20,15 @@ ROLLING_FEATURE_COLUMNS: tuple[str, ...] = (
 )
 
 
+def _coerce_history_confidence(confidence: HistoryConfidence | str) -> HistoryConfidence:
+    if isinstance(confidence, HistoryConfidence):
+        return confidence
+    try:
+        return HistoryConfidence(confidence)
+    except ValueError:
+        return HistoryConfidence.LOW
+
+
 def apply_history_confidence_fallback(
     frame,
     payload: InjuryPredictionRequest,
@@ -42,10 +51,7 @@ def apply_history_confidence_fallback(
         include_target_day=False,
     )
     confidence_raw = context.get("confidence") or HistoryConfidence.LOW.value
-    try:
-        confidence = HistoryConfidence(confidence_raw)
-    except ValueError:
-        confidence = HistoryConfidence.LOW
+    confidence = _coerce_history_confidence(confidence_raw)
     features = context.get("features") or {}
 
     if confidence in (HistoryConfidence.HIGH, HistoryConfidence.MEDIUM) and features:
@@ -60,15 +66,16 @@ def apply_history_confidence_fallback(
     return frame, confidence
 
 
-def history_score_from_confidence(confidence: HistoryConfidence) -> float:
-    if confidence == HistoryConfidence.HIGH:
+def history_score_from_confidence(confidence: HistoryConfidence | str) -> float:
+    level = _coerce_history_confidence(confidence)
+    if level == HistoryConfidence.HIGH:
         return settings.CONFIDENCE_SCORE_HIGH
-    if confidence == HistoryConfidence.MEDIUM:
+    if level == HistoryConfidence.MEDIUM:
         return settings.CONFIDENCE_SCORE_MEDIUM
     return settings.CONFIDENCE_SCORE_LOW
 
 
-def prediction_confidence_0_100(confidence: HistoryConfidence, quality_score: float) -> float:
+def prediction_confidence_0_100(confidence: HistoryConfidence | str, quality_score: float) -> float:
     """Blend history-window confidence with same-day input completeness (0–1) → 0–100."""
     history_score = history_score_from_confidence(confidence)
     combined = (

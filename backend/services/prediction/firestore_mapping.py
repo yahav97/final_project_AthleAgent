@@ -47,7 +47,8 @@ def injury_prediction_request_from_firestore_snapshot(
     - Sleep / recovery: ``daily_health/{D}`` only (last night ending this morning).
     - Physical load: ``daily_health/{D-1}`` only (Android sync writes load to prior day).
     - Survey: ``daily_checkins/{D}``.
-    - Nutrition: ``daily_nutrition/{D-1}`` + population defaults for missing fields.
+    - Nutrition: ``daily_nutrition/{D-1}`` with population defaults when fields are missing/zero.
+      ``predict_injury_risk`` runs ``resolve_request_nutrition`` again (idempotent).
     """
     profile = snapshot.get("profile") or {}
     health_today = snapshot.get("daily_health") or {}

@@ -39,8 +39,8 @@ def calculate_data_quality_score(
     if payload_dict.get("nutritionImputed"):
         weak_fields.append("nutrition_imputed")
 
-    penalty = ZERO_OR_MISSING_PENALTY * len(
-        [f for f in weak_fields if f in MEASUREMENT_FIELDS + PROFILE_FIELDS]
+    penalty = ZERO_OR_MISSING_PENALTY * sum(
+        1 for field in weak_fields if field != "nutrition_imputed"
     )
     if "nutrition_imputed" in weak_fields:
         penalty += NUTRITION_IMPUTED_PENALTY

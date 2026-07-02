@@ -8,13 +8,13 @@ from ml.model_loader import get_model, get_model_gate_reason
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
 from services.history.repository import fetch_daily_firestore_snapshot, save_daily_prediction_result
+from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
     apply_history_confidence_fallback,
     count_defaulted_critical_features,
     prediction_confidence_0_100,
 )
-from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
 from services.preprocessing import (
     calculate_data_quality_score,
@@ -30,18 +30,14 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     """
     Run preprocessing → feature row → sklearn ``predict_proba`` (injury positive class).
 
-    If ``injury_model.pkl`` is not present on the server, returns a conservative demo
-    response so local development and CI still behave predictably.
-
-    Client is expected to send complete measurement payloads; missing/null/zero
-    values lower ``prediction_confidence`` (never HTTP rejection).
+    Raises ``MLModelError`` when the promoted model bundle is not live.
+    Missing or zero measurements lower ``prediction_confidence`` only (never HTTP rejection).
     """
     payload = resolve_request_nutrition(payload)
     frame = injury_request_to_model_dataframe(payload)
     frame, history_confidence = apply_history_confidence_fallback(frame, payload)
     quality = calculate_data_quality_score(payload)
-    score = quality["score"]
-    quality_score = float(score) if isinstance(score, (int, float)) else 0.0
+    quality_score = float(quality["score"])
     logger.info(
         "predict_data_quality userId=%s date=%s quality=%.3f weak_fields=%s",
         payload.userId,
