@@ -60,13 +60,11 @@ def compute_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
     total_calories_burned = float(row.get("total_calories_burned") or 0.0)
     if total_calories_burned <= 0 and (active_cal > 0 or bmr_cal > 0):
         total_calories_burned = active_cal + bmr_cal
-    if total_calories_burned <= 0:
-        total_calories_burned = float(DEFAULT_FEATURE_VALUES["total_calories_burned"])
 
     return {
         "acute_load_7d": acute_load_7d,
         "acwr_ratio": acwr_ratio,
         "sleep_debt_3d": sleep_debt_3d,
         "hrv_drop": hrv_drop,
-        "total_calories_burned": float(min(9000.0, total_calories_burned)),
+        "total_calories_burned": float(total_calories_burned),
     }

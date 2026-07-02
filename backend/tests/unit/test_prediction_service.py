@@ -91,6 +91,9 @@ class TestDefaultedCriticalFeatures:
                 age=28,
                 sleepMinutes=420,
                 steps=5000,
+                stressLevel=40,
+                muscleSoreness=3,
+                energyLevel=70,
             )
         )
         count = ps._count_defaulted_critical_features(df)

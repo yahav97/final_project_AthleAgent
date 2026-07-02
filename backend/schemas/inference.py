@@ -19,7 +19,8 @@ class InjuryPredictionRequest(BaseModel):
     """
     Daily signals as stored or computed in the Android app (camelCase JSON).
 
-    All fields optional so partial payloads are valid; the service applies defaults.
+    All fields optional; the production Android app always submits a complete daily survey
+    to Firestore before triggering prediction.
     """
 
     model_config = ConfigDict(extra="ignore")

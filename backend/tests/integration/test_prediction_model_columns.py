@@ -34,7 +34,7 @@ def test_predict_injury_risk_with_loaded_model_no_500(monkeypatch):
             "profile": {"birth_date": "1995-01-01"},
             "daily_health": {"sleepMinutes": 480},
             "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
-            "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2},
+            "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2, "energyLevel": 65},
             "daily_nutrition_yesterday": {},
         },
     )
@@ -71,6 +71,7 @@ def test_predict_injury_risk_service_subset_columns_skips_missing_estimator(monk
                 steps=7000,
                 stressLevel=30,
                 muscleSoreness=2,
+                energyLevel=70,
             )
         )
 
@@ -90,6 +91,7 @@ def test_predict_injury_risk_raises_when_model_missing(monkeypatch):
                 steps=6200,
                 stressLevel=36,
                 muscleSoreness=3,
+                energyLevel=65,
             )
         )
 

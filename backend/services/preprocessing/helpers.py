@@ -27,6 +27,40 @@ def is_present(value: object) -> bool:
     return True
 
 
+def is_missing(value: object) -> bool:
+    """True when a field was not provided or is non-finite."""
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    if isinstance(value, (int, float)):
+        return not math.isfinite(float(value))
+    return False
+
+
+def is_zero_or_nan(value: object) -> bool:
+    """True when a measurement is absent, NaN, or exactly zero."""
+    if is_missing(value):
+        return True
+    try:
+        return float(value) == 0.0  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return True
+
+
+def is_explicit_zero_or_nan(value: object) -> bool:
+    """True only when the client sent a value that is 0 or non-finite."""
+    if value is None:
+        return False
+    if isinstance(value, str) and not value.strip():
+        return False
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return True
+    return not (num == num) or num == 0.0  # NaN or zero
+
+
 def positive_numeric(value: object) -> float:
     """Return a finite numeric value only when strictly greater than zero."""
     try:

@@ -85,17 +85,17 @@ class TestRestingHr:
         assert resting_hr_from_doc({"restingHeartRate": 48}) == pytest.approx(48.0)
         assert resting_hr_from_doc({"heartRateMin": 50}) == pytest.approx(50.0)
         assert resting_hr_from_doc({"heartRateAvg": 60}) == pytest.approx(60.0)
-        assert resting_hr_from_doc({}) == pytest.approx(54.0)
+        assert resting_hr_from_doc({}) == pytest.approx(0.0)
 
-    def test_clamps_extreme_values(self):
-        assert resting_hr(20, 0, 0) == pytest.approx(38.0)
-        assert resting_hr(120, 0, 0) == pytest.approx(95.0)
+    def test_extreme_values_pass_through(self):
+        assert resting_hr(20, 0, 0) == pytest.approx(20.0)
+        assert resting_hr(120, 0, 0) == pytest.approx(120.0)
 
 
 class TestInjuredYesterday:
     @pytest.mark.parametrize(
         ("raw", "expected"),
-        [(None, DEFAULT_FEATURE_VALUES["injured_yesterday"]), (True, 1.0), (False, 0.0), (0, 0.0), (1, 1.0)],
+        [(None, 0.0), (True, 1.0), (False, 0.0), (0, 0.0), (1, 1.0)],
     )
     def test_injured_yesterday_as_feature(self, raw, expected):
         assert injured_yesterday_as_feature(raw) == pytest.approx(expected)

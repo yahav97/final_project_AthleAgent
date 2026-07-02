@@ -6,14 +6,11 @@ import math
 from datetime import date, datetime
 from typing import Any, Mapping
 
-from services.model_features import DEFAULT_FEATURE_VALUES
 from utils.exceptions import ValidationError
 
 STEPS_TO_KM = 0.0008
-RESTING_HR_MIN = 38.0
-RESTING_HR_MAX = 95.0
 DAYS_PER_YEAR = 365.0
-DEFAULT_RESTING_HR = float(DEFAULT_FEATURE_VALUES["resting_hr"])
+DEFAULT_RESTING_HR = 0.0
 
 
 def _parse_date_key(value: str) -> date | None:
@@ -108,10 +105,10 @@ def injured_yesterday_for_request(raw: object) -> int | None:
 
 
 def injured_yesterday_as_feature(raw: object) -> float:
-    """Model feature 0/1; missing or invalid → population default."""
+    """Model feature 0/1; missing or invalid → 0."""
     parsed = parse_injured_yesterday_flag(raw)
     if parsed is None:
-        return float(DEFAULT_FEATURE_VALUES["injured_yesterday"])
+        return 0.0
     return float(parsed)
 
 
@@ -147,16 +144,14 @@ def resting_hr(
     *,
     default: float = DEFAULT_RESTING_HR,
 ) -> float:
-    """RestingHeartRate → heartRateMin → heartRateAvg, clamped to sane range."""
+    """RestingHeartRate → heartRateMin → heartRateAvg; missing chain → default (0)."""
     if resting > 0:
-        value = resting
-    elif hr_min > 0:
-        value = hr_min
-    elif hr_avg > 0:
-        value = hr_avg
-    else:
-        return float(default)
-    return float(max(RESTING_HR_MIN, min(RESTING_HR_MAX, value)))
+        return float(resting)
+    if hr_min > 0:
+        return float(hr_min)
+    if hr_avg > 0:
+        return float(hr_avg)
+    return float(default)
 
 
 def resting_hr_from_doc(doc: Mapping[str, Any]) -> float:

@@ -30,8 +30,8 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     If ``injury_model.pkl`` is not present on the server, returns a conservative demo
     response so local development and CI still behave predictably.
 
-    Client is expected to avoid calling until required inputs exist; missing load is
-    surfaced via ``load_signal`` in data quality (confidence only, not HTTP rejection).
+    Client is expected to send structurally valid payloads; explicit zeros or NaNs
+    only lower ``prediction_confidence`` (never HTTP rejection).
     """
     import services.prediction_service as prediction_service_module
 

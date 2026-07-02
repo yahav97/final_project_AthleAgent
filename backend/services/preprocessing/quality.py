@@ -3,46 +3,50 @@
 from __future__ import annotations
 
 from schemas.inference import InjuryPredictionRequest
-from services.preprocessing.constants import HARD_FIELDS, SENSITIVE_FIELDS
-from services.preprocessing.helpers import has_positive_load_signal, is_present
+from services.preprocessing.constants import (
+    MEASUREMENT_FIELDS,
+    NUTRITION_IMPUTED_PENALTY,
+    PROFILE_FIELDS,
+    ZERO_OR_MISSING_PENALTY,
+)
+from services.preprocessing.helpers import is_explicit_zero_or_nan
 
 
 def calculate_data_quality_score(
     payload: InjuryPredictionRequest,
 ) -> dict[str, float | list[str] | bool]:
     """
-    Score current-day payload completeness and report hard-missing conditions.
+    Score same-day input strength for prediction confidence.
 
-    Score range: 0.0 - 1.0
-    - tolerant missing fields do not reduce score
-    - sensitive missing fields reduce score
-    - hard requirements trigger red flag
+    Policy:
+    - Frontend payloads are trusted; absent fields are not penalized.
+    - Fields explicitly sent as 0 or NaN reduce confidence.
+    - Imputed nutrition history is flagged separately.
+    - Historical gaps are handled in ``confidence`` (not here).
     """
     payload_dict = payload.model_dump()
-    hard_missing = [field for field in HARD_FIELDS if not is_present(payload_dict.get(field))]
-    sensitive_missing = [
-        field for field in SENSITIVE_FIELDS if not is_present(payload_dict.get(field))
-    ]
+    weak_fields: list[str] = []
+
+    for field in MEASUREMENT_FIELDS + PROFILE_FIELDS:
+        raw = payload_dict.get(field)
+        if raw is not None and is_explicit_zero_or_nan(raw):
+            weak_fields.append(field)
+
     if payload_dict.get("nutritionImputed"):
-        sensitive_missing.append("nutrition_imputed")
+        weak_fields.append("nutrition_imputed")
 
-    has_load_signal = has_positive_load_signal(payload_dict)
-    has_recovery_signal = is_present(payload_dict.get("sleepMinutes")) or (
-        is_present(payload_dict.get("stressLevel")) and is_present(payload_dict.get("muscleSoreness"))
+    penalty = ZERO_OR_MISSING_PENALTY * len(
+        [f for f in weak_fields if f in MEASUREMENT_FIELDS + PROFILE_FIELDS]
     )
-    if not has_load_signal:
-        hard_missing.append("load_signal")
-    if not has_recovery_signal:
-        hard_missing.append("recovery_signal")
+    if "nutrition_imputed" in weak_fields:
+        penalty += NUTRITION_IMPUTED_PENALTY
 
-    sensitive_penalty = 0.12 * len(sensitive_missing)
-    score = max(0.0, min(1.0, 1.0 - sensitive_penalty))
-    if hard_missing:
-        score = min(score, 0.25)
+    score = max(0.0, min(1.0, 1.0 - penalty))
 
     return {
         "score": float(score),
-        "hard_missing": hard_missing,
-        "sensitive_missing": sensitive_missing,
-        "has_hard_blocker": bool(hard_missing),
+        "weak_fields": weak_fields,
+        "hard_missing": [],
+        "sensitive_missing": weak_fields,
+        "has_hard_blocker": False,
     }
