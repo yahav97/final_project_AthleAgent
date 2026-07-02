@@ -1005,11 +1005,11 @@ prediction_confidence = round((0.6 × history_score + 0.4 × quality_score) × 1
 
 | אירוע | השפעה |
 |-------|--------|
-| כל שדה מדידה חסר / אפס / NaN | **−0.08** לכל שדה ב-`MEASUREMENT_FIELDS` |
-| תזונה ממוצעת (`nutritionImputed`) | **−0.12** |
-| שדות פרופיל שנשלחו כ-0 או NaN | **−0.08** לכל שדה ב-`PROFILE_FIELDS` |
+| כל שדה מדידה חסר / אפס / NaN | **−0.08** לכל שדה ב-`SAME_DAY_MEASUREMENT_FIELDS` |
+| תזונה ממוצעת (`nutritionImputed`) | **−0.12** (`NUTRITION_IMPUTED_PENALTY`) |
+| שדות פרופיל שנשלחו כ-0 או NaN | **−0.08** לכל שדה ב-`OPTIONAL_PROFILE_FIELDS` |
 
-**שדות מדידה (MEASUREMENT_FIELDS):**  
+**שדות מדידה (`SAME_DAY_MEASUREMENT_FIELDS`):**  
 `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
 
 > **חשוב:** חיזוי **לא נחסם** בגלל שדות חסרים — רק `prediction_confidence` יורד.

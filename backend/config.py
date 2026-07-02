@@ -4,8 +4,21 @@ Configuration management for AthleAgent backend.
 All tunable application behaviour lives here. Override via environment variables
 or a `.env` file in `backend/` (preferred) or the process working directory.
 
-Domain constants (risk bands, ML gates, history windows) are grouped below so
-staging and future tuning do not require hunting through service modules.
+Policy map (where each group is used in code):
+┌─────────────────────────────┬──────────────────────────────────────────┐
+│ Settings group              │ Consumed by                              │
+├─────────────────────────────┼──────────────────────────────────────────┤
+│ ML_MIN_* / ML_DEGRADED_*      │ ml/model_loader.py — live model gates    │
+│ RISK_*_CUTOFF               │ services/risk_levels.py                  │
+│ HISTORY_*                   │ history/repository.py, day_quality.py    │
+│ SLEEP_*                     │ feature_engineering.py, rolling_features │
+│ CONFIDENCE_*                │ prediction/confidence.py                 │
+│ NUTRITION_DEFAULT_*         │ nutrition_defaults.py                    │
+└─────────────────────────────┴──────────────────────────────────────────┘
+
+Prediction confidence blend (see ``compute_prediction_confidence_percent``):
+  (CONFIDENCE_HISTORY_WEIGHT × history_score + CONFIDENCE_QUALITY_WEIGHT × quality_score) × 100
+  Example high history + strong inputs: (0.6×0.95 + 0.4×1.0)×100 ≈ 97
 """
 
 from __future__ import annotations
@@ -100,10 +113,27 @@ class Settings(BaseSettings):
 
     # -------------------------------------------------------------------------
     # Firestore history window & confidence policy
+    # (see history/repository.py, history/day_quality.py, prediction/confidence.py)
     # -------------------------------------------------------------------------
-    HISTORY_LOOKBACK_DAYS: int = 7
-    HISTORY_CONFIDENCE_HIGH_MIN_DAYS: int = 7
-    HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS: int = 4
+    HISTORY_LOOKBACK_DAYS: int = Field(
+        default=7,
+        description="Days fetched for rolling ACWR / sleep debt / HRV features.",
+    )
+    HISTORY_CONFIDENCE_HIGH_MIN_DAYS: int = Field(
+        default=7,
+        description="Quality watch-sync days (in lookback) required for HistoryConfidence.HIGH.",
+    )
+    HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS: int = Field(
+        default=4,
+        description="Quality days for HistoryConfidence.MEDIUM (below HIGH threshold).",
+    )
+    HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS: int = Field(
+        default=3,
+        description=(
+            "Per merged wake-up day: min categories with data among "
+            "load / sleep / heart / energy (4 total) to count as a quality day."
+        ),
+    )
 
     # -------------------------------------------------------------------------
     # Sleep / recovery feature engineering (see ML_model/policy_config.py)
@@ -113,13 +143,17 @@ class Settings(BaseSettings):
     SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = _ML_DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE
 
     # -------------------------------------------------------------------------
-    # Prediction confidence scoring (history window × input completeness)
+    # Prediction confidence scoring (history window × same-day input completeness)
+    # Formula: (HISTORY_WEIGHT×history_score + QUALITY_WEIGHT×quality_score) × 100
     # -------------------------------------------------------------------------
-    CONFIDENCE_HISTORY_WEIGHT: float = 0.6
-    CONFIDENCE_QUALITY_WEIGHT: float = 0.4
-    CONFIDENCE_SCORE_HIGH: float = 0.95
-    CONFIDENCE_SCORE_MEDIUM: float = 0.70
-    CONFIDENCE_SCORE_LOW: float = 0.45
+    CONFIDENCE_HISTORY_WEIGHT: float = Field(default=0.6, description="Weight of 7-day history confidence.")
+    CONFIDENCE_QUALITY_WEIGHT: float = Field(default=0.4, description="Weight of same-day data quality score.")
+    CONFIDENCE_SCORE_HIGH: float = Field(
+        default=0.95,
+        description="History score when Firestore window is HIGH (7+ quality days).",
+    )
+    CONFIDENCE_SCORE_MEDIUM: float = Field(default=0.70, description="History score for MEDIUM window.")
+    CONFIDENCE_SCORE_LOW: float = Field(default=0.45, description="History score for LOW / new athlete.")
 
     # -------------------------------------------------------------------------
     # Nutrition imputation when a day has no logged meals

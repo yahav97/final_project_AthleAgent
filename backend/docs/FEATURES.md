@@ -377,11 +377,11 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 ### שדות מדידה (הורדת ציון איכות)
 
-`MEASUREMENT_FIELDS`: `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
+`SAME_DAY_MEASUREMENT_FIELDS`: `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
 
-בנוסף: `nutrition_imputed` (כשתזונת אתמול הושלמה ממוצעים) — **−0.12** כמו שדה רגיש אחד.
+בנוסף: `nutrition_imputed` (כשתזונת אתמול הושלמה ממוצעים) — **−0.12** (`NUTRITION_IMPUTED_PENALTY`).
 
-כל חסר מוריד 0.12 מציון האיכות. ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי ב-HTTP.
+כל שדה מדידה חסר / אפס / NaN מוריד **−0.08** (`ZERO_OR_MISSING_PENALTY`). ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי ב-HTTP.
 
 ### שדות סובלניים (לא מורידים ציון)
 

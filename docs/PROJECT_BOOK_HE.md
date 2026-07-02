@@ -704,7 +704,9 @@ POST /predict/daily {userId, date}
 | `prediction/bundle` | parse joblib bundle |
 | `history/repository` | קריאה/כתיבה Firestore |
 | `history/rolling_features` | ACWR, sleep_debt, hrv_drop על 7 ימים |
-| `preprocessing/` | validation, scales, request_mapping |
+| `preprocessing/request_features` | API → base model feature dict |
+| `preprocessing/request_mapping` | base + derived → DataFrame |
+| `preprocessing/validation` | `ModelServingContract`, column alignment |
 | `feature_engineering.py` | פיצ'רים נגזרים |
 | `field_transforms.py` | המרות שדות Firestore |
 | `model_features.py` | טעינת חוזה 35 פיצ'רים |
@@ -889,7 +891,7 @@ erDiagram
 
 | שכבה | Framework | דוגמאות |
 |------|-----------|---------|
-| Backend unit | pytest | `test_preprocessing`, `test_prediction_service`, `test_field_transforms`, `test_history_repository`, `test_nutrition_defaults`, `test_model_loader` |
+| Backend unit | pytest | `test_preprocessing`, `test_request_features`, `test_validation`, `test_prediction_service`, `test_field_transforms`, `test_history_repository`, `test_nutrition_defaults`, `test_model_loader` |
 | Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
 | Train-serve | pytest | `test_train_serve_parity` |
 | Android | JUnit | `ExampleUnitTest` (placeholder) |

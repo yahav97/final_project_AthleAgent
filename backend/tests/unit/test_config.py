@@ -55,6 +55,7 @@ class TestDomainDefaults:
         assert s.HISTORY_LOOKBACK_DAYS == 7
         assert s.HISTORY_CONFIDENCE_HIGH_MIN_DAYS == 7
         assert s.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS == 4
+        assert s.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS == 3
 
     def test_sleep_feature_defaults_match_training_constants(self):
         import sys

@@ -26,7 +26,7 @@ backend/
 ├── services/
 │   ├── prediction/             # service, bundle, confidence, firestore_mapping
 │   ├── history/                # firestore_client, repository, rolling_features, date_utils
-│   ├── preprocessing/          # quality, validation, scales, request_mapping
+│   ├── preprocessing/          # quality, validation, scales, request_features, request_mapping
 │   ├── feature_engineering.py  # derived features
 │   ├── field_transforms.py     # Firestore field helpers
 │   ├── model_features.py       # loads contract JSON from disk
@@ -177,16 +177,17 @@ All fields optional — service applies defaults.
 #### Inference Logic (`predict_injury_risk`)
 
 ```
-1. df = injury_request_to_model_dataframe(payload)
-2. df, history_confidence = apply_history_confidence_fallback(df, payload)
-3. quality = calculate_data_quality_score(payload)
-4. prediction_confidence = blend(history_confidence, quality.score)
-5. model, cols, threshold, ... = resolve_model_bundle(get_model())
-6. if model is None → raise MLModelError("model_not_live:...")
-7. X = validate_feature_vector_for_model(df, model_contract)
-8. proba = model.predict_proba(X)[0, 1]
-9. risk_level = classify_risk_level(proba): Low ≤ 20%, Medium 21–70%, High > 70% (`risk_levels.py`)
-10. return {risk_level, risk_score: proba, prediction_confidence}
+1. payload = resolve_request_nutrition(payload)
+2. df = injury_request_to_model_dataframe(payload)   # request_features → derived → DataFrame
+3. df, history_confidence = apply_history_confidence_fallback(df, payload)
+4. quality = calculate_data_quality_score(payload)
+5. prediction_confidence = compute_prediction_confidence_percent(history_confidence, quality.score)
+6. bundle = resolve_model_bundle(get_model())  → ResolvedModelBundle
+7. if bundle.estimator is None → raise MLModelError("model_not_live:...")
+8. X = validate_feature_vector_for_model(df, model_contract)
+9. proba = bundle.estimator.predict_proba(X)[0, 1]
+10. risk_level = classify_risk_level(proba): Low ≤ 20%, Medium 21–70%, High > 70% (`risk_levels.py`)
+11. return {risk_level, risk_score: proba, prediction_confidence}
 ```
 
 #### Firestore Merge Policy (`injury_prediction_request_from_firestore_snapshot`)
@@ -196,7 +197,7 @@ All fields optional — service applies defaults.
 | Sleep | `today_only()` | `daily_health/{D}` |
 | Physical | `yesterday_only()` | `daily_health/{D-1}` בלבד |
 | Survey | direct from checkins | `daily_checkins/{D}` |
-| Nutrition | `apply_nutrition_population_defaults()` | `{D-1}` + `nutrition_defaults.py` |
+| Nutrition | raw ``daily_nutrition/{D-1}`` → ``resolve_request_nutrition`` in ``predict_injury_risk`` | `{D-1}` |
 | HR avg | `heart_rate_avg_from_doc()` | `daily_health/{D-1}` בלבד |
 
 ---
@@ -208,6 +209,8 @@ All fields optional — service applies defaults.
 | `firestore_client.get_firestore_client()` | Firebase Admin init (singleton) |
 | `repository.fetch_daily_firestore_snapshot` | Profile + D + D-1 docs |
 | `repository.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
+| `day_quality.count_quality_history_days` | Usable watch-sync days (≥3 of 4 categories) |
+| `history_merge.merge_wake_up_day_row` | physical@W-1 + sleep/survey@W |
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
 | `repository.save_daily_prediction_result` | Merge write to daily_health |
 | `repository.stable_athlete_numeric_id` | SHA256 → deterministic int id |
@@ -226,11 +229,13 @@ Input: list of `{date_key, daily_distance_km, sleep_hours, hrv_score}` per day.
 
 #### History Confidence Levels
 
-| Level | Condition | Rolling features |
-|-------|-----------|------------------|
-| `HistoryConfidence.HIGH` | ≥ 7 days history | computed from Firestore |
-| `HistoryConfidence.MEDIUM` | 4–6 days | computed |
-| `HistoryConfidence.LOW` | < 4 days or new athlete | `DEFAULT_FEATURE_VALUES` for rolling cols |
+A **quality day** = merged wake-up row with ≥ `HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS` (default 3) of 4 watch categories: load, sleep, heart, energy (`day_quality.py`).
+
+| Level | Condition (`quality_days_count`) | Rolling features |
+|-------|----------------------------------|------------------|
+| `HistoryConfidence.HIGH` | ≥ `HISTORY_CONFIDENCE_HIGH_MIN_DAYS` (7) | computed from Firestore |
+| `HistoryConfidence.MEDIUM` | ≥ `HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS` (4) | computed |
+| `HistoryConfidence.LOW` | below medium threshold | `DEFAULT_FEATURE_VALUES` for rolling cols |
 
 #### Firestore Read (`fetch_daily_firestore_snapshot`)
 
@@ -260,11 +265,13 @@ users/{uid}/daily_nutrition/{date-1}           → nutrition_yesterday
 
 | Module / Function | Responsibility |
 |----------|----------------|
-| `request_mapping.injury_request_to_model_dataframe` | Pydantic → 1-row DataFrame (35 cols) |
-| `quality.calculate_data_quality_score` | Completeness score 0–1 |
-| `validation.validate_feature_vector_for_model` | Align columns to bundle |
+| `request_features.base_model_features_from_request` | API fields → model-side feature dict |
+| `request_mapping.injury_request_to_model_dataframe` | base + derived features → 1-row DataFrame |
+| `quality.calculate_data_quality_score` | Completeness score 0–1 (`weak_fields`) |
+| `validation.validate_feature_vector_for_model` | Align columns via `ModelServingContract` |
+| `validation.parse_model_serving_contract` | Parse `{estimator, feature_columns}` dict |
 | `scales.stress_to_model_scale` / `soreness_to_model_scale` / `energy_to_model_scale` | Android → training scale |
-| `helpers.safe_float` / `is_present` | Numeric + presence helpers |
+| `helpers.safe_float` / `is_absent_or_weak` | Numeric + presence helpers |
 
 **Key transforms (request → model columns):**
 
@@ -296,7 +303,14 @@ Derived features computed in preprocessing:
 
 ### 6.5 `model_features.py` + `data/model_feature_contract.json`
 
-**35 model columns** — stored in `backend/data/model_feature_contract.json` and loaded once via `model_features.py` (not inline Python lists).
+**35 model columns** — stored in `backend/data/model_feature_contract.json` and loaded once via:
+
+| Function / constant | Role |
+|---------------------|------|
+| `load_model_feature_contract()` | Parse JSON (cached) |
+| `MODEL_FEATURE_COLUMNS` | Column order for `predict_proba` |
+| `DEFAULT_FEATURE_VALUES` | Population defaults for thin history |
+| `TRAINING_BASE_FEATURE_COLUMNS` | Columns present in training CSV export |
 
 **Defaults:** `default_values` in the same JSON — population medians for imputation.
 
@@ -397,7 +411,10 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | `tests/unit/test_prediction_service.py` | Bundle, confidence, Firestore mapping, predict orchestration |
 | `tests/unit/test_field_transforms.py` | Age, distance, HR, injured-yesterday parsing |
 | `tests/unit/test_history_repository.py` | Snapshot fetch, rolling features, day quality |
-| `tests/unit/test_preprocessing.py` | DataFrame building, quality score |
+| `tests/unit/test_request_features.py` | Request → base model feature helpers |
+| `tests/unit/test_nutrition_defaults.py` | Population nutrition imputation |
+| `tests/unit/test_preprocessing.py` | DataFrame building, quality score, scales |
+| `tests/unit/test_validation.py` | ModelServingContract, column alignment |
 | `tests/unit/test_feature_engineering.py` | Derived features |
 | `tests/unit/test_model_loader.py` | Manifest validation, gates |
 | `tests/unit/test_train_serve_parity.py` | Training CSV ↔ serving alignment |

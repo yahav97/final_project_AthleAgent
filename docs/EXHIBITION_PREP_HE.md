@@ -7,7 +7,7 @@
 |-----|-----|
 | **מגישים** | יהב סימון, צוף פלדון |
 | **מנחה** | מר איל איזנשטיין \| מדעי המחשב |
-| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [EXHIBITION_QA_CHEATSHEET_HE.md](EXHIBITION_QA_CHEATSHEET_HE.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md) |
+| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [EXHIBITION_QA_CHEATSHEET_HE.md](EXHIBITION_QA_CHEATSHEET_HE.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md) · [LLD.md](../backend/docs/LLD.md) |
 
 ---
 
@@ -58,13 +58,16 @@
 
 #### חיזוי סיכון יומי: XGBoost → 3 רמות
 
-| שלב | מה קורה |
-|-----|---------|
-| 1 | הבקאנד קורא snapshot מ-Firestore + 7 ימי היסטוריה |
-| 2 | Feature engineering → וקטור של 35 ערכים |
-| 3 | `model.predict_proba(X)[0, 1]` → הסתברות פציעה **היום** (0–1) |
-| 4 | הכפלה ב-100 → `finalRiskScore` (0–100%) |
-| 5 | סיווג לרמות UI |
+| שלב | מה קורה | מודול בקוד |
+|-----|---------|------------|
+| 1 | קריאת snapshot מ-Firestore + חלון 7 ימי היסטוריה | `history/repository.py` |
+| 2 | מיזוג שדות (שינה@D, עומס@D-1) + תזונה + סקר | `prediction/firestore_mapping.py` |
+| 3 | מילוי תזונה חסרה בממוצע אוכלוסייה (אם צריך) | `nutrition_defaults.resolve_request_nutrition` |
+| 4 | מיפוי request → 35 פיצ'רים + ACWR / חוב שינה | `preprocessing/request_features.py`, `feature_engineering.py` |
+| 5 | העשרת פיצ'רים היסטוריים (או defaults אם היסטוריה דלה) | `prediction/confidence.apply_history_confidence_fallback` |
+| 6 | `predict_proba` → הסתברות פציעה **היום** (0–1) | `prediction/service.py` + joblib bundle |
+| 7 | סיווג רמה + חישוב `prediction_confidence` | `risk_levels.py`, `compute_prediction_confidence_percent` |
+| 8 | כתיבה ל-Firestore: `finalRiskScore`, `riskLevel` | `history/repository.save_daily_prediction_result` |
 
 **רמות סיכון (production):**
 
@@ -184,13 +187,24 @@ sequenceDiagram
 | `GET /health` | liveness |
 | `POST /api/v1/observability/client-events` | telemetry מהאנדרואיד |
 
-**מה קורה בחיזוי:**
-1. קריאת `daily_health`, `daily_checkins`, `daily_nutrition`, `users` מ-Firestore
-2. הנדסת פיצ'רים (ACWR, sleep debt, HRV drop...)
-3. `predict_proba` → `risk_score`
-4. `classify_risk_level` → Low/Medium/High
-5. חישוב `prediction_confidence` (איכות קלט)
-6. כתיבה ל-`daily_health/{date}`
+**מה קורה בחיזוי (צינור מפורט):**
+
+```
+POST /predict/daily { userId, date }
+  → fetch_daily_firestore_snapshot
+  → injury_prediction_request_from_firestore_snapshot
+  → resolve_request_nutrition
+  → base_model_features_from_request + compute_derived_features
+  → injury_request_to_model_dataframe (35 עמודות)
+  → apply_history_confidence_fallback (7 ימים, HistoryConfidence)
+  → calculate_data_quality_score (weak_fields)
+  → compute_prediction_confidence_percent
+  → resolve_model_bundle → validate_feature_vector_for_model
+  → predict_proba → classify_risk_level
+  → save_daily_prediction_result
+```
+
+**בשורה אחת לקהל:** קוראים את מה שנשמר ב-Firestore, בונים 35 מספרים שהמודל מכיר, מריצים XGBoost, ושומרים חזרה ציון + רמת סיכון + confidence.
 
 #### בקרת אמינות ושלמות נתונים
 
@@ -201,10 +215,46 @@ sequenceDiagram
 | מנגנון | מה עושה |
 |--------|---------|
 | **Cross-trigger** | חיזוי רק כשגם סקר **וגם** סנכרון שעון הושלמו |
-| **prediction_confidence** | מספר 0–100 נפרד מהסיכון — "כמה הקלט אמין" |
+| **prediction_confidence** | מספר 0–100 נפרד מהסיכון — "כמה הקלט אמין" (ראו למטה) |
 | **Defaults ניטרליים** | שדות חסרים לא מניחים 0 שינה (= סיכון נמוך מלאכותי) |
 | **ML manifest gates** | אם Recall < 80% או AUC < 0.68 — הבקאנד מחזיר **HTTP 503** ולא משרת חיזוי |
-| **nutritionImputed** | תזונה חסרה → ממוצעים כלליים + confidence יורד |
+| **nutritionImputed** | תזונה חסרה → ממוצעים מ-`config.NUTRITION_DEFAULT_*` + קנס ב-quality score |
+
+#### `prediction_confidence` — איך מחשבים? (לשאלות עומק)
+
+המודל **תמיד** מחזיר סיכון. ה-confidence אומר **כמה לסמוך על הקלט** — לא משנה את הסיכון.
+
+**נוסחה** (`backend/config.py` + `prediction/confidence.py`):
+
+```
+prediction_confidence = (0.6 × history_score + 0.4 × quality_score) × 100
+```
+
+| רכיב | משקל | מה נמדד |
+|------|------|---------|
+| **history_score** | 60% | כמה "ימי שעון אמיתיים" יש ב-7 הימים האחרונים |
+| **quality_score** | 40% | שלמות שדות הבוקר (שינה, צעדים, HRV...) — 0 עד 1 |
+
+**יום איכותי בהיסטוריה** (`history/day_quality.py`): בשורה ממוזגת (עומס@אתמול + שינה@היום) צריך לפחות **3 מתוך 4** קטגוריות עם ערך תקין:
+
+| קטגוריה | דוגמאות שדות |
+|---------|--------------|
+| עומס (load) | `steps`, `distanceMeters` |
+| שינה (sleep) | `sleepMinutes` |
+| דופק (heart) | `heartRateAvg`, `hrvRmssd`, `restingHeartRate` |
+| אנרגיה (energy) | `activeCalories`, `totalCalories`, `bmrCalories` |
+
+| ימי איכות בחלון 7 | רמת היסטוריה | `history_score` |
+|-------------------|--------------|-----------------|
+| ≥ 7 | HIGH | 0.95 |
+| 4–6 | MEDIUM | 0.70 |
+| 0–3 | LOW | 0.45 |
+
+**quality_score** (`preprocessing/quality.py`): מתחיל מ-1.0, יורד **−0.08** לכל שדה מדידה חסר/אפס (`SAME_DAY_MEASUREMENT_FIELDS`), **−0.12** אם תזונה ממוצעת (`nutritionImputed`).
+
+**דוגמה מספרית:** היסטוריה HIGH (0.95) + קלט חלקי (0.8) → `(0.6×0.95 + 0.4×0.8)×100 ≈ 89`.
+
+**משפט לתערוכה:** *"הסיכון הוא תחזית המודל; ה-confidence אומר כמה הנתונים של הבוקר והשבוע אמינים."*
 
 **Cross-trigger בפירוט:**
 
@@ -224,8 +274,10 @@ sequenceDiagram
 **האתגר:** משתמש לא תמיד מסנכרן שעון, מפספס סקר, או שאין תזונה.
 
 **הפתרון:**
-- **`prediction_confidence`** (0–100) — **לא** סיכון פציעה! מודד איכות קלט (עומק היסטוריה + שלמות שדות).
-- **השלמה ניטרלית** — ערכי default שלא מוטים לכיוון סיכון גבוה או נמוך.
+- **`prediction_confidence`** (0–100) — **לא** סיכון פציעה! שילוב של:
+  - **60%** — עומק היסטוריית שעון (ימי איכות בחלון 7)
+  - **40%** — שלמות שדות הבוקר (`quality_score`)
+- **השלמה ניטרלית** — ערכי default שלא מוטים לכיוון סיכון גבוה או נמוך; תזונה חסרה → ממוצע אוכלוסייה מסומן `nutritionImputed`.
 - **התניית חיזוי** — cross-trigger: לא מריצים ML בלי שינה **וגם** סקר.
 
 **דוגמה לקהל:**  
@@ -263,15 +315,45 @@ sequenceDiagram
 
 | אתגר | הסבר קצר |
 |------|----------|
-| **Train-serve parity** | אותן נוסחאות פיצ'רים באימון (`data_generator.py`) ובשרת (`model_features.py`) — נבדק ב-`test_train_serve_parity.py` |
-| **Model manifest gates** | הבקאנד לא משרת מודל גרוע — `GET /status/ml` → Live/Blocked |
+| **Train-serve parity** | אותן נוסחאות פיצ'רים באימון (`data_generator.py`) ובשרת (`request_features.py` + `feature_engineering.py`) — נבדק ב-`test_train_serve_parity.py` |
+| **Model manifest gates** | הבקאנד לא משרת מודל גרוע — `GET /status/ml` → Live/Blocked (`config.ML_MIN_*`) |
 | **Firestore-as-truth** | decoupling: trigger חיזוי ≠ קריאת תוצאה — תומך retry ו-async |
-| **Date-split sync** | שינה ל-{D}, עומס ל-{D-1} — החלטת עיצוב מורכבת שמיושמת ב-`WearableSyncActivity` |
+| **Date-split sync** | שינה ל-{D}, עומס ל-{D-1} — `firestore_mapping.py` + `WearableSyncActivity` |
 | **Observability** | `X-Request-ID` מ-Android ל-`logs/athleagent.log` — trace מקצה לקצה בלי PHI |
+| **קריאות קוד** | מודולים קטנים עם שמות מפורשים (`ResolvedModelBundle`, `SAME_DAY_MEASUREMENT_FIELDS`) — קל להסביר בבחינה |
 
 ---
 
 ## חלק ג׳ — מעבר לפוסטר
+
+### מפת מודולי Backend (לשאלות "איפה זה בקוד?")
+
+| תיקייה / קובץ | אחריות |
+|---------------|--------|
+| `prediction/service.py` | orchestration: nutrition → features → ML → תשובה |
+| `prediction/firestore_mapping.py` | Firestore snapshot → `InjuryPredictionRequest` |
+| `prediction/confidence.py` | היסטוריה 7 ימים + `compute_prediction_confidence_percent` |
+| `prediction/bundle.py` | `ResolvedModelBundle` — parse של joblib |
+| `preprocessing/request_features.py` | API fields → שמות מודל |
+| `preprocessing/quality.py` | `quality_score`, `weak_fields` |
+| `history/day_quality.py` | יום איכותי = 3/4 קטגוריות שעון |
+| `history/rolling_features.py` | ACWR, sleep_debt, hrv_drop על היסטוריה |
+| `config.py` | כל הספים: risk, history, confidence, nutrition |
+| `data/model_feature_contract.json` | רשימת 35 העמודות + defaults |
+
+### קבועי מדיניות מרכזיים (`backend/config.py`)
+
+| קבוע | ערך (ברירת מחדל) | שימוש |
+|------|------------------|-------|
+| `RISK_HIGH_CUTOFF` | 0.70 | מעל → High (71–100%) |
+| `RISK_MEDIUM_CUTOFF` | 0.20 | מעל → Medium (21–70%) |
+| `HISTORY_LOOKBACK_DAYS` | 7 | חלון rolling features |
+| `HISTORY_CONFIDENCE_HIGH_MIN_DAYS` | 7 | היסטוריה חזקה |
+| `HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS` | 4 | היסטוריה בינונית |
+| `HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS` | 3 | מינימום קטגוריות ליום איכותי |
+| `CONFIDENCE_HISTORY_WEIGHT` | 0.6 | משקל היסטוריה ב-confidence |
+| `CONFIDENCE_QUALITY_WEIGHT` | 0.4 | משקל איכות יום ב-confidence |
+| `NUTRITION_DEFAULT_PROTEIN` | 130g | ממוצע כשאין לוג תזונה |
 
 ### זרימת נתונים — תמונה כוללת
 
@@ -382,6 +464,7 @@ speed_intensity_ratio
 | **"איך מגינים על פרטיות?"** | Firebase Auth, הרשאות Health Connect, Gemini רץ בלקוח, אין PHI בלוגים (NFR-SEC-01). |
 | **"למה אין auth על API?"** | מגבלת scope בפרויקט גמר. מתועד ב-[HLD_PROJECT.md](HLD_PROJECT.md) §8. Roadmap: Firebase ID Token בבקאנד. |
 | **"MVVM?"** | כיוון עיצובי בפוסטר; מימוש Activity-centric. Roadmap: Repository layer. |
+| **"מה ההבדל בין סיכון ל-confidence?"** | **סיכון** = מה המודל חוזה (הסתברות פציעה). **Confidence** = כמה הנתונים אמינים (היסטוריה + שלמות בוקר) — לא משנה את הסיכון, רק את מידת האמון. |
 | **"מה ההבדל מ-Whoop/Oura?"** | הם מתמקדים בספורטאי בודד; AthleAgent מוסיף **מאמן + קבוצה** + מודל ML משלנו + תזונה מצילום. |
 | **"האם הדאטה אמיתי?"** | אימון על דאטה **סינתטי** מבוסס מחקר (ACWR, שינה, HRV). האפליקציה שומרת נתונים אמיתיים ב-Firestore לשימוש בחיזוי. |
 
@@ -400,6 +483,8 @@ speed_intensity_ratio
 | [HLD_PROJECT.md](HLD_PROJECT.md) | ארכיטקטורה מלאה בעברית |
 | [RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | pipeline ציון סיכון E2E (~1000 שורות) |
 | [FEATURES.md](../backend/docs/FEATURES.md) | חוזה Firestore → מודל |
+| [LLD.md](../backend/docs/LLD.md) | עיצוב ברמה נמוכה — Backend modules |
+| `backend/config.py` | ספי risk / history / confidence / nutrition |
 | [NFR.md](NFR.md) | דרישות לא-פונקציונליות מדידות |
 | [model_improvement_journey.ipynb](../ML_model/notebooks/model_improvement_journey.ipynb) | מסע שיפור המודל |
 
@@ -437,7 +522,7 @@ speed_intensity_ratio
 | **ML** | XGBoost, scikit-learn, pandas, joblib |
 | **AI** | Google Gemini Vision + Text (client-side) |
 | **Health** | Google Health Connect SDK |
-| **DevOps** | Docker, GitHub Actions (pytest), ~150+ בדיקות backend |
+| **DevOps** | Docker, GitHub Actions (pytest), **216+** בדיקות backend |
 
 ---
 
