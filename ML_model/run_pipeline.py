@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from data_generator import DAYS_PER_ATHLETE, NUM_ATHLETES
+
 
 def _run(command: list[str], cwd: Path, allowed_exit_codes: tuple[int, ...] = (0,)) -> int:
     proc = subprocess.run(command, cwd=str(cwd), check=False, capture_output=True, text=True)
@@ -50,8 +52,8 @@ def _promote(ml_dir: Path, artifacts_dir: Path, degraded_rc: bool) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run AthleAgent ML pipeline.")
-    parser.add_argument("--num-athletes", type=int, default=1000)
-    parser.add_argument("--days", type=int, default=365)
+    parser.add_argument("--num-athletes", type=int, default=NUM_ATHLETES)
+    parser.add_argument("--days", type=int, default=DAYS_PER_ATHLETE)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--force-benchmark", action="store_true")
     parser.add_argument(

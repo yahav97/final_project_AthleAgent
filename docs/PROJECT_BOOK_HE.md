@@ -563,7 +563,7 @@ final_project_AthleAgent/
 
 | נתיב | תפקיד |
 |------|--------|
-| **`data_generator.py`** | יצירת `athlete_injury_data.csv` סינתטי (~359K שורות) |
+| **`data_generator.py`** | יצירת `athlete_injury_data.csv` סינתטי (340,000 שורות) |
 | **`create_benchmark_set.py`** | holdout קבוע `benchmark_holdout.csv` |
 | **`train_model.py`** | CV, השוואת 5 מועמדים, refit, artifacts |
 | **`validate_metrics.py`** | gates לפני promotion |
@@ -611,7 +611,7 @@ final_project_AthleAgent/
 
 אין לנו מאגר ציבורי גדול של ספורטאים עם תיוג יומי "נפצע / לא נפצע". לכן בנינו **דאטה סינתטי** ב-`data_generator.py`:
 
-- 1,000 ספורטאים × 365 יום ≈ **359,000 שורות**
+- 1,000 ספורטאים × 340 יום = **340,000 שורות**
 - מודל סיכון מבוסס מחקר ספורט:
   - **ACWR > 1.4** (Gabbett, 2016)
   - חוב שינה מצטבר
@@ -675,7 +675,7 @@ flowchart TD
 | Recall@Threshold | **81.1%** |
 | ROC-AUC | **0.793** |
 | Brier Score | **0.113** |
-| שורות אימון | 359,000 |
+| שורות אימון | 340,000 |
 
 ---
 

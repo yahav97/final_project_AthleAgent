@@ -41,10 +41,12 @@ from feature_contract import (
 # CONFIGURATION
 # ============================================================================
 
-NUM_ATHLETES = 1000         # Default requested scale for first iteration
-DAYS_PER_ATHLETE = 365      # One full year per athlete
+NUM_ATHLETES = 1000         # Default scale: 1,000 × 340 days = 340,000 rows
+DAYS_PER_ATHLETE = 340      # ~11 months per athlete (round dataset size for training)
+ANNUAL_CYCLE_DAYS = 365     # Calendar seasonality period (independent of simulation length)
 START_DATE = '2025-01-01'   # Starting date for data generation
 DEFAULT_SEED = 42
+EXPECTED_DATASET_ROWS = NUM_ATHLETES * DAYS_PER_ATHLETE
 
 # ============================================================================
 # DATA GENERATION FUNCTION
@@ -70,7 +72,7 @@ def _acwr_baseline_from_distance_tail(
     if not tail:
         return 0.55
     weekly_mean = float(np.mean(tail))
-    weekly_std = float(np.std(tail)) if len(tail) > 1 else 0.0
+    weekly_std = float(np.std(tail, ddof=1)) if len(tail) > 1 else 0.0
     return float(max(0.55, weekly_mean * 0.85 + weekly_std * 0.35 + 0.5))
 
 
@@ -172,7 +174,7 @@ def generate_synthetic_data(
         for day in range(days_per_athlete):
             injured_yesterday = int(prev_injury_today)
             weekly_cycle = np.sin((2 * np.pi * (day % 7)) / 7.0)
-            annual_cycle = np.sin((2 * np.pi * day / 365.0) + season_phase)
+            annual_cycle = np.sin((2 * np.pi * day / ANNUAL_CYCLE_DAYS) + season_phase)
             mesocycle = np.sin((2 * np.pi * day / 28.0) + mesocycle_phase)
             # 3 build weeks + 1 deload week pattern.
             microcycle_week = (day // 7) % 4
@@ -496,7 +498,7 @@ def generate_synthetic_data(
     # ACWR (Acute:Chronic Workload Ratio) - Key injury risk indicator
     # Acute load: 7-day rolling average
     df['acute_load_7d'] = df.groupby('athlete_id')['daily_distance_km'].transform(
-        lambda x: x.rolling(7).mean()
+        lambda x: x.rolling(7, min_periods=1).mean()
     )
 
     def _acwr_ratio_from_distances(distances: pd.Series) -> pd.Series:
@@ -522,12 +524,12 @@ def generate_synthetic_data(
     # Sleep debt - cumulative sleep deficit over 3 days (see policy_config.py)
     sleep_target = DEFAULT_SLEEP_TARGET_HOURS
     df['sleep_debt_3d'] = df.groupby('athlete_id')['sleep_hours'].transform(
-        lambda x: (sleep_target - x).clip(lower=0).rolling(3).sum()
+        lambda x: (sleep_target - x).clip(lower=0).rolling(3, min_periods=1).sum()
     )
     
     # HRV rolling average (7-day baseline)
     df['hrv_rolling_7d'] = df.groupby('athlete_id')['hrv_score'].transform(
-        lambda x: x.rolling(7).mean()
+        lambda x: x.rolling(7, min_periods=1).mean()
     )
     # HRV drop - negative values indicate stress/recovery issues
     df['hrv_drop'] = (df['hrv_score'] - df['hrv_rolling_7d']).clip(-15.0, 15.0)
@@ -557,6 +559,15 @@ def generate_synthetic_data(
     ]
     assert_finite_feature_columns(final_df, model_feature_cols)
 
+    expected_rows = num_athletes * days_per_athlete
+    actual_rows = len(final_df)
+    if actual_rows != expected_rows:
+        raise ValueError(
+            f"Expected {expected_rows:,} rows "
+            f"({num_athletes} athletes × {days_per_athlete} days) but got {actual_rows:,}. "
+            "Check rolling-window min_periods and dropna logic."
+        )
+
     return final_df
 
 
@@ -568,6 +579,7 @@ def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
     corr = df.loc[:, corr_cols].corr()
     report = {
         "rows": int(len(df)),
+        "expected_rows": int(NUM_ATHLETES * DAYS_PER_ATHLETE),
         "columns": int(df.shape[1]),
         "injury_rate": injury_rate,
         "class_counts": {str(k): int(v) for k, v in class_counts.items()},
