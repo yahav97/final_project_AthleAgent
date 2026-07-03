@@ -7,7 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.View
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -54,7 +54,7 @@ class HomeAthleteActivity : AppCompatActivity() {
         if (success && imageUri != null) {
             openAnalyzingActivity(imageUri.toString())
         } else {
-            Toast.makeText(this, "Camera capture failed or canceled", Toast.LENGTH_SHORT).show()
+            SignalManager.getInstance().showSignal(binding.root, "Camera capture failed or canceled", SignalManager.SignalType.ERROR)
         }
     }
 

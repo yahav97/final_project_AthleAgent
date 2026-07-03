@@ -3,7 +3,9 @@ package com.yahav.athleagent.ui.athlete
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
+import android.view.animation.AnimationUtils
+import com.yahav.athleagent.R
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
@@ -21,12 +23,15 @@ class JoinTeamActivity : AppCompatActivity() {
         binding = ActivityJoinTeamBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        binding.joinTeamFormContainer.startAnimation(entranceAnim)
+
         binding.joinTeamBTNSubmit.setOnClickListener {
             val code = binding.joinTeamEDTCode.text.toString().trim()
             if (code.isNotEmpty()) {
                 searchTeamAndSendRequest(code)
             } else {
-                Toast.makeText(this, "Please enter a team code", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Please enter a team code", SignalManager.SignalType.INFO)
             }
         }
     }
@@ -43,7 +48,7 @@ class JoinTeamActivity : AppCompatActivity() {
                 if (documents.isEmpty) {
                     binding.joinTeamProgressBar.visibility = View.GONE
                     binding.joinTeamBTNSubmit.isEnabled = true
-                    Toast.makeText(this, "Team not found. Check the code.", Toast.LENGTH_LONG).show()
+                    SignalManager.getInstance().showSignal(binding.root, "Team not found. Check the code.", SignalManager.SignalType.ERROR)
                 } else {
                     val teamDoc = documents.documents[0]
                     val teamName = teamDoc.getString("TeamName") ?: "Unknown Team"
@@ -56,7 +61,7 @@ class JoinTeamActivity : AppCompatActivity() {
                 binding.joinTeamProgressBar.visibility = View.GONE
                 binding.joinTeamBTNSubmit.isEnabled = true
                 Log.e("JoinTeamDebug", "Firebase Query Failed: ", e)
-                Toast.makeText(this, "Error connecting to server", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Error connecting to server", SignalManager.SignalType.ERROR)
             }
     }
 
@@ -64,7 +69,7 @@ class JoinTeamActivity : AppCompatActivity() {
     private fun sendJoinRequest(teamRef: DocumentReference, teamName: String) {
         val currentUser = auth.currentUser
         if (currentUser == null) {
-            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            SignalManager.getInstance().showSignal(binding.root, "User not logged in", SignalManager.SignalType.ERROR)
             return
         }
 
@@ -80,13 +85,13 @@ class JoinTeamActivity : AppCompatActivity() {
             .set(requestData)
             .addOnSuccessListener {
                 binding.joinTeamProgressBar.visibility = View.GONE
-                Toast.makeText(this, "Request sent to $teamName!", Toast.LENGTH_LONG).show()
+                SignalManager.getInstance().showSignal(binding.root, "Request sent to $teamName!", SignalManager.SignalType.SUCCESS)
                 finish()
             }
             .addOnFailureListener {
                 binding.joinTeamProgressBar.visibility = View.GONE
                 binding.joinTeamBTNSubmit.isEnabled = true
-                Toast.makeText(this, "Failed to send request", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Failed to send request", SignalManager.SignalType.ERROR)
             }
     }
 }

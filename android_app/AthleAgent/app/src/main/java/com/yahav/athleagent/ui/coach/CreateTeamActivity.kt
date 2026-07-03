@@ -2,7 +2,9 @@ package com.yahav.athleagent.ui.coach
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
+import android.view.animation.AnimationUtils
+import com.yahav.athleagent.R
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,6 +21,9 @@ class CreateTeamActivity : AppCompatActivity() {
         binding = ActivityCreateTeamBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val entranceAnim = AnimationUtils.loadAnimation(this, R.anim.anim_auth_entrance)
+        binding.createTeamFormContainer.startAnimation(entranceAnim)
+
         binding.createTeamBTNSubmit.setOnClickListener {
             attemptCreateTeam()
         }
@@ -29,7 +34,7 @@ class CreateTeamActivity : AppCompatActivity() {
         val teamCode = binding.createTeamETTeamCode.text.toString().trim()
 
         if (teamName.isEmpty() || teamCode.isEmpty()) {
-            Toast.makeText(this, "Please fill in both Team Name and Team Code", Toast.LENGTH_SHORT).show()
+            SignalManager.getInstance().showSignal(binding.root, "Please fill in both Team Name and Team Code", SignalManager.SignalType.INFO)
             return
         }
 
@@ -51,7 +56,7 @@ class CreateTeamActivity : AppCompatActivity() {
             }
             .addOnFailureListener {
                 setLoading(false)
-                Toast.makeText(this, "Error checking team code availability", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Error checking team code availability", SignalManager.SignalType.ERROR)
             }
     }
 
@@ -66,13 +71,13 @@ class CreateTeamActivity : AppCompatActivity() {
         db.collection("teams").add(newTeam)
             .addOnSuccessListener {
                 setLoading(false)
-                Toast.makeText(this, "Team Created Successfully!", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Team Created Successfully!", SignalManager.SignalType.SUCCESS)
                 // Close the screen and automatically return to the home screen
                 finish()
             }
             .addOnFailureListener {
                 setLoading(false)
-                Toast.makeText(this, "Error creating team", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Error creating team", SignalManager.SignalType.ERROR)
             }
     }
 

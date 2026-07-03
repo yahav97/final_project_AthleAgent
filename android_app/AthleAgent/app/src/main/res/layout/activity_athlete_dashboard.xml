@@ -23,9 +23,8 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/dashboard_CARD_risk"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1.2"
-        android:layout_marginBottom="16dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
         app:cardBackgroundColor="@color/white"
         app:cardCornerRadius="32dp"
         app:cardElevation="8dp"
@@ -33,15 +32,15 @@
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="28dp"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="16dp"
             android:gravity="center">
 
             <RelativeLayout
-                android:layout_width="220dp"
-                android:layout_height="0dp"
-                android:layout_weight="1">
+                android:layout_width="200dp"
+                android:layout_height="200dp">
 
                 <ProgressBar
                     android:id="@+id/dashboard_PRG_riskScore"
@@ -66,7 +65,7 @@
                         android:text="@string/daily_risk_score"
                         android:textSize="14sp"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/lm_text_muted"/>
+                        android:textColor="@color/charcoal_black"/>
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/dashboard_TXT_score"
@@ -76,6 +75,16 @@
                         android:textSize="48sp"
                         android:fontFamily="@font/roboto_bold"
                         android:textColor="@color/brand_button_dark_muted"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/dashboard_TXT_confidence"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Confidence: --%"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/roboto_bold"
+                        android:textColor="@color/brand_button_light_muted"
+                        android:layout_marginTop="2dp"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </RelativeLayout>
 
@@ -107,7 +116,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="16dp">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
