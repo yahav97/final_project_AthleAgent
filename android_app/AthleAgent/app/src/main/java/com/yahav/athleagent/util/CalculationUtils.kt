@@ -7,13 +7,13 @@ import java.util.Locale
 object CalculationUtils {
 
     /**
-     * Maps a risk score (0-100) to a qualitative risk level.
+     * Maps a risk score (0-100) to a qualitative risk level based on user requirements.
      */
     fun getRiskLevel(score: Int): String {
         return when {
-            score <= 20 -> "Low"
-            score <= 50 -> "Medium"
-            score <= 70 -> "High"
+            score <= 35 -> "Low"
+            score <= 55 -> "Medium"
+            score <= 75 -> "High"
             else -> "Critical"
         }
     }

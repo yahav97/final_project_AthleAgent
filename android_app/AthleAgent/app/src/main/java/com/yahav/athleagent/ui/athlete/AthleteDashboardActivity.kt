@@ -99,7 +99,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
                             )
                         }
                     } else {
-                        binding.dashboardTXTAiRecommendation.text = aiRecommendation
+                        typeText(binding.dashboardTXTAiRecommendation, aiRecommendation)
                     }
                 } else {
                     // The model hasn't run. Check if it's due to missing data or zero/empty data
@@ -188,10 +188,10 @@ class AthleteDashboardActivity : AppCompatActivity() {
     private fun updateUIWithScore(riskScore: Int, confidence: Float) {
         runOnUiThread {
             val (drawableResId, textColorHex) = when {
-                riskScore <= 20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")
-                riskScore <= 50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300")
-                riskScore <= 70 -> Pair(R.drawable.progress_drawable_orange, "#F57C00")
-                else -> Pair(R.drawable.progress_drawable_red, "#B71C1C")
+                riskScore <= 35 -> Pair(R.drawable.progress_drawable_green, "#00F59B")
+                riskScore <= 55 -> Pair(R.drawable.progress_drawable_yellow, "#FEEB3B")
+                riskScore <= 75 -> Pair(R.drawable.progress_drawable_orange, "#FF9800")
+                else -> Pair(R.drawable.progress_drawable_red, "#FF1744")
             }
 
             binding.dashboardPRGRiskScore.progressDrawable = ContextCompat.getDrawable(this, drawableResId)
@@ -247,12 +247,25 @@ class AthleteDashboardActivity : AppCompatActivity() {
             val generativeModel = GenerativeModel(modelName = "gemini-2.5-flash", apiKey = geminiApiKey)
 
             val prompt = """
-                You are a senior sports medicine doctor. 
-                ML Injury Risk Score: $riskScore% (Risk Level: $riskLevel, AI Confidence: $confidence%).
-                Sleep: ${sleepMins / 60}h ${sleepMins % 60}m, Soreness: $soreness/5, Stress: $stress/100.
-                Provide a short 1-sentence recommendation for training today.
-                be realistic they are pro athletes who wants to play as much as they can.
-            """.trimIndent()
+            You are a professional athletic performance coach and injury prevention specialist.
+            Analyze the following athlete's data for today:
+            - Injury Risk Score: $riskScore% (0 is safe, 100 is extreme risk)
+            - Qualitative Risk Level: $riskLevel
+            - Prediction Confidence: $confidence%
+            - Sleep: ${sleepMins / 60}h ${sleepMins % 60}m
+            - Muscle Soreness: $soreness/10
+            - Stress: $stress/100
+            
+            Guidelines for your response:
+            1. BE ACCURATE: Your tone and advice MUST strictly match the Risk Score ($riskScore%). 
+               - 0-35 (Low): Encouraging, "Green light", focus on optimal performance.
+               - 36-55 (Medium): Cautious, "Yellow light", suggest minor load management.
+               - 56-75 (High): Warning, "Orange light", strongly recommend active recovery.
+               - 76-100 (Critical): Emergency, "Red light", advise immediate rest.
+            2. BE PRACTICAL: Provide 1-2 specific, actionable training or recovery tips based on the data.
+            3. BE CONCISE: Keep the recommendation under 2-3 short sentences.
+            4. Speak directly to a professional athlete who wants to maximize their season.
+        """.trimIndent()
 
             val response = generativeModel.generateContent(prompt)
             val aiText = response.text ?: "No recommendation available."

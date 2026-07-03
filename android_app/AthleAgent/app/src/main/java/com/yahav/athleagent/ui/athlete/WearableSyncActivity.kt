@@ -155,6 +155,11 @@ class WearableSyncActivity : AppCompatActivity() {
                 }
 
                 // Demo wearable data injected for 7 days
+                withContext(Dispatchers.Main) {
+                    SignalManager.getInstance().showSignal(binding.root, "Sync complete!", SignalManager.SignalType.SUCCESS)
+                    delay(1500)
+                    finish() // Return to Home screen
+                }
 
             } catch (e: Exception) {
                 Log.e("DemoInjection", "Error injecting wearable data", e)
