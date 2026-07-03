@@ -73,7 +73,7 @@ class LoginActivity : AppCompatActivity() {
 
         val callback = object : LoginManager.LoginCallback {
             override fun onSuccess(message: String) {
-                SignalManager.getInstance().snackbar(binding.root, message)
+                SignalManager.getInstance().showSignal(binding.root, message, SignalManager.SignalType.SUCCESS)
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
                     binding.loginLayoutContent.visibility = View.GONE
@@ -83,7 +83,7 @@ class LoginActivity : AppCompatActivity() {
             }
 
             override fun onFailure(error: String) {
-                SignalManager.getInstance().snackbar(binding.root, error)
+                SignalManager.getInstance().showSignal(binding.root, error, SignalManager.SignalType.ERROR)
                 binding.loginLayoutContent.visibility = View.VISIBLE
                 binding.loginLayoutLoading.visibility = View.GONE
             }
@@ -93,7 +93,7 @@ class LoginActivity : AppCompatActivity() {
             val email = binding.loginETUsername.text.toString().trim()
             val password = binding.loginETPassword.text.toString().trim()
             if (email.isEmpty() || password.isEmpty()) {
-                SignalManager.getInstance().snackbar(binding.root, "Please enter email and password")
+                SignalManager.getInstance().showSignal(binding.root, "Please enter email and password", SignalManager.SignalType.INFO)
                 return@setOnClickListener
             }
             binding.loginLayoutContent.visibility = View.GONE
@@ -108,7 +108,7 @@ class LoginActivity : AppCompatActivity() {
         binding.loginLBLForgotPassword.setOnClickListener {
             val email = binding.loginETUsername.text.toString().trim()
             if (email.isEmpty()) {
-                SignalManager.getInstance().snackbar(binding.root, "Please enter your email first")
+                SignalManager.getInstance().showSignal(binding.root, "Please enter your email first", SignalManager.SignalType.INFO)
             } else {
                 loginManager.forgotPassword(email, callback)
             }
@@ -144,7 +144,7 @@ class LoginActivity : AppCompatActivity() {
                 }.addOnFailureListener {
                     binding.loginLayoutLoading.visibility = View.GONE
                     binding.loginLayoutContent.visibility = View.VISIBLE
-                    SignalManager.getInstance().snackbar(binding.root, "Failed to load user profile")
+                    SignalManager.getInstance().showSignal(binding.root, "Failed to load user profile", SignalManager.SignalType.ERROR)
                 }
             }
         } else {
@@ -239,13 +239,13 @@ class LoginActivity : AppCompatActivity() {
         FirebaseFirestore.getInstance().collection("users").document(user.uid)
             .set(userData)
             .addOnSuccessListener {
-                SignalManager.getInstance().snackbar(binding.root, "Welcome ${user.displayName}!")
+                SignalManager.getInstance().showSignal(binding.root, "Welcome ${user.displayName}!", SignalManager.SignalType.SUCCESS)
                 navigateToDashboard(role)
             }
             .addOnFailureListener {
                 binding.loginLayoutLoading.visibility = View.GONE
                 binding.loginLayoutContent.visibility = View.VISIBLE
-                SignalManager.getInstance().snackbar(binding.root, "Error saving profile")
+                SignalManager.getInstance().showSignal(binding.root, "Error saving profile", SignalManager.SignalType.ERROR)
             }
     }
 
@@ -258,7 +258,7 @@ class LoginActivity : AppCompatActivity() {
             .addOnFailureListener {
                 binding.loginLayoutLoading.visibility = View.GONE
                 binding.loginLayoutContent.visibility = View.VISIBLE
-                SignalManager.getInstance().snackbar(binding.root, "Failed to check user role")
+                SignalManager.getInstance().showSignal(binding.root, "Failed to check user role", SignalManager.SignalType.ERROR)
             }
     }
 

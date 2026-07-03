@@ -70,14 +70,29 @@ class RegisterActivity : AppCompatActivity() {
             val name = binding.registerETName.text.toString().trim()
             val email = binding.registerETEmail.text.toString().trim()
             val password = binding.registerETPassword.text.toString().trim()
+            val historyStr = binding.registerETInjuryHistory.text.toString().trim()
+            val birthDate = binding.registerETBirthDate.text.toString().trim()
 
-            val role = if (binding.registerTOGGLERole.checkedButtonId == R.id.register_BTN_athlete_role) {
-                "Athlete"
-            } else {
-                "Coach"
+            val isAthlete = binding.registerTOGGLERole.checkedButtonId == R.id.register_BTN_athlete_role
+            val role = if (isAthlete) "Athlete" else "Coach"
+
+            // Validation: Ensure all mandatory fields are filled
+            if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                SignalManager.getInstance().showSignal(binding.root, "Please fill in all basic fields.", SignalManager.SignalType.INFO)
+                return@setOnClickListener
             }
 
-            val historyStr = binding.registerETInjuryHistory.text.toString().trim()
+            if (isAthlete) {
+                if (birthDate.isEmpty()) {
+                    SignalManager.getInstance().showSignal(binding.root, "Birth date is required for athletes.", SignalManager.SignalType.INFO)
+                    return@setOnClickListener
+                }
+                if (historyStr.isEmpty()) {
+                    SignalManager.getInstance().showSignal(binding.root, "Injury history count is required (can be 0).", SignalManager.SignalType.INFO)
+                    return@setOnClickListener
+                }
+            }
+
             val historyInjuryCount = if (historyStr.isNotEmpty()) historyStr.toInt() else 0
 
             val callback = object : LoginManager.LoginCallback {
@@ -93,17 +108,17 @@ class RegisterActivity : AppCompatActivity() {
                         FirebaseFirestore.getInstance().collection("users").document(userId)
                             .set(mlData, SetOptions.merge())
                             .addOnCompleteListener {
-                                SignalManager.getInstance().toast(message)
+                                SignalManager.getInstance().showSignal(binding.root, message, SignalManager.SignalType.SUCCESS)
                                 finish()
                             }
                     } else {
-                        SignalManager.getInstance().toast(message)
+                        SignalManager.getInstance().showSignal(binding.root, message, SignalManager.SignalType.INFO)
                         finish()
                     }
                 }
 
                 override fun onFailure(error: String) {
-                    SignalManager.getInstance().toast(error)
+                    SignalManager.getInstance().showSignal(binding.root, error, SignalManager.SignalType.ERROR)
                 }
             }
 

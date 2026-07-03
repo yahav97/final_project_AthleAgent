@@ -8,7 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
@@ -132,7 +132,8 @@ class AnalyzingMealActivity : AppCompatActivity() {
 
     // Show an error message and close the activity
     private fun showErrorAndFinish(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        val rootView = findViewById<android.view.View>(android.R.id.content)
+        SignalManager.getInstance().showSignal(rootView, message, SignalManager.SignalType.ERROR)
         finish()
     }
 }

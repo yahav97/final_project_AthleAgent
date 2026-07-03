@@ -2,7 +2,7 @@ package com.yahav.athleagent.ui.athlete
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -91,16 +91,16 @@ class MealAnalysisActivity : AppCompatActivity() {
 
                         eventReporter.reportEvent("user_action", "Meal saved")
 
-                        Toast.makeText(this, "Meal saved successfully!", Toast.LENGTH_SHORT).show()
+                        SignalManager.getInstance().showSignal(binding.root, "Meal saved successfully!", SignalManager.SignalType.SUCCESS)
                         finish()
                     }
                     .addOnFailureListener {
-                        Toast.makeText(this, "Error updating daily total", Toast.LENGTH_SHORT).show()
+                        SignalManager.getInstance().showSignal(binding.root, "Error updating daily total", SignalManager.SignalType.ERROR)
                         binding.mealBTNSave.isEnabled = true
                     }
             }
             .addOnFailureListener { e ->
-                Toast.makeText(this, "Error saving meal: ${e.message}", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Error saving meal: ${e.message}", SignalManager.SignalType.ERROR)
                 binding.mealBTNSave.isEnabled = true
             }
     }

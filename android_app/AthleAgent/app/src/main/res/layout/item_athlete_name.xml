@@ -4,10 +4,13 @@
     android:id="@+id/itemAthlete_TXT_name"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="@dimen/spacing_20"
-    android:textSize="@dimen/login_text_size"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="18dp"
+    android:textSize="18sp"
     android:fontFamily="@font/roboto_bold"
     android:textColor="@color/text_color_primary"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
-    android:focusable="true"/>
+    android:focusable="true"
+    android:ellipsize="end"
+    android:maxLines="1" />

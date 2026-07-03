@@ -3,7 +3,7 @@ package com.yahav.athleagent.ui.coach
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -22,6 +22,10 @@ import com.yahav.athleagent.R
 import androidx.core.graphics.toColorInt
 import com.yahav.athleagent.BuildConfig
 import com.yahav.athleagent.model.AthleteItem
+import android.view.animation.AnimationUtils
+import android.widget.TextView
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,6 +47,8 @@ class CoachDashboardActivity : AppCompatActivity() {
 
     private val eventReporter = ClientEventReporter(ApiClient.observabilityApi)
     private val geminiApiKey = BuildConfig.GEMINI_API_KEY
+
+    private var typingJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +76,7 @@ class CoachDashboardActivity : AppCompatActivity() {
         db.collection("teams").whereEqualTo("coachId", coachUid).get()
             .addOnSuccessListener { teams ->
                 if (teams.isEmpty) {
-                    Toast.makeText(this, "You don't have a team yet.", Toast.LENGTH_SHORT).show()
+                    SignalManager.getInstance().showSignal(binding.root, "You don't have a team yet.", SignalManager.SignalType.INFO)
                     return@addOnSuccessListener
                 }
 
@@ -78,7 +84,7 @@ class CoachDashboardActivity : AppCompatActivity() {
                 val athleteUids = myTeam.get("athletes") as? List<String> ?: emptyList()
 
                 if (athleteUids.isEmpty()) {
-                    Toast.makeText(this, "No athletes in your team.", Toast.LENGTH_SHORT).show()
+                    SignalManager.getInstance().showSignal(binding.root, "No athletes in your team.", SignalManager.SignalType.INFO)
                     return@addOnSuccessListener
                 }
 
@@ -103,7 +109,12 @@ class CoachDashboardActivity : AppCompatActivity() {
 
         binding.coachDashPRGRiskScore.progress = 0
         binding.coachDashTXTScore.text = "--%"
+        binding.coachDashTXTConfidence.text = "Confidence: --%"
         binding.coachDashTXTAiRecommendation.text = "Loading data..."
+
+        val animation = AnimationUtils.loadAnimation(this, R.anim.anim_card_entrance)
+        binding.coachDashCARDHistory.startAnimation(animation)
+        binding.coachDashCARDRisk.startAnimation(animation)
 
         loadAthleteHealthData(athlete.uid)
     }
@@ -118,29 +129,31 @@ class CoachDashboardActivity : AppCompatActivity() {
             .addOnSuccessListener { todayDoc ->
                 if (todayDoc.exists() && todayDoc.contains("finalRiskScore")) {
                     val currentRisk = todayDoc.getDouble("finalRiskScore")?.toInt() ?: 0
+                    val confidence = todayDoc.getDouble("predictionConfidence")?.toFloat() ?: 0f
                     val aiRec = todayDoc.getString("aiRecommendation")
 
                     if (!aiRec.isNullOrEmpty()) {
-                        updateRiskUI(currentRisk, aiRec)
+                        updateRiskUI(currentRisk, confidence, aiRec)
                     } else {
                         // aiRecommendation gap solution: generating it dynamically via the coach
                         binding.coachDashTXTAiRecommendation.text = "Generating AI Recommendation..."
                         db.collection("users").document(athleteUid).collection("daily_checkins").document(today).get()
                             .addOnSuccessListener { checkInDoc ->
                                 val riskLevel = todayDoc.getString("riskLevel") ?: "Low"
-                                val confidence = todayDoc.getDouble("predictionConfidence")?.toFloat() ?: 0f
                                 val sleepMinutes = todayDoc.getLong("sleepMinutes") ?: 480L
                                 val soreness = checkInDoc.getLong("muscleSoreness")?.toInt() ?: 1
                                 val stress = checkInDoc.getLong("stressLevel")?.toInt() ?: 20
 
                                 lifecycleScope.launch(Dispatchers.IO) {
                                     fetchAIRecommendationForCoach(
-                                        athleteUid, today, currentRisk, riskLevel, confidence, sleepMinutes, soreness, stress
+                                        athleteUid, today, currentRisk, confidence, riskLevel, sleepMinutes, soreness, stress
                                     )
                                 }
                             }
                     }
                 } else {
+                    binding.coachDashTXTScore.text = "--%"
+                    binding.coachDashTXTConfidence.text = "Confidence: --%"
                     binding.coachDashTXTAiRecommendation.text = "Athlete has not synced data for today yet."
                 }
                 loadHistoricalChartData(athleteUid)
@@ -154,8 +167,8 @@ class CoachDashboardActivity : AppCompatActivity() {
         athleteUid: String,
         dateKey: String,
         riskScore: Int,
-        riskLevel: String,
         confidence: Float,
+        riskLevel: String,
         sleepMins: Long,
         soreness: Int,
         stress: Int
@@ -174,7 +187,7 @@ class CoachDashboardActivity : AppCompatActivity() {
             val aiText = response.text ?: "No recommendation available."
 
             withContext(Dispatchers.Main) {
-                updateRiskUI(riskScore, aiText)
+                updateRiskUI(riskScore, confidence, aiText)
             }
 
             // Save the recommendation back into the athlete's document
@@ -225,7 +238,7 @@ class CoachDashboardActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetTextI18n")
-    private fun updateRiskUI(riskScore: Int, aiRecommendation: String) {
+    private fun updateRiskUI(riskScore: Int, confidence: Float, aiRecommendation: String) {
         val (drawableResId, textColorHex) = when (riskScore) {
             in 0..20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")
             in 21..50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300")
@@ -238,7 +251,20 @@ class CoachDashboardActivity : AppCompatActivity() {
 
         binding.coachDashTXTScore.text = "$riskScore%"
         binding.coachDashTXTScore.setTextColor(textColorHex.toColorInt())
-        binding.coachDashTXTAiRecommendation.text = " $aiRecommendation"
+        binding.coachDashTXTConfidence.text = "Confidence: ${confidence.toInt()}%"
+
+        typeText(binding.coachDashTXTAiRecommendation, aiRecommendation)
+    }
+
+    private fun typeText(textView: TextView, fullText: String) {
+        typingJob?.cancel()
+        textView.text = ""
+        typingJob = lifecycleScope.launch {
+            for (char in fullText) {
+                textView.append(char.toString())
+                delay(30)
+            }
+        }
     }
 
     private fun updateChart(entries: List<Entry>) {
