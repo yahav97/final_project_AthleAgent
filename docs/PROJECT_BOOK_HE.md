@@ -7,7 +7,7 @@
 | **מנחה** | מר איל איזנשטיין |
 | **מחלקה** | מדעי המחשב |
 | **תאריך** | יולי 2026 |
-| **גרסת מסמך** | 1.0 |
+| **גרסת מסמך** | 1.1 |
 
 ---
 
@@ -18,7 +18,7 @@
 3. [שחקנים ודיאגרמת Use Case](#3-שחקנים-ודיאגרמת-use-case)
 4. [דרישות מערכת (SRS)](#4-דרישות-מערכת-srs)
 5. [אינטגרציות לממשקים חיצוניים](#5-אינטגרציות-לממשקים-חיצוניים)
-6. [ארכיטקטורה כללית](#6-ארכיטקטורה-כללית)
+6. [ארכיטקטורה כללית ומבנה הפרויקט](#6-ארכיטקטורה-כללית-ומבנה-הפרויקט)
 7. [מסע האלגוריתם — איך הגענו למודל](#7-מסע-האלגוריתם--איך-הגענו-למודל)
 8. [פירוט האלגוריתם והמודל](#8-פירוט-האלגוריתם-והמודל)
 9. [תכונות מחלקות ורכיבים](#9-תכונות-מחלקות-ורכיבים)
@@ -82,164 +82,200 @@
 | ML | 35 פיצ'רים, XGBoost, gates (Recall ≥ 80%, AUC ≥ 0.68) |
 | מאמן | יצירת קבוצה, אישור בקשות, דשבורד קבוצתי |
 | אמינות | cross-trigger, confidence score, train-serve parity (חוזה 35 + 15 שלמים) |
-| DevOps | Docker, ~214 בדיקות pytest, observability |
+| DevOps | Docker, 244 בדיקות pytest, observability |
 
 ---
 
 ## 3. שחקנים ודיאגרמת Use Case
 
+> **היקף דיאגרמה:** סעיף זה מתאר את **מטרות העסק** של AthleAgent — איסוף נתונים, חיזוי סיכון וניהול קבוצה. **הרשמה והתחברות** (Firebase Auth) הן תשתית אבטחה נדרשת לפני כל שימוש, אך **אינן** מופיעות בדיאגרמת Use Case — ראו [§3.5](#35-תשתית-אימות-מחוץ-לדיאגרמה).
+
 ### 3.1 שחקנים (Actors)
 
-| שחקן | תיאור | אינטראקציה עיקרית |
-|------|--------|-------------------|
-| **ספורטאי (Athlete)** | משתמש קצה שמזין נתונים סובייקטיביים וצופה בסיכון אישי | סקר יומי, ארוחה, דשבורד, בקשת הצטרפות לקבוצה |
-| **מאמן (Coach)** | מנהל קבוצה ועוקב אחר סיכון הרשימה | יצירת קבוצה, אישור/דחיית בקשות, דשבורד קבוצתי |
-| **מערכת Firebase** | שירות ענן לאימות ואחסון | Auth + Firestore |
-| **Health Connect** | גשר Google לנתוני wearables | שעונים מסנכרנים אליו **אוטומטית**; המערכת שואבת ממנו נתונים |
-| **Google Gemini** | מודל AI לראייה וטקסט | ניתוח ארוחות, המלצות בדשבורד ספורטאי ומאמן |
-| **שרת AthleAgent (Backend)** | שירות ML inference | `POST /predict/daily` |
-| **מערכת ML (Offline)** | pipeline אימון | `run_pipeline.py` — לא בזמן ריצה של האפליקציה |
+שחקנים מחולקים לשלוש קבוצות: **אנושיים ראשיים**, **מערכות חיצוניות**, ו**מערכות פנימיות**.
 
-### 3.2 רשימת Use Cases מלאה (מאומת מול הקוד)
+#### שחקנים אנושיים ראשיים (Primary Actors)
 
-| מזהה | Use Case | שחקן יוזם | מטרה עסקית | מימוש (`Activity` / שירות) | מערכות חיצוניות |
-|------|----------|-----------|------------|------------------------------|------------------|
-| **UC-01** | **הרשמת משתמש** | ספורטאי, מאמן | יצירת חשבון + פרופיל (`role`, תאריך לידה ופציעות עבר לספורטאי) | `RegisterActivity` (+ השלמת פרופיל ב-Google Sign-In ראשון ב-`LoginActivity`) | Firebase Auth, Firestore |
-| **UC-02** | **התחברות** | ספורטאי, מאמן | כניסה למערכת וניתוב לפי תפקיד | `LoginActivity` (אימייל/סיסמה, Google) | Firebase Auth, Firestore |
-| **UC-03** | **מילוי סקר יומי** | ספורטאי | דיווח מצב גוף/נפש (אנרגיה, סטרס, כאב שרירים, פציעה אתמול) | `DailyCheckInActivity` | Firestore |
-| **UC-04** | **תיעוד ארוחה מתמונה** | ספורטאי | חילוץ קלוריות ומאקרו מתמונה ושמירה | `AnalyzingMealActivity` → `MealAnalysisActivity` | Gemini, Firestore |
-| **UC-05** | **צפייה בסיכון אישי, היסטוריה והמלצות** | ספורטאי | ציון יומי, `prediction_confidence`, גרף היסטוריה, המלצת AI | `AthleteDashboardActivity` | Firestore, Gemini |
-| **UC-06** | **בקשת הצטרפות לקבוצה** | ספורטאי | שליחת בקשה לפי קוד קבוצה | `JoinTeamActivity` | Firestore |
-| **UC-07** | **קליטת נתוני שעון אוטומטית** | *(ללא שחקן אנושי)* | שאיבת שינה/עומס/HRV מ-Health Connect ל-Firestore | `WearableSyncActivity` (ingestion) | Health Connect, Firestore |
-| **UC-08** | **חיזוי סיכון פציעה יומי** | *(מערכת — cross-trigger)* | הנדסת 35 פיצ'רים + XGBoost + שמירת `finalRiskScore` | `POST /predict/daily` (Backend) | Backend → Firestore |
-| **UC-09** | **יצירת קבוצת אימון** | מאמן | הגדרת שם קבוצה וקוד הצטרפות | `CreateTeamActivity` | Firestore |
-| **UC-10** | **ניהול בקשות הצטרפות** | מאמן | אישור או דחיית ספורטאים לרשימה | `CoachRequestsActivity` | Firestore |
-| **UC-11** | **מעקב סיכון קבוצתי ופרטי ספורטאי** | מאמן | רשימת ספורטאים, ציון יומי, גרף היסטוריה, המלצת AI | `CoachDashboardActivity` | Firestore, Gemini |
+| שחקן | מי הוא? | מטרות במערכת | מסכים מרכזיים | נתונים שמזין / קורא |
+|------|---------|--------------|---------------|---------------------|
+| **ספורטאי (Athlete)** | משתמש קצה שמתאמן ורוצה לדעת אם בטוח לאמן היום | דיווח מצב יומי, צפייה בסיכון אישי, הצטרפות לקבוצת מאמן | `DailyCheckInActivity`, `WearableSyncActivity`, `AthleteDashboardActivity`, `JoinTeamActivity` | כותב: `daily_checkins`, `daily_health`, `daily_nutrition`. קורא: `finalRiskScore`, היסטוריה |
+| **מאמן (Coach)** | מנהל קבוצת אימון שצריך תמונת סיכון לכל הרשימה | יצירת קבוצה, אישור ספורטאים, מעקב סיכון קבוצתי | `CreateTeamActivity`, `CoachRequestsActivity`, `CoachDashboardActivity` | כותב: `teams`, סטטוס בקשות. קורא: `daily_health` של כל ספורטאי בקבוצה |
 
-**לא נכללו בדיאגרמה (לא use case עסקי מרכזי):**
+**הבחנה חשובה:** הספורטאי **לא** מזין ידנית נתוני שעון — שעונים (Garmin, Samsung וכו') מסנכרנים ל-Health Connect **בלעדיו**. האפליקציה רק **שואבת** משם (UC-05). המאמן **לא** מזין נתוני בריאות — הוא **צופה** בתוצאות חיזוי שכבר חושבו.
+
+#### שחקנים חיצוניים (Secondary / External Actors)
+
+| שחקן | תפקיד במערכת | מתי נכנס לפעולה |
+|------|--------------|-----------------|
+| **Cloud Firestore** | Source of Truth — אחסון כל הנתונים היומיים ותוצאות חיזוי | בכל כתיבה/קריאה מהאפליקציה או מהבקאנד |
+| **Firebase Auth** | אימות זהות (מחוץ לדיאגרמת UC) | לפני כניסה לאפליקציה — ראו §3.5 |
+| **Health Connect** | גשר Android לנתוני wearables וחיישנים | סנכרון בוקר — שינה, צעדים, HRV, דופק |
+| **Google Gemini** | AI לראייה (ארוחות) וטקסט (המלצות) | צילום ארוחה; טעינת דשבורד ספורטאי/מאמן |
+| **שרת AthleAgent (Backend)** | inference ML — 35 פיצ'רים + XGBoost | `POST /predict/daily` אחרי cross-trigger |
+| **מערכת ML (Offline)** | אימון, validation, promotion | `run_pipeline.py` — **לא** בזמן ריצה של האפליקציה |
+
+#### מי **לא** שחקן?
+
+| רכיב | למה לא שחקן |
+|------|-------------|
+| `MainActivity` / `HomeAthleteActivity` / `HomeCoachActivity` | ניווט בלבד — hub למסכים |
+| `PrivacyPolicyActivity` | תצוגת טקסט משפטי |
+| Logout | סיום סשן — לא מטרה עסקית |
+| `WearableSyncActivity` (כמסך) | המסך הוא ממשק; ה-UC הוא **קליטת נתונים** — מופעל על ידי Health Connect |
+
+### 3.2 רשימת Use Cases — מטרות עסקיות (ללא הרשמה/התחברות)
+
+| מזהה | Use Case | שחקן יוזם | מטרה עסקית | מימוש | מערכות חיצוניות |
+|------|----------|-----------|------------|-------|------------------|
+| **UC-01** | **מילוי סקר יומי** | ספורטאי | דיווח מצב גוף/נפש: אנרגיה, סטרס, כאב שרירים, פציעה אתמול (1–10) | `DailyCheckInActivity` | Firestore |
+| **UC-02** | **תיעוד ארוחה מתמונה** | ספורטאי | חילוץ קלוריות ומאקרו מתמונה ושמירה | `AnalyzingMealActivity` → `MealAnalysisActivity` | Gemini, Firestore |
+| **UC-03** | **צפייה בסיכון אישי, היסטוריה והמלצות** | ספורטאי | ציון יומי (`finalRiskScore`), `prediction_confidence`, גרף 7 ימים, המלצת AI | `AthleteDashboardActivity` | Firestore, Gemini |
+| **UC-04** | **בקשת הצטרפות לקבוצה** | ספורטאי | שליחת בקשה לפי קוד קבוצה שהמאמן מסר | `JoinTeamActivity` | Firestore |
+| **UC-05** | **קליטת נתוני שעון אוטומטית** | Health Connect *(לא ספורטאי)* | שאיבת שינה/עומס/HRV מ-Health Connect ל-Firestore | `WearableSyncActivity` | Health Connect, Firestore |
+| **UC-06** | **חיזוי סיכון פציעה יומי** | מערכת *(cross-trigger)* | הנדסת 35 פיצ'רים + XGBoost + שמירת `finalRiskScore` | `POST /predict/daily` | Backend → Firestore |
+| **UC-07** | **יצירת קבוצת אימון** | מאמן | הגדרת שם קבוצה וקוד הצטרפות ייחודי | `CreateTeamActivity` | Firestore |
+| **UC-08** | **ניהול בקשות הצטרפות** | מאמן | אישור או דחיית ספורטאים; עדכון `users.teamId` | `CoachRequestsActivity` | Firestore |
+| **UC-09** | **מעקב סיכון קבוצתי ופרטי ספורטאי** | מאמן | רשימת ספורטאים, ציון יומי, גרף היסטוריה, המלצת AI לכל אחד | `CoachDashboardActivity` | Firestore, Gemini |
+
+**לא נכללו (לא use case עסקי):**
 
 | פעולה | סיבה |
 |--------|------|
-| התנתקות (Logout) | סיום סשן — לא מטרה עסקית של המערכת |
-| מדיניות פרטיות | `PrivacyPolicyActivity` — תצוגת טקסט משפטי |
-| שכחתי סיסמה | תת-זרימה של UC-02, לא מטרה עצמאית |
-| מסכי Home (`HomeAthleteActivity`, `HomeCoachActivity`) | ניווט בלבד — לא use case |
+| הרשמה / התחברות | תשתית אבטחה — §3.5 |
+| התנתקות | סיום סשן |
+| מדיניות פרטיות | טקסט משפטי |
+| מסכי Home | ניווט בלבד |
 
-> **היסטוריה:** בדיאגרמת התכנון הראשונית "צפייה בהיסטוריה" הופיעה כ-UC נפרד; במימוש היא **חלק מ-UC-05** (ספורטאי) ומ-**UC-11** (מאמן — drill-down לספורטאי בודד), באותו מסך דשבורד.
+> **היסטוריה:** "צפייה בהיסטוריה" הייתה UC נפרד בתכנון; במימוש היא **חלק מ-UC-03** (ספורטאי) ומ-**UC-09** (מאמן — drill-down לספורטאי בודד).
 
-### 3.3 דיאגרמת Use Case
+### 3.3 מבנה ה-Use Cases לפי תחום
+
+```mermaid
+flowchart TB
+    subgraph Athlete["תחום ספורטאי"]
+        UC01[UC-01 סקר יומי]
+        UC02[UC-02 ארוחה]
+        UC03[UC-03 דשבורד אישי]
+        UC04[UC-04 הצטרפות לקבוצה]
+    end
+
+    subgraph System["תחום מערכת — אוטומטי"]
+        UC05[UC-05 קליטת שעון]
+        UC06[UC-06 חיזוי ML]
+        UC05 -->|cross-trigger| UC06
+        UC01 -->|cross-trigger| UC06
+    end
+
+    subgraph Coach["תחום מאמן"]
+        UC07[UC-07 יצירת קבוצה]
+        UC08[UC-08 ניהול בקשות]
+        UC09[UC-09 דשבורד קבוצתי]
+        UC07 --> UC08
+        UC08 --> UC09
+    end
+
+    UC04 -.->|בקשה| UC08
+    UC06 --> UC03
+    UC06 --> UC09
+```
+
+| תחום | Use Cases | תלות |
+|------|-----------|------|
+| **ספורטאי — קלט** | UC-01, UC-02, UC-05 | UC-02 אופציונלי; UC-01 + UC-05 נדרשים ל-UC-06 |
+| **ספורטאי — פלט** | UC-03 | דורש UC-06 (או ציון קודם ב-Firestore) |
+| **מאמן — קבוצה** | UC-07 → UC-08 → UC-09 | ספורטאי חייב UC-04 לפני שיופיע ב-UC-09 |
+| **מערכת** | UC-05, UC-06 | cross-trigger: שינה>0 + צעדים אתמול>0 + סקר היום |
+
+### 3.4 דיאגרמת Use Case (ללא הרשמה/התחברות)
 
 ```mermaid
 usecaseDiagram
-    %% Primary Actors
     actor Athlete as "ספורטאי\n(Athlete)"
     actor Coach as "מאמן\n(Coach)"
 
-    %% Secondary External Actors
-    actor Firebase as "Firebase Cloud\n(Auth & Firestore)"
-    actor HealthConnect as "Google Health Connect\n(OS Wearables API)"
-    actor GeminiAI as "Google Gemini API\n(LLM & Vision)"
-    actor Backend as "AthleAgent Backend\n(FastAPI ML Inference)"
+    actor Firestore as "Cloud Firestore"
+    actor HealthConnect as "Health Connect"
+    actor GeminiAI as "Google Gemini"
+    actor Backend as "AthleAgent Backend"
 
-    rectangle "AthleAgent System Platform" {
-        %% Shared — auth as separate purposeful actions
-        usecase UC_Register as "UC-01 הרשמת משתמש"
-        usecase UC_Login as "UC-02 התחברות"
+    rectangle "AthleAgent — מטרות עסקיות" {
+        usecase UC_CheckIn as "UC-01 מילוי סקר יומי"
+        usecase UC_Meal as "UC-02 תיעוד ארוחה"
+        usecase UC_AthleteDash as "UC-03 סיכון אישי\nהיסטוריה והמלצות"
+        usecase UC_Join as "UC-04 הצטרפות לקבוצה"
 
-        %% Athlete-initiated
-        usecase UC_CheckIn as "UC-03 מילוי סקר יומי"
-        usecase UC_Meal as "UC-04 תיעוד ארוחה מתמונה"
-        usecase UC_AthleteDash as "UC-05 סיכון אישי\nהיסטוריה והמלצות"
-        usecase UC_Join as "UC-06 בקשת הצטרפות לקבוצה"
+        usecase UC_Sync as "UC-05 קליטת נתוני שעון"
+        usecase UC_Predict as "UC-06 חיזוי סיכון יומי"
 
-        %% System-initiated (no human primary actor)
-        usecase UC_Sync as "UC-07 קליטת נתוני שעון\nאוטומטית"
-        usecase UC_Predict as "UC-08 חיזוי סיכון יומי\n(ML Inference)"
-
-        %% Coach-initiated
-        usecase UC_CreateTeam as "UC-09 יצירת קבוצה"
-        usecase UC_ManageReq as "UC-10 ניהול בקשות הצטרפות"
-        usecase UC_CoachDash as "UC-11 מעקב סיכון קבוצתי"
+        usecase UC_CreateTeam as "UC-07 יצירת קבוצה"
+        usecase UC_ManageReq as "UC-08 ניהול בקשות"
+        usecase UC_CoachDash as "UC-09 מעקב סיכון קבוצתי"
 
         UC_Sync -.->|"cross-trigger"| UC_Predict
         UC_CheckIn -.->|"cross-trigger"| UC_Predict
     }
 
-    %% Athlete associations
-    Athlete --> UC_Register
-    Athlete --> UC_Login
     Athlete --> UC_CheckIn
     Athlete --> UC_Meal
     Athlete --> UC_AthleteDash
     Athlete --> UC_Join
 
-    %% Coach associations
-    Coach --> UC_Register
-    Coach --> UC_Login
     Coach --> UC_CreateTeam
     Coach --> UC_ManageReq
     Coach --> UC_CoachDash
 
-    %% Automatic ingestion — initiated by Health Connect, not Athlete
     HealthConnect --> UC_Sync
 
-    %% External system links
-    UC_Register --> Firebase
-    UC_Login --> Firebase
-
-    UC_CheckIn --> Firebase
-
+    UC_CheckIn --> Firestore
     UC_Meal --> GeminiAI
-    UC_Meal --> Firebase
-
-    UC_AthleteDash --> Firebase
+    UC_Meal --> Firestore
+    UC_AthleteDash --> Firestore
     UC_AthleteDash --> GeminiAI
-
-    UC_Join --> Firebase
-
+    UC_Join --> Firestore
     UC_Sync --> HealthConnect
-    UC_Sync --> Firebase
-
+    UC_Sync --> Firestore
     UC_Predict --> Backend
-    Backend --> Firebase
-
-    UC_CreateTeam --> Firebase
-    UC_ManageReq --> Firebase
-
-    UC_CoachDash --> Firebase
+    Backend --> Firestore
+    UC_CreateTeam --> Firestore
+    UC_ManageReq --> Firestore
+    UC_CoachDash --> Firestore
     UC_CoachDash --> GeminiAI
 ```
 
 > **הערות לדיאגרמה:**
-> - **UC-07 אוטומטי** — שעונים (Garmin, Samsung וכו') מסנכרנים ל-Health Connect **בלעדי הספורטאי**; המערכת שואבת משם. אין קישור `Athlete → UC-07`.
-> - **cross-trigger (UC-08)** — חיזוי ML מופעל רק כאשר גם נתוני שעון (UC-07) וגם סקר יומי (UC-03) קיימים ותקינים; זה לא `<<include>>` חובה.
-> - **UC-04 (ארוחה)** שומרת תזונה ב-Firestore בלבד — **אינה** מפעילה חיזוי ישירות.
-> - **UC-05 / UC-11** כוללים גרף היסטוריה — לא UC נפרד.
-> - **Backend** מבצע inference (`POST /predict/daily`) וקורא/כותב Firestore; התצוגה קוראת `finalRiskScore` מ-Firestore.
-> - **ML Pipeline offline** (`run_pipeline.py`) אינו מופיע — לא use case בזמן ריצה של האפליקציה.
+> - **UC-05** — אין קישור `Athlete → UC-05`; השעון מסנכרן ל-Health Connect ברקע.
+> - **cross-trigger (UC-06)** — רק כש-UC-01 + UC-05 מוכנים עם ערכים תקינים (>0).
+> - **UC-02** שומרת תזונה בלבד — **לא** מפעילה חיזוי.
+> - **UC-03 / UC-09** כוללים גרף היסטוריה — לא UC נפרד.
+> - **ML Pipeline offline** (`run_pipeline.py`) אינו מופיע — לא use case בזמן ריצה.
 
-### 3.4 תרחישי שימוש עיקריים
+### 3.5 תשתית אימות (מחוץ לדיאגרמה)
+
+הרשמה והתחברות **נדרשות** לפני כל Use Case עסקי, אך אינן מטרות המוצר:
+
+| פעולה | מימוש | מה קורה |
+|-------|-------|---------|
+| **הרשמה** | `RegisterActivity`, `LoginManager` | Firebase Auth + יצירת `users/{uid}` עם `role`, תאריך לידה ופציעות עבר (ספורטאי) |
+| **התחברות** | `LoginActivity`, `MainActivity` | אימייל/סיסמה או Google Sign-In → קריאת `role` → ניתוב ל-`HomeAthleteActivity` / `HomeCoachActivity` |
+| **ניתוב אוטומטי** | `MainActivity` | אם כבר מחובר — דילוג על Login |
+
+### 3.6 תרחישי שימוש עיקריים
 
 #### תרחיש 1: זרימה יומית של ספורטאי
 
-1. **UC-07** — נתוני שעון זורמים אוטומטית ל-Health Connect; המערכת שואבת ושומרת (שינה → היום, עומס → אתמול).
-2. **UC-03** — מילוי סקר (אנרגיה, סטרס, כאב שרירים, פציעה אתמול).
-3. *(אופציונלי)* **UC-04** — צילום ארוחה → Gemini מחלץ קלוריות ומאקרו.
-4. **UC-08** — cross-trigger מפעיל `POST /predict/daily` (כאשר UC-07 + UC-03 מוכנים).
-5. Backend קורא Firestore → 35 פיצ'רים → XGBoost → כותב `finalRiskScore`.
-6. **UC-05** — דשבורד מציג ציון, גרף היסטוריה והמלצת Gemini.
+1. **UC-05** — נתוני שעון זורמים ל-Health Connect; האפליקציה שואבת (שינה → היום, עומס → אתמול).
+2. **UC-01** — מילוי סקר (אנרגיה, סטרס, כאב שרירים, פציעה אתמול).
+3. *(אופציונלי)* **UC-02** — צילום ארוחה → Gemini מחלץ קלוריות ומאקרו.
+4. **UC-06** — cross-trigger מפעיל `POST /predict/daily`.
+5. Backend → 35 פיצ'רים → XGBoost → `finalRiskScore` ב-Firestore.
+6. **UC-03** — דשבורד מציג ציון, גרף והמלצת Gemini.
 
 #### תרחיש 2: ניהול קבוצה על ידי מאמן
 
-1. **UC-09** — מאמן יוצר קבוצה ומגדיר קוד הצטרפות.
-2. **UC-06** — ספורטאים שולחים בקשות הצטרפות.
-3. **UC-10** — מאמן מאשר או דוחה.
-4. **UC-11** — דשבורד מאמן מציג סיכון יומי, היסטוריה והמלצת Gemini לכל ספורטאי בקבוצה.
-
-#### תרחיש 3: כניסה למערכת
-
-1. **UC-01** — משתמש חדש נרשם (בחירת תפקיד Athlete/Coach).
-2. **UC-02** — משתמש קיים מתחבר; ניתוב ל-`HomeAthleteActivity` או `HomeCoachActivity` לפי `users.role`.
+1. **UC-07** — מאמן יוצר קבוצה וקוד הצטרפות.
+2. **UC-04** — ספורטאים שולחים בקשות.
+3. **UC-08** — מאמן מאשר או דוחה.
+4. **UC-09** — דשבורד מאמן: סיכון יומי והמלצות לכל ספורטאי.
 
 ---
 
@@ -251,8 +287,8 @@ usecaseDiagram
 
 | מזהה | דרישה | עדיפות | מימוש |
 |------|--------|--------|-------|
-| FR-01 | הרשמה והתחברות (אימייל + Google) | חובה | `LoginActivity`, `RegisterActivity`, Firebase Auth |
-| FR-02 | routing לפי תפקיד (athlete / coach) | חובה | `LoginActivity` → `users.role` |
+| FR-01 | הרשמה והתחברות (אימייל + Google) | חובה | `LoginActivity`, `RegisterActivity` — **תשתית**, לא UC עסקי (§3.5) |
+| FR-02 | routing לפי תפקיד (athlete / coach) | חובה | `MainActivity` → `users.role` |
 | FR-03 | סנכרון נתוני wearables דרך Health Connect | חובה | `WearableSyncActivity` |
 | FR-04 | סקר יומי (4 שדות) | חובה | `DailyCheckInActivity` |
 | FR-05 | ניתוח ארוחה מתמונה (AI) | רצוי | `AnalyzingMealActivity` + Gemini |
@@ -414,7 +450,7 @@ sequenceDiagram
 
 ---
 
-## 6. ארכיטקטורה כללית
+## 6. ארכיטקטורה כללית ומבנה הפרויקט
 
 ### 6.1 שלוש שכבות
 
@@ -439,18 +475,123 @@ sequenceDiagram
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 מבנה Repository
+### 6.2 עץ תיקיות הפרויקט (מלא)
 
 ```
 final_project_AthleAgent/
-├── android_app/AthleAgent/     # אפליקציית Android
-├── backend/                    # FastAPI inference service
-├── ML_model/                   # Training pipeline + artifacts
-├── docs/                       # תיעוד פרויקט
-└── README.md
+├── android_app/AthleAgent/          # אפליקציית Android (Kotlin)
+├── backend/                         # שרת FastAPI — inference + Firestore
+├── ML_model/                        # pipeline אימון offline + artifacts
+├── docs/                            # תיעוד פרויקט (עברית + אנגלית)
+├── logs/                            # לוג מרכזי JSON Lines (gitignored)
+├── uploads/                         # תמונות legacy (אם הועלו)
+├── .github/workflows/               # CI — הרצת pytest ב-GitHub Actions
+├── Dockerfile                       # image לבקאנד
+├── docker-compose.yml               # הרצה מקומית (backend + volume לוגים)
+├── clean_logs.py                    # ניקוי logs/athleagent.log
+├── requirements.txt                 # alias ל-backend/requirements.txt
+├── .env.example                     # משתני סביבה לדוגמה (שורש)
+├── pyrightconfig.json               # הגדרות type checker ל-Python
+└── README.md                        # סקירת פרויקט (אנגלית)
 ```
 
-### 6.3 Tech Stack
+### 6.3 פירוט תיקיות — שורש הפרויקט
+
+| תיקייה / קובץ | תפקיד |
+|---------------|--------|
+| **`android_app/`** | כל קוד הלקוח — אפליקציית Android ב-Kotlin |
+| **`backend/`** | שרת Python — API, ML inference, קריאה/כתיבה ל-Firestore |
+| **`ML_model/`** | אימון מודל offline — לא רץ בזמן שימוש באפליקציה |
+| **`docs/`** | מסמכי פרויקט גמר: ספר פרויקט, HLD, LLD, Docker, לוגים, תערוכה |
+| **`logs/`** | קובץ לוג מרכזי `athleagent.log` — Backend + אירועי Android (דרך API). פורמט JSON Lines, rotation 10MB×5. ראו [LOGGING_HE.md](LOGGING_HE.md) |
+| **`uploads/`** | אחסון תמונות זמני (legacy); ארוחות נשמרות ב-Firestore, לא כאן |
+| **`.github/workflows/`** | `backend-tests.yml` — pytest על push/PR ל-main |
+| **`Dockerfile`** | בונה image עם Python + backend + מודל promoted |
+| **`docker-compose.yml`** | מריץ backend על `127.0.0.1:8000`, ממפה `./logs` → `/app/logs` |
+| **`clean_logs.py`** | סקריפט עזר לריקון קובץ הלוג לפני דמו/דיבוג |
+
+### 6.4 פירוט — `android_app/AthleAgent/`
+
+| נתיב | תפקיד |
+|------|--------|
+| **`app/src/main/java/com/yahav/athleagent/`** | קוד Kotlin ראשי |
+| `ui/auth/` | `LoginActivity`, `RegisterActivity`, `MainActivity` — אימות וניתוב |
+| `ui/athlete/` | מסכי ספורטאי: סקר, שעון, ארוחה, דשבורד, הצטרפות לקבוצה |
+| `ui/coach/` | מסכי מאמן: יצירת קבוצה, בקשות, דשבורד קבוצתי |
+| `ui/PrivacyPolicyActivity.kt` | מדיניות פרטיות |
+| `network/` | `ApiClient`, `ApiService` — Retrofit ל-`POST /predict/daily` |
+| `observability/` | `ClientEventReporter`, `CorrelationIdInterceptor` — telemetry ל-API |
+| `logic/` | `LoginManager` — עזר הרשמה/התחברות |
+| `model/` | DTOs: `AthleteItem`, `AlertItem`, `PredictionModels` |
+| `utilities/` | `SignalManager` — Toast/Snackbar |
+| `App.kt` | אתחול אפליקציה: Timber, observability |
+| **`app/src/main/res/`** | layouts (`activity_*.xml`), drawables, strings, themes |
+| **`app/src/main/AndroidManifest.xml`** | הרשאות Health Connect, הגדרת Activities |
+| **`app/src/test/`** | `ExampleUnitTest` — placeholder |
+| **`app/src/androidTest/`** | `ExampleInstrumentedTest` — placeholder |
+| **`app/build.gradle.kts`** | תלויות: Firebase, Retrofit, Gemini, Health Connect, MPAndroidChart |
+| **`local.properties`** | `GEMINI_API_KEY`, נתיב SDK — **לא ב-git** |
+| **`gradle/`** | Gradle wrapper |
+
+### 6.5 פירוט — `backend/`
+
+| נתיב | תפקיד |
+|------|--------|
+| **`main.py`** | FastAPI app, CORS, lifespan, טעינת מודל ב-startup |
+| **`config.py`** | Settings (Pydantic): gates, risk bands, logging, feature flags |
+| **`injury_model.pkl`** | symlink/copy למודל promoted (נטען ע"י `model_loader`) |
+| **`firebase-key.json`** | Service Account ל-Firestore Admin — **לא ב-git** |
+| **`api/routes/`** | `health.py`, `predict.py`, `observability.py` |
+| **`middleware/`** | `request_logging.py` — לוג בקשות + `X-Request-ID` |
+| **`ml/model_loader.py`** | טעינת joblib, בדיקת gates, Live/Blocked |
+| **`schemas/`** | Pydantic: `inference.py`, `observability.py`, `enums.py`, `types.py` |
+| **`services/prediction/`** | inference, Firestore mapping, confidence |
+| **`services/history/`** | `repository.py` — קריאה/כתיבה Firestore, rolling features |
+| **`services/preprocessing/`** | `request_features`, `validation`, `scales` — train-serve parity |
+| **`services/` (שורש) | `feature_engineering`, `risk_levels`, `nutrition_defaults` |
+| **`data/model_feature_contract.json`** | חוזה 35 פיצ'רים + 15 שלמים |
+| **`utils/`** | `logging.py`, `exceptions.py`, `client_event_limiter.py`, `request_context.py` |
+| **`scripts/`** | `seed_demo_athlete_firestore.py` — דאטה לדמו; `trace_request.sh` |
+| **`docs/`** | תיעוד טכני: HLD, LLD, MODEL, RISK_SCORE, FEATURES, BACKEND |
+| **`tests/`** | 244 בדיקות pytest — ראו [§12](#12-בדיקות-ואיכות) |
+| **`logs/`** | עותק מקומי אופציונלי; הקובץ הראשי בשורש `logs/` |
+| **`uploads/images/`** | legacy — לא בשימוש production לארוחות |
+| **`pytest.ini`** | הגדרות pytest |
+| **`requirements.txt`** | תלויות Python (FastAPI, firebase-admin, xgboost, sklearn…) |
+
+### 6.6 פירוט — `ML_model/`
+
+| נתיב | תפקיד |
+|------|--------|
+| **`data_generator.py`** | יצירת `athlete_injury_data.csv` סינתטי (~359K שורות) |
+| **`create_benchmark_set.py`** | holdout קבוע `benchmark_holdout.csv` |
+| **`train_model.py`** | CV, השוואת 5 מועמדים, refit, artifacts |
+| **`validate_metrics.py`** | gates לפני promotion |
+| **`run_pipeline.py`** | end-to-end: generate → train → validate → `promoted.json` |
+| **`feature_contract.py`** | חוזה משותף עם backend — `workout_intensity_minutes()` |
+| **`policy_config.py`** | ספי Recall, FPR, F1 |
+| **`artifacts/`** | תוצאות אימון לפי `run_id/` + `promoted.json` |
+| **`artifacts/<run_id>/`** | `injury_model.pkl`, `run_manifest.json`, CSVs, calibration |
+| **`fixtures/`** | `athlete_injury_demo.csv` — דאטה קטן לנוטבוק (ב-git) |
+| **`notebooks/`** | `model_improvement_journey.ipynb` — מסע שיפור המודל |
+| **`docs/MODEL_SELECTION.md`** | פרוטוקול בחירת מודל |
+| **`athlete_injury_data.csv`** | דאטה מלא (gitignored, נוצר ע"י generator) |
+| **`benchmark_holdout.csv`** | holdout קבוע לבחירת מודל |
+
+### 6.7 פירוט — `docs/`
+
+| מסמך | תוכן |
+|------|------|
+| **`PROJECT_BOOK_HE.md`** | ספר פרויקט זה — מסמך מרכזי לפרויקט גמר |
+| **`HLD_PROJECT.md`** | עיצוב ברמה גבוהה — ארכיטקטורה מלאה |
+| **`LLD_PROJECT.md`** | עיצוב ברמה נמוכה — מחלקות וזרימות |
+| **`DOCKER.md`** | הרצה ב-Docker, firebase-key, troubleshooting |
+| **`LOGGING_HE.md`** | מדריך לוגים — פורמט, correlation ID, observability |
+| **`EXHIBITION_PREP_HE.md`** | הכנה לתערוכה — שאלות ותשובות |
+| **`EXHIBITION_QA_CHEATSHEET_HE.md`** | צ'יטשיט לשאלות נפוצות |
+| **`NFR.md`** | דרישות לא-פונקציונליות מפורטות |
+
+### 6.8 Tech Stack
 
 | שכבה | טכנולוגיות |
 |------|------------|
@@ -666,7 +807,8 @@ POST /predict/daily {userId, date}
 |-------|--------|
 | `ApiClient` | Retrofit singleton, base URL `10.0.2.2:8000` |
 | `ApiService` | `POST /predict/daily`, DTOs |
-| `ClientEventReporter` | שליחת events ל-observability API |
+| `ClientEventReporter` | שליחת events ל-`POST /api/v1/observability/client-events` |
+| `ObservabilityApi` | DTO לאירועי client |
 | `CorrelationIdInterceptor` | `X-Request-ID` לtrace |
 | `RequestIdHolder` | שמירת request ID thread-local |
 
@@ -889,19 +1031,69 @@ erDiagram
 
 ## 12. בדיקות ואיכות
 
-| שכבה | Framework | דוגמאות |
-|------|-----------|---------|
-| Backend unit | pytest | `test_preprocessing`, `test_request_features`, `test_feature_type_contract`, `test_validation`, `test_prediction_service`, … |
-| Backend integration | pytest | `test_routes_predict_daily`, `test_openapi_contract`, `test_inference_edge_cases` |
-| Train-serve | חוזה + בדיקות אוטומטיות | `model_feature_contract.json`, `feature_contract.py`, `test_feature_type_contract.py` |
-| Android | JUnit | `ExampleUnitTest` (placeholder) |
+### 12.1 סיכום
+
+| שכבה | Framework | כמות | מיקום |
+|------|-----------|------|-------|
+| Backend unit | pytest | 214 | `backend/tests/unit/` |
+| Backend integration | pytest | 30 | `backend/tests/integration/` |
+| Train-serve parity | חוזה JSON + בדיקות | — | `model_feature_contract.json`, `test_feature_type_contract.py` |
+| Android | JUnit | placeholder | `app/src/test/`, `app/src/androidTest/` |
+| **סה"כ backend** | pytest | **244** | `backend/tests/` |
 
 **הרצה:**
 ```bash
 cd backend && python -m pytest tests/ -v
 ```
 
-**ספירה:** ~197 בדיקות backend.
+**CI:** `.github/workflows/backend-tests.yml` — Python 3.12, `ATHLEAGENT_DISABLE_FILE_LOGGING=1`.
+
+### 12.2 מבנה `backend/tests/`
+
+```
+backend/tests/
+├── conftest.py              # fixtures משותפים: TestClient, mock pipeline
+├── unit/                    # בדיקות מבודדות — ללא Firestore אמיתי
+│   ├── test_prediction_service.py    # לוגיקת inference
+│   ├── test_preprocessing.py         # מיפוי request → features
+│   ├── test_request_features.py      # 35 פיצ'רים
+│   ├── test_feature_type_contract.py # train-serve parity
+│   ├── test_feature_engineering.py   # ACWR, sleep_debt, hrv_drop
+│   ├── test_confidence_fallback.py   # history confidence
+│   ├── test_risk_levels.py           # Low/Medium/High
+│   ├── test_model_loader.py          # gates, promoted artifact
+│   ├── test_history_repository.py    # Firestore mock reads/writes
+│   ├── test_validation.py            # ModelServingContract
+│   ├── test_field_transforms.py      # המרות Firestore
+│   ├── test_nutrition_defaults.py    # ממוצעי אוכלוסייה
+│   ├── test_schemas.py               # Pydantic models
+│   ├── test_config.py                # Settings
+│   ├── test_exceptions.py            # שגיאות מותאמות
+│   ├── test_request_logging.py       # middleware לוגים
+│   └── test_client_event_limiter.py  # rate limit observability
+├── integration/             # בדיקות HTTP end-to-end (mocked Firestore)
+│   ├── test_routes_predict_daily.py  # POST /predict/daily
+│   ├── test_routes_ml_status.py      # GET /status/ml
+│   ├── test_routes_health.py         # GET /health
+│   ├── test_openapi_contract.py      # סכמת OpenAPI
+│   ├── test_routes_legacy.py         # endpoints ישנים (אם קיימים)
+│   └── test_prediction_model_columns.py # עמודות מודל
+```
+
+### 12.3 מה נבדק?
+
+| תחום | דוגמאות בדיקה |
+|------|---------------|
+| **Inference** | `predict_injury_risk`, gates, 503 כשמודל Blocked |
+| **Features** | 35 עמודות, 15 שלמים, נוסחאות ACWR |
+| **API** | status codes, OpenAPI schema, correlation ID |
+| **Firestore mapping** | date-split (שינה@D, עומס@D-1) |
+| **Confidence** | blend history + data quality |
+| **Observability** | client-events endpoint, rate limiting |
+
+### 12.4 לוגים ובדיקות
+
+בזמן pytest מוגדר `ATHLEAGENT_DISABLE_FILE_LOGGING=1` ב-`conftest.py` — הבדיקות **לא** כותבות ל-`logs/athleagent.log`. זה מונע זיהום הלוג בזמן CI.
 
 ---
 
@@ -944,6 +1136,7 @@ AthleAgent היא **כלי תמיכה להחלטות** — לא אבחון רפ�
 | [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | pipeline ציון סיכון E2E |
 | [ML_model/docs/MODEL_SELECTION.md](../ML_model/docs/MODEL_SELECTION.md) | פרוטוקול בחירת מודל |
 | [EXHIBITION_PREP_HE.md](EXHIBITION_PREP_HE.md) | הכנה לתערוכה |
+| [LOGGING_HE.md](LOGGING_HE.md) | מדריך לוגים ו-observability |
 | [DOCKER.md](DOCKER.md) | הרצה ב-Docker |
 
 ### נספח ב׳ — פקודות שימושיות
