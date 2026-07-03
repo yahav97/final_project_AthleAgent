@@ -13,11 +13,11 @@ RANDOM_STATE = 42
 DATASET_FILENAME = "athlete_injury_data.csv"
 BENCHMARK_FILENAME = "benchmark_holdout.csv"
 ATHLETE_CV_SPLITS = 2
+
+# Injury probability cutoffs swept during training (0.10–0.21 step 0.01, then 0.22–0.60 step 0.02).
 THRESHOLDS_TO_EVAL = sorted(
-    {
-        round(x, 2)
-        for x in list(np.arange(0.10, 0.22, 0.01)) + list(np.arange(0.22, 0.62, 0.02))
-    }
+    [round(value / 100, 2) for value in range(10, 22)]
+    + [round(value / 100, 2) for value in range(22, 62, 2)]
 )
 LABEL_COLUMN = "injury_today"
 

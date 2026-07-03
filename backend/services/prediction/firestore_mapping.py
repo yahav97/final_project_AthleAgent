@@ -65,19 +65,26 @@ def read_first_matching_field(
     field_names: FirestoreFieldNames,
     prefer_primary: bool,
 ) -> Any:
-    """Return the first usable value across docs and field-name aliases."""
+    """Return the first usable value across docs and field-name aliases.
+
+    Non-zero values are preferred over zero (treated as weak / placeholder).
+    """
     docs = (primary, fallback) if prefer_primary else (fallback, primary)
-    for doc in docs:
-        for field_name in field_names:
-            value = doc.get(field_name)
-            if value is not None and value != 0:
-                return value
-    for doc in docs:
-        for field_name in field_names:
-            value = doc.get(field_name)
-            if value is not None:
+    for allow_zero in (False, True):
+        for doc in docs:
+            for field_name in field_names:
+                value = doc.get(field_name)
+                if value is None:
+                    continue
+                if not allow_zero and value == 0:
+                    continue
                 return value
     return 0
+
+
+def _field_from_single_doc(doc: dict[str, Any], field_names: FirestoreFieldNames) -> Any:
+    """Read a field from one Firestore document (no primary/fallback merge)."""
+    return read_first_matching_field(doc, {}, field_names, prefer_primary=True)
 
 
 # Backward-compatible alias used in tests.
@@ -104,41 +111,35 @@ def injury_prediction_request_from_firestore_snapshot(
     checkins = snapshot.get("daily_checkins") or {}
     nutrition_yesterday = snapshot.get("daily_nutrition_yesterday") or {}
 
-    def from_today(field_names: FirestoreFieldNames) -> Any:
-        return read_first_matching_field(health_today, {}, field_names, prefer_primary=True)
-
-    def from_yesterday(field_names: FirestoreFieldNames) -> Any:
-        return read_first_matching_field(health_yesterday, {}, field_names, prefer_primary=True)
-
     return InjuryPredictionRequest(
         userId=user_id,
         date=date_key,
         age=age_from_profile(profile, as_of_date=date_key),
         historyInjuryCount=first_doc_value(profile, "historyInjuryCount", "history_injury_count"),
         injuredYesterday=injured_yesterday_from_docs(checkins, health_today),
-        sleepMinutes=from_today(SLEEP_MINUTES_FIELDS),
-        steps=from_yesterday(STEPS_FIELDS),
-        distanceMeters=from_yesterday(DISTANCE_FIELDS),
-        activeCalories=from_yesterday(ACTIVE_CALORIES_FIELDS),
-        totalCalories=from_yesterday(TOTAL_CALORIES_FIELDS),
+        sleepMinutes=_field_from_single_doc(health_today, SLEEP_MINUTES_FIELDS),
+        steps=_field_from_single_doc(health_yesterday, STEPS_FIELDS),
+        distanceMeters=_field_from_single_doc(health_yesterday, DISTANCE_FIELDS),
+        activeCalories=_field_from_single_doc(health_yesterday, ACTIVE_CALORIES_FIELDS),
+        totalCalories=_field_from_single_doc(health_yesterday, TOTAL_CALORIES_FIELDS),
         heartRateAvg=heart_rate_avg_from_doc(health_yesterday),
-        heartRateMax=from_yesterday(HEART_RATE_MAX_FIELDS),
-        heartRateMin=from_yesterday(HEART_RATE_MIN_FIELDS),
-        weightKg=from_yesterday(WEIGHT_FIELDS),
-        heightCm=from_yesterday(HEIGHT_FIELDS),
-        bmrCalories=from_yesterday(BMR_FIELDS),
-        hrvRmssd=from_yesterday(HRV_FIELDS),
-        restingHeartRate=from_yesterday(RESTING_HR_FIELDS),
-        bodyFatPct=from_yesterday(BODY_FAT_FIELDS),
-        vo2Max=from_yesterday(VO2_MAX_FIELDS),
-        elevationGainedMeters=from_yesterday(ELEVATION_FIELDS),
-        floorsClimbed=from_yesterday(FLOORS_FIELDS),
-        avgSpeed=from_yesterday(AVG_SPEED_FIELDS),
-        maxSpeed=from_yesterday(MAX_SPEED_FIELDS),
-        avgPower=from_yesterday(AVG_POWER_FIELDS),
-        avgCadence=from_yesterday(AVG_CADENCE_FIELDS),
-        respiratoryRate=from_yesterday(RESPIRATORY_RATE_FIELDS),
-        oxygenSaturation=from_yesterday(OXYGEN_SATURATION_FIELDS),
+        heartRateMax=_field_from_single_doc(health_yesterday, HEART_RATE_MAX_FIELDS),
+        heartRateMin=_field_from_single_doc(health_yesterday, HEART_RATE_MIN_FIELDS),
+        weightKg=_field_from_single_doc(health_yesterday, WEIGHT_FIELDS),
+        heightCm=_field_from_single_doc(health_yesterday, HEIGHT_FIELDS),
+        bmrCalories=_field_from_single_doc(health_yesterday, BMR_FIELDS),
+        hrvRmssd=_field_from_single_doc(health_yesterday, HRV_FIELDS),
+        restingHeartRate=_field_from_single_doc(health_yesterday, RESTING_HR_FIELDS),
+        bodyFatPct=_field_from_single_doc(health_yesterday, BODY_FAT_FIELDS),
+        vo2Max=_field_from_single_doc(health_yesterday, VO2_MAX_FIELDS),
+        elevationGainedMeters=_field_from_single_doc(health_yesterday, ELEVATION_FIELDS),
+        floorsClimbed=_field_from_single_doc(health_yesterday, FLOORS_FIELDS),
+        avgSpeed=_field_from_single_doc(health_yesterday, AVG_SPEED_FIELDS),
+        maxSpeed=_field_from_single_doc(health_yesterday, MAX_SPEED_FIELDS),
+        avgPower=_field_from_single_doc(health_yesterday, AVG_POWER_FIELDS),
+        avgCadence=_field_from_single_doc(health_yesterday, AVG_CADENCE_FIELDS),
+        respiratoryRate=_field_from_single_doc(health_yesterday, RESPIRATORY_RATE_FIELDS),
+        oxygenSaturation=_field_from_single_doc(health_yesterday, OXYGEN_SATURATION_FIELDS),
         energyLevel=checkins.get("energyLevel"),
         muscleSoreness=checkins.get("muscleSoreness"),
         stressLevel=checkins.get("stressLevel"),

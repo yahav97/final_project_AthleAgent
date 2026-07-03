@@ -18,6 +18,18 @@ class ResolvedModelBundle(NamedTuple):
     gate_status: str
 
 
+def _blocked_bundle(gate: ModelGateReason) -> ResolvedModelBundle:
+    """Return a bundle that cannot serve predictions."""
+    return ResolvedModelBundle(
+        None,
+        None,
+        None,
+        None,
+        BundleResolutionMode.FALLBACK_DEMO.value,
+        gate.value,
+    )
+
+
 def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
     """
     Enforce a single model contract for serving.
@@ -31,23 +43,9 @@ def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
       }
     """
     if loaded_model is None:
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.MODEL_NOT_LOADED.value,
-        )
+        return _blocked_bundle(ModelGateReason.MODEL_NOT_LOADED)
     if not isinstance(loaded_model, dict):
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.UNSUPPORTED_MODEL_FORMAT.value,
-        )
+        return _blocked_bundle(ModelGateReason.UNSUPPORTED_MODEL_FORMAT)
 
     estimator = loaded_model.get("estimator")
     feature_columns = loaded_model.get("feature_columns")
@@ -56,58 +54,23 @@ def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
     model_name = str(loaded_model.get("winner") or "live_model")
 
     if estimator is None:
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.MISSING_ESTIMATOR.value,
-        )
+        return _blocked_bundle(ModelGateReason.MISSING_ESTIMATOR)
     if not isinstance(feature_columns, list) or not feature_columns:
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.MISSING_FEATURE_COLUMNS.value,
-        )
+        return _blocked_bundle(ModelGateReason.MISSING_FEATURE_COLUMNS)
     if threshold_raw is None:
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.INVALID_THRESHOLD.value,
-        )
+        return _blocked_bundle(ModelGateReason.INVALID_THRESHOLD)
     try:
         injury_threshold = float(threshold_raw)
     except (TypeError, ValueError):
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.INVALID_THRESHOLD.value,
-        )
+        return _blocked_bundle(ModelGateReason.INVALID_THRESHOLD)
     try:
         medium_risk_threshold = (
             float(medium_threshold_raw)
             if medium_threshold_raw is not None
-            else max(0.15, injury_threshold * 0.6)
+            else max(0.15, injury_threshold * 0.6)  # same formula as ML_model/training/pipeline.py
         )
     except (TypeError, ValueError):
-        return ResolvedModelBundle(
-            None,
-            None,
-            None,
-            None,
-            BundleResolutionMode.FALLBACK_DEMO.value,
-            ModelGateReason.INVALID_MEDIUM_THRESHOLD.value,
-        )
+        return _blocked_bundle(ModelGateReason.INVALID_MEDIUM_THRESHOLD)
 
     return ResolvedModelBundle(
         estimator,

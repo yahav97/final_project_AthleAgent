@@ -29,20 +29,12 @@ def sleep_hours_from_doc(doc: dict[str, Any]) -> float:
     return max(3.0, min(12.0, sleep_minutes / 60.0))
 
 
-# Backward-compatible alias.
-sleep_hours = sleep_hours_from_doc
-
-
 def hrv_score_from_doc(doc: dict[str, Any], resting_hr: float) -> float:
     """Model HRV score from RMSSD on the doc, or a resting-HR proxy when missing."""
     hrv_rmssd = float(doc.get("hrvRmssd") or 0.0)
     if hrv_rmssd > 0:
         return float(max(30.0, min(105.0, hrv_rmssd)))
     return hrv_proxy_from_resting_hr(resting_hr)
-
-
-# Backward-compatible alias.
-hrv_score = hrv_score_from_doc
 
 
 def compute_historical_derived_features(
@@ -58,12 +50,12 @@ def compute_historical_derived_features(
         if not date_key:
             continue
         rest_hr = resting_hr_from_doc(row)
-        row_hrv_score = hrv_score(row, rest_hr)
+        row_hrv_score = hrv_score_from_doc(row, rest_hr)
         rows.append(
             {
                 "date_key": date_key,
                 "daily_distance_km": daily_distance_km_from_doc(row),
-                "sleep_hours": sleep_hours(row),
+                "sleep_hours": sleep_hours_from_doc(row),
                 "hrv_score": row_hrv_score,
             }
         )

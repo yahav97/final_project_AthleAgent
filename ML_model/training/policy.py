@@ -97,6 +97,7 @@ def select_operating_threshold_for_model(
     threshold_rows: list[dict[str, float | str]],
     model_name: str,
 ) -> float:
+    """Pick one threshold for a model using progressively relaxed recall/FPR gates."""
     df = pd.DataFrame(threshold_rows)
     policy = get_policy()
     model_df = df[df["Model"] == model_name].copy()
@@ -190,6 +191,7 @@ def pick_best_model(results_df: pd.DataFrame, threshold_rows: list[dict[str, flo
             on="Model",
             how="left",
         )
+        # Lower OperatingTier is better; within a tier prefer higher F1/precision and lower FPR.
         return merged.sort_values(
             by=[
                 "OperatingTier",

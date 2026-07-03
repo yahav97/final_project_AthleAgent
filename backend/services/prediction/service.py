@@ -59,12 +59,9 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     loaded_model = get_model()
     bundle = resolve_model_bundle(loaded_model)
     if bundle.estimator is None:
-        gate_reason = get_model_gate_reason()
-        blocked_reason = (
-            bundle.gate_status
-            if bundle.gate_status != ModelGateReason.MODEL_NOT_LOADED.value
-            else gate_reason
-        )
+        blocked_reason = bundle.gate_status
+        if blocked_reason == ModelGateReason.MODEL_NOT_LOADED.value:
+            blocked_reason = get_model_gate_reason()
         logger.warning(
             "predict_blocked userId=%s reason=%s prediction_confidence=%.2f",
             payload.userId,

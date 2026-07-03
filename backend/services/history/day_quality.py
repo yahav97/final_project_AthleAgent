@@ -50,10 +50,6 @@ WATCH_SYNC_SIGNAL_GROUPS: dict[str, WatchSyncFieldNames] = {
 }
 
 
-def min_watch_sync_signal_groups_required() -> int:
-    return settings.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS
-
-
 def _row_has_any_usable_field(row: dict[str, Any], field_names: WatchSyncFieldNames) -> bool:
     return any(not is_absent_or_weak(row.get(name)) for name in field_names)
 
@@ -69,7 +65,7 @@ def count_watch_sync_signal_groups(row: dict[str, Any]) -> int:
 
 def is_quality_history_day(row: dict[str, Any]) -> bool:
     """Day counts toward history confidence when it looks like a real wearable sync."""
-    return count_watch_sync_signal_groups(row) >= min_watch_sync_signal_groups_required()
+    return count_watch_sync_signal_groups(row) >= settings.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS
 
 
 def count_quality_history_days(rows: list[dict[str, Any]]) -> int:

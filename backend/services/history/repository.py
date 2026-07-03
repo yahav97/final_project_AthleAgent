@@ -115,6 +115,24 @@ def save_daily_prediction_result(
         return False
 
 
+def _history_date_window(
+    end_day: datetime,
+    lookback_days: int,
+    include_target_day: bool,
+) -> tuple[datetime, datetime]:
+    """Return inclusive [start_day, end_inclusive] for wake-up-day history fetches.
+
+    Example: prediction date D, lookback 7, exclude target → wake-up days D-7 … D-1.
+    """
+    if include_target_day:
+        start_day = end_day - timedelta(days=lookback_days - 1)
+        end_inclusive = end_day
+    else:
+        end_inclusive = end_day - timedelta(days=1)
+        start_day = end_inclusive - timedelta(days=lookback_days - 1)
+    return start_day, end_inclusive
+
+
 def fetch_user_history(
     user_id: str,
     date_key: str,
@@ -135,12 +153,7 @@ def fetch_user_history(
         end_day = to_date_key(date_key)
     except ValueError:
         return []
-    if include_target_day:
-        start_day = end_day - timedelta(days=lookback_days - 1)
-        end_inclusive = end_day
-    else:
-        end_inclusive = end_day - timedelta(days=1)
-        start_day = end_inclusive - timedelta(days=lookback_days - 1)
+    start_day, end_inclusive = _history_date_window(end_day, lookback_days, include_target_day)
 
     db = get_firestore_client()
     if db is None:

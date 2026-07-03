@@ -15,7 +15,7 @@ from services.field_transforms import (
     resting_hr,
     resting_hr_from_doc,
 )
-from services.history.rolling_features import compute_historical_derived_features, hrv_score
+from services.history.rolling_features import compute_historical_derived_features, hrv_score_from_doc
 from utils.exceptions import ValidationError
 
 pytestmark = pytest.mark.unit
@@ -110,11 +110,11 @@ class TestInjuredYesterday:
 class TestHrvScore:
     def test_uses_rmssd_when_present(self):
         doc = {"hrvRmssd": 72.0, "heartRateAvg": 60}
-        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(72.0)
+        assert hrv_score_from_doc(doc, resting_hr=54.0) == pytest.approx(72.0)
 
     def test_falls_back_to_proxy(self):
         doc = {"heartRateAvg": 60}
-        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
+        assert hrv_score_from_doc(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
 
     def test_historical_hrv_drop_uses_real_hrv_series(self):
         rows = [

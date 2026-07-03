@@ -45,7 +45,23 @@ from training.policy import (
 )
 
 
+# Medium risk band uses 60% of the injury threshold (floor 0.15) — matches backend bundle defaults.
+MEDIUM_RISK_THRESHOLD_FRACTION = 0.6
+MEDIUM_RISK_THRESHOLD_FLOOR = 0.15
+
+
 # --- data & features ---
+
+
+def _unwrap_sklearn_estimator(model: object) -> object:
+    """Reach the fitted estimator inside Pipeline or CalibratedClassifierCV wrappers."""
+    if isinstance(model, Pipeline):
+        return model.named_steps["model"]
+    if isinstance(model, CalibratedClassifierCV):
+        calibrated = model.calibrated_classifiers_
+        if calibrated and hasattr(calibrated[0], "estimator"):
+            return calibrated[0].estimator
+    return model
 
 
 def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,13 +77,7 @@ def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def extract_feature_importance(model, feature_names: list[str]) -> pd.DataFrame | None:
-    base_model = model
-    if isinstance(model, Pipeline):
-        base_model = model.named_steps["model"]
-    elif isinstance(model, CalibratedClassifierCV):
-        calibrated = model.calibrated_classifiers_
-        if calibrated and hasattr(calibrated[0], "estimator"):
-            base_model = calibrated[0].estimator
+    base_model = _unwrap_sklearn_estimator(model)
     if hasattr(base_model, "feature_importances_"):
         return pd.DataFrame(
             {"feature": feature_names, "importance": base_model.feature_importances_}
@@ -362,7 +372,10 @@ def save_training_artifacts(
         "estimator": estimator_for_serving,
         "feature_columns": split.feature_columns,
         "threshold": result.best_operating_threshold,
-        "medium_threshold": max(0.15, result.best_operating_threshold * 0.6),
+        "medium_threshold": max(
+            MEDIUM_RISK_THRESHOLD_FLOOR,
+            result.best_operating_threshold * MEDIUM_RISK_THRESHOLD_FRACTION,
+        ),
         "policy": policy_as_dict(),
         "winner": result.best_model_name,
     }

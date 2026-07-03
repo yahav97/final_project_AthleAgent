@@ -26,7 +26,7 @@ def is_explicit_zero_or_nan(value: object) -> bool:
         num = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return True
-    return not (num == num) or num == 0.0  # NaN or zero
+    return math.isnan(num) or num == 0.0
 
 
 def is_absent_or_weak(value: object) -> bool:
