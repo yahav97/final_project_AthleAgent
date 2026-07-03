@@ -6,7 +6,7 @@
 | [`notebooks/model_improvement_journey.ipynb`](notebooks/model_improvement_journey.ipynb) | **Live demo** — same functions as `train_model.py` on a CSV subset |
 | [`artifacts/promoted.json`](artifacts/promoted.json) | Production model pointer (updated by `run_pipeline.py`) |
 | `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook |
-| `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, ~1000×365) |
+| `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, 1,000×340 = 340k rows) |
 | `feature_contract.py` | Shared JSON loader — `integer_feature_columns`, `workout_intensity_minutes()`, `assert_whole_number_columns()` |
 | `policy_config.py` | Selection gates (Recall, FPR, F1, …) — notebook can override live |
 | `train_model.py` | Full pipeline → `artifacts/<run_id>/` |
