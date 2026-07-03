@@ -100,6 +100,23 @@ class TestFirebaseAuthMiddleware:
         assert response.status_code == 401
         assert response.json()["code"] == "auth_required"
 
+    def test_rejects_invalid_bearer_token_when_enabled(self, auth_app, monkeypatch):
+        def _verify_raises(token: str):
+            raise ValueError("invalid token")
+
+        import firebase_admin.auth as firebase_auth
+
+        monkeypatch.setattr(firebase_auth, "verify_id_token", _verify_raises)
+
+        with TestClient(auth_app) as client:
+            response = client.post(
+                "/predict/daily",
+                json={"userId": "u1", "date": "2026-05-09"},
+                headers={"Authorization": "Bearer bad-token"},
+            )
+        assert response.status_code == 401
+        assert response.json()["code"] == "auth_invalid"
+
     def test_health_stays_public_when_enabled(self, auth_app):
         with TestClient(auth_app) as client:
             response = client.get("/health")

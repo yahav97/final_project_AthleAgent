@@ -15,6 +15,7 @@ from services.history.history_merge import merge_wake_up_day_row
 from services.history.repository import (
     fetch_user_history,
     get_history_window_context,
+    history_confidence_from_quality_days,
     stable_athlete_numeric_id,
 )
 from services.history.rolling_features import (
@@ -25,6 +26,24 @@ from services.history.rolling_features import (
 from services.preprocessing.request_features import add_same_day_composite_features
 
 pytestmark = pytest.mark.unit
+
+
+class TestHistoryConfidenceBoundaries:
+    @pytest.mark.parametrize(
+        ("quality_days", "expected"),
+        [
+            (0, "low"),
+            (3, "low"),
+            (4, "medium"),
+            (6, "medium"),
+            (7, "high"),
+        ],
+    )
+    def test_history_confidence_from_quality_days(self, quality_days, expected):
+        from schemas.enums import HistoryConfidence
+
+        level = history_confidence_from_quality_days(quality_days)
+        assert level == HistoryConfidence(expected)
 
 
 class TestStableAthleteId:

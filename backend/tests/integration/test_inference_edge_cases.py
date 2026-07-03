@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from main import app
 from schemas.inference import InjuryPredictionRequest
 from services.prediction.service import predict_injury_risk
-from utils.exceptions import ValidationError
+from utils.exceptions import MLModelError, ValidationError
 
 pytestmark = pytest.mark.integration
 
@@ -23,13 +23,14 @@ _BASE_PAYLOAD = dict(
 )
 
 
-def test_predict_extreme_sleep_zero_raises_when_model_blocked(monkeypatch):
+def test_predict_zero_sleep_passes_through_when_model_blocked(monkeypatch):
+    """Zero sleep lowers quality score but still reaches model gate (not HTTP 422)."""
     monkeypatch.setattr("services.prediction.service.get_model", lambda: None)
     monkeypatch.setattr(
         "services.prediction.service.get_model_gate_reason",
         lambda: "manifest_corrupted",
     )
-    with pytest.raises(Exception, match="Model is not live"):
+    with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
         predict_injury_risk(InjuryPredictionRequest(**{**_BASE_PAYLOAD, "sleepMinutes": 0}))
 
 

@@ -10,6 +10,7 @@ DOCUMENTED_PATHS = {
     "/test_predict",
     "/predict/daily",
     "/status/ml",
+    "/api/v1/observability/client-events",
 }
 
 
@@ -26,6 +27,7 @@ class TestOpenApiContract:
         ("/health", "get"),
         ("/predict/daily", "post"),
         ("/status/ml", "get"),
+        ("/api/v1/observability/client-events", "post"),
     ])
     def test_production_paths_have_operation_metadata(self, api_client, path, method):
         spec = api_client.get("/openapi.json").json()

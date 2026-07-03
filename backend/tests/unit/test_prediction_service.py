@@ -99,7 +99,7 @@ class TestConfidenceScoring:
 
 
 class TestDefaultedCriticalFeatures:
-    def test_counts_columns_matching_defaults(self):
+    def test_counts_defaults_for_same_day_proxy_features(self):
         df = injury_request_to_model_dataframe(
             InjuryPredictionRequest(
                 userId="u1",
@@ -113,8 +113,12 @@ class TestDefaultedCriticalFeatures:
             )
         )
         count = count_defaulted_critical_features(df)
-        assert count >= 0
-        assert count <= 6
+        # sleep_hours_ma7 and hrv_drop match population defaults; others come from same-day load.
+        assert count == 2
+
+    def test_counts_all_six_when_frame_uses_population_defaults(self):
+        df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
+        assert count_defaulted_critical_features(df) == 6
 
     def test_counts_zero_when_history_features_differ(self):
         df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
@@ -280,6 +284,49 @@ class TestPredictInjuryRisk:
         assert out["risk_level"] == expected_level
         assert out["risk_score"] == pytest.approx(probability, abs=1e-4)
 
+    def test_history_enrichment_affects_risk_score(
+        self,
+        sample_prediction_request,
+        mock_model_bundle,
+        monkeypatch,
+    ):
+        import numpy as np
+
+        class _FeatureSensitiveEstimator:
+            feature_names_in_ = MODEL_FEATURE_COLUMNS
+
+            def predict_proba(self, X):
+                acwr = float(X["acwr_ratio"].iloc[0])
+                prob = min(0.95, max(0.05, 0.15 + acwr * 0.2))
+                return np.array([[1.0 - prob, prob]])
+
+        bundle = dict(mock_model_bundle)
+        bundle["estimator"] = _FeatureSensitiveEstimator()
+
+        def _low_history(*args, **kwargs):
+            return {"confidence": "low", "features": {}}
+
+        def _high_history(*args, **kwargs):
+            return {
+                "confidence": "high",
+                "features": {"acwr_ratio": 2.5, "acwr_ratio_ma7": 2.5},
+            }
+
+        monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
+        monkeypatch.setattr(
+            "services.prediction.confidence.get_history_window_context",
+            _low_history,
+        )
+        low_out = predict_injury_risk(sample_prediction_request)
+
+        monkeypatch.setattr(
+            "services.prediction.confidence.get_history_window_context",
+            _high_history,
+        )
+        high_out = predict_injury_risk(sample_prediction_request)
+
+        assert high_out["risk_score"] > low_out["risk_score"]
+        assert high_out["prediction_confidence"] > low_out["prediction_confidence"]
 
     def test_from_firestore_raises_when_snapshot_empty(self, monkeypatch):
         monkeypatch.setattr(
