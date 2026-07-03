@@ -3,7 +3,7 @@ package com.yahav.athleagent.ui.coach
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
+import com.yahav.athleagent.utilities.SignalManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
@@ -95,10 +95,10 @@ class CoachRequestsActivity : AppCompatActivity() {
             batch.update(teamRef, "athletes", FieldValue.arrayUnion(request.athleteId))
             batch.update(athleteRef, "teamId", request.teamId)
         }.addOnSuccessListener {
-            Toast.makeText(this, "Athlete Approved!", Toast.LENGTH_SHORT).show()
+            SignalManager.getInstance().showSignal(binding.root, "Athlete Approved!", SignalManager.SignalType.SUCCESS)
             removeRequestFromList(request)
         }.addOnFailureListener { e ->
-            Toast.makeText(this, "Failed to approve: ${e.message}", Toast.LENGTH_SHORT).show()
+            SignalManager.getInstance().showSignal(binding.root, "Failed to approve: ${e.message}", SignalManager.SignalType.ERROR)
         }
     }
 
@@ -109,7 +109,7 @@ class CoachRequestsActivity : AppCompatActivity() {
         // On rejection, simply update the request status to rejected
         requestRef.update("status", "rejected")
             .addOnSuccessListener {
-                Toast.makeText(this, "Request Rejected", Toast.LENGTH_SHORT).show()
+                SignalManager.getInstance().showSignal(binding.root, "Request Rejected", SignalManager.SignalType.SUCCESS)
                 removeRequestFromList(request)
             }
     }

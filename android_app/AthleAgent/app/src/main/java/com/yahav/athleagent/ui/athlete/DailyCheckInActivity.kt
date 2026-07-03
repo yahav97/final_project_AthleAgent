@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.google.android.material.snackbar.Snackbar
+import com.yahav.athleagent.utilities.SignalManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -106,7 +106,7 @@ class DailyCheckInActivity : AppCompatActivity() {
     }
 
     private fun saveCheckInToFirebase() {
-        Snackbar.make(binding.root, "Saving your check-in...", Snackbar.LENGTH_SHORT).show()
+        SignalManager.getInstance().showSignal(binding.root, "Saving your check-in...", SignalManager.SignalType.INFO)
 
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "test_user_123"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -127,9 +127,7 @@ class DailyCheckInActivity : AppCompatActivity() {
 
                 eventReporter.reportEvent("user_action", "Daily Check-in submitted")
 
-                Snackbar.make(binding.root, "Check-in Saved Successfully!", Snackbar.LENGTH_LONG)
-                    .setBackgroundTint("#3A6578".toColorInt())
-                    .show()
+                SignalManager.getInstance().showSignal(binding.root, "Check-in Saved Successfully!", SignalManager.SignalType.SUCCESS)
 
                 checkAndTriggerPredictionInBackground()
 
@@ -137,9 +135,7 @@ class DailyCheckInActivity : AppCompatActivity() {
             }
             .addOnFailureListener { e ->
                 Log.e("DailyCheckIn", "Error saving check-in", e)
-                Snackbar.make(binding.root, "Failed to save: ${e.message}", Snackbar.LENGTH_LONG)
-                    .setBackgroundTint(Color.RED)
-                    .show()
+                SignalManager.getInstance().showSignal(binding.root, "Failed to save: ${e.message}", SignalManager.SignalType.ERROR)
             }
     }
 
@@ -162,7 +158,7 @@ class DailyCheckInActivity : AppCompatActivity() {
             yesterdayHealthRef.get().addOnSuccessListener { yesterdayHealthDoc ->
                 todayCheckinRef.get().addOnSuccessListener { todayCheckinDoc ->
 
-                    // Fetching the values themselves for validation
+                    // Check if the background ML model has already run and saved the result
                     val todaySleep = todayHealthDoc.getLong("sleepMinutes") ?: 0L
                     val yesterdaySteps = yesterdayHealthDoc.getLong("steps") ?: 0L
                     val hasTodaySurvey = todayCheckinDoc.exists() && todayCheckinDoc.contains("energyLevel")

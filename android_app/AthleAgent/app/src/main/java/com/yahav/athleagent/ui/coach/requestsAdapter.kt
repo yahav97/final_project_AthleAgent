@@ -3,9 +3,9 @@ package com.yahav.athleagent.ui.coach
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.AppCompatImageButton
-import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.textview.MaterialTextView
+import androidx.recyclerview.widget.RecyclerView
 import com.yahav.athleagent.R
 import com.yahav.athleagent.model.AthleteRequest
 
@@ -19,8 +19,8 @@ class RequestsAdapter(
     // ViewHolder class that holds references to the UI elements of a single request item
     class RequestViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val emailTxt: MaterialTextView = view.findViewById(R.id.itemRequest_LBL_email)
-        val btnApprove: AppCompatImageButton = view.findViewById(R.id.itemRequest_BTN_approve)
-        val btnReject: AppCompatImageButton = view.findViewById(R.id.itemRequest_BTN_reject)
+        val btnApprove: MaterialButton = view.findViewById(R.id.itemRequest_BTN_approve)
+        val btnReject: MaterialButton = view.findViewById(R.id.itemRequest_BTN_reject)
     }
 
     // Inflates the XML layout for individual list items

@@ -13,7 +13,7 @@ import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.snackbar.Snackbar
+import com.yahav.athleagent.utilities.SignalManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -73,7 +73,7 @@ class WearableSyncActivity : AppCompatActivity() {
         if (granted.containsAll(permissions)) {
             startHealthSync()
         } else {
-            Snackbar.make(binding.root, "Missing required health permissions.", Snackbar.LENGTH_LONG).show()
+            SignalManager.getInstance().showSignal(binding.root, "Missing required health permissions.", SignalManager.SignalType.ERROR)
         }
     }
 
@@ -84,6 +84,84 @@ class WearableSyncActivity : AppCompatActivity() {
 
         binding.syncBTNSubmit.setOnClickListener {
             checkAndRequestHealthPermissions()
+        }
+
+        binding.syncBTNSubmit.setOnLongClickListener {
+            injectSevenDaysOfWearableDemoData()
+            true
+        }
+    }
+
+    private fun injectSevenDaysOfWearableDemoData() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+                for (i in 0..6) {
+                    val cal = Calendar.getInstance()
+                    cal.add(Calendar.DATE, -i)
+                    val dateKey = dateFormat.format(cal.time)
+                    
+                    // Randomized realistic wearable data (NO survey data)
+                    val steps = (4000..16000).random().toLong()
+                    val sleepMinutes = (340..560).random().toLong()
+                    val heartRateAvg = (62..82).random()
+                    val hrvRmssd = (35..75).random().toDouble()
+                    val oxygenSaturation = (95..99).random().toDouble()
+                    val vo2Max = (40..55).random().toDouble()
+                    val bodyFatPct = (12..22).random().toDouble()
+                    val respiratoryRate = (14..20).random().toDouble()
+                    val restingHeartRate = (55..70).random()
+                    
+                    // Health Data payload matching backend requirements
+                    val healthData = mapOf(
+                        "steps" to steps,
+                        "sleepMinutes" to sleepMinutes,
+                        "activeCalories" to (steps * 0.045).toInt(),
+                        "totalCalories" to (2000..2800).random(),
+                        "heartRateAvg" to heartRateAvg,
+                        "heartRateMax" to (heartRateAvg + 60),
+                        "heartRateMin" to (heartRateAvg - 15),
+                        "weightKg" to (70..85).random().toDouble(),
+                        "bmrCalories" to (1600..1900).random(),
+                        "restingHeartRate" to restingHeartRate,
+                        "elevationGainedMeters" to (5..50).random().toDouble(),
+                        "floorsClimbed" to (1..15).random(),
+                        "avgSpeed" to (4..8).random().toDouble(),
+                        "maxSpeed" to (10..15).random().toDouble(),
+                        "avgCadence" to (70..90).random().toDouble(),
+                        "hrvRmssd" to hrvRmssd,
+                        "oxygenSaturation" to oxygenSaturation,
+                        "vo2Max" to vo2Max,
+                        "bodyFatPct" to bodyFatPct,
+                        "respiratoryRate" to respiratoryRate,
+                        "lastSync" to FieldValue.serverTimestamp(),
+                        
+                        // Fake risk metrics for visualization purposes
+                        "finalRiskScore" to (15..55).random(),
+                        "riskLevel" to "Low",
+                        "predictionConfidence" to (88..98).random().toDouble()
+                    )
+
+                    // Note: We DO NOT inject daily_checkins here as per requirements.
+
+                    // Save to Firestore
+                    db.collection("users").document(userId)
+                        .collection("daily_health").document(dateKey)
+                        .set(healthData, SetOptions.merge())
+                }
+
+                // Demo wearable data injected for 7 days
+
+            } catch (e: Exception) {
+                Log.e("DemoInjection", "Error injecting wearable data", e)
+                withContext(Dispatchers.Main) {
+                    SignalManager.getInstance().showSignal(binding.root, "Wearable data injection failed.", SignalManager.SignalType.ERROR)
+                }
+            }
         }
     }
 
@@ -100,13 +178,13 @@ class WearableSyncActivity : AppCompatActivity() {
                 }
             }
         } else {
-            Snackbar.make(binding.root, "Health Connect is not available.", Snackbar.LENGTH_LONG).show()
+            SignalManager.getInstance().showSignal(binding.root, "Health Connect is not available.", SignalManager.SignalType.ERROR)
         }
     }
 
     private fun startHealthSync() {
         eventReporter.reportEvent("sync", "Started wearable data sync")
-        Snackbar.make(binding.root, "Fetching advanced metrics...", Snackbar.LENGTH_SHORT).show()
+        SignalManager.getInstance().showSignal(binding.root, "Fetching advanced metrics...", SignalManager.SignalType.INFO)
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -159,8 +237,7 @@ class WearableSyncActivity : AppCompatActivity() {
                                 checkAndTriggerPredictionInBackground()
 
                                 lifecycleScope.launch(Dispatchers.Main) {
-                                    Snackbar.make(binding.root, "Sync complete!", Snackbar.LENGTH_LONG)
-                                        .setBackgroundTint("#3A6578".toColorInt()).show()
+                                    SignalManager.getInstance().showSignal(binding.root, "Sync complete!", SignalManager.SignalType.SUCCESS)
                                     delay(1500)
                                     finish()
                                 }
@@ -170,7 +247,7 @@ class WearableSyncActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e("Sync", "Error", e)
                 withContext(Dispatchers.Main) {
-                    Snackbar.make(binding.root, "Sync failed.", Snackbar.LENGTH_SHORT).show()
+                    SignalManager.getInstance().showSignal(binding.root, "Sync failed.", SignalManager.SignalType.ERROR)
                 }
             }
         }
@@ -295,7 +372,7 @@ class WearableSyncActivity : AppCompatActivity() {
             yesterdayHealthRef.get().addOnSuccessListener { yesterdayHealthDoc ->
                 todayCheckinRef.get().addOnSuccessListener { todayCheckinDoc ->
 
-                    // Fetching the values themselves for validation
+                    // Check if the background ML model has already run and saved the result
                     val todaySleep = todayHealthDoc.getLong("sleepMinutes") ?: 0L
                     val yesterdaySteps = yesterdayHealthDoc.getLong("steps") ?: 0L
                     val hasTodaySurvey = todayCheckinDoc.exists() && todayCheckinDoc.contains("energyLevel")

@@ -78,23 +78,28 @@ class AthleteDashboardActivity : AppCompatActivity() {
                     val confidence = healthDoc.getDouble("predictionConfidence")?.toFloat() ?: 0f
 
                     // 2. Update the progress dial UI
-                    updateUIWithScore(riskScore)
+                    updateUIWithScore(riskScore, confidence)
 
                     // 3. Extract existing data to provide context for Gemini
                     val sleepMinutes = healthDoc.getLong("sleepMinutes") ?: 480L
                     val soreness = checkInDoc.getLong("muscleSoreness")?.toInt() ?: 1
                     val stress = checkInDoc.getLong("stressLevel")?.toInt() ?: 20
+                    val aiRecommendation = healthDoc.getString("aiRecommendation")
 
-                    // 4. Call Gemini to generate a verbal recommendation
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        fetchAIRecommendation(
-                            riskScore,
-                            riskLevel,
-                            confidence,
-                            sleepMinutes,
-                            soreness,
-                            stress
-                        )
+                    // 4. Call Gemini to generate a verbal recommendation ONLY if it doesn't exist
+                    if (aiRecommendation.isNullOrEmpty()) {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            fetchAIRecommendation(
+                                riskScore,
+                                riskLevel,
+                                confidence,
+                                sleepMinutes,
+                                soreness,
+                                stress
+                            )
+                        }
+                    } else {
+                        binding.dashboardTXTAiRecommendation.text = aiRecommendation
                     }
                 } else {
                     // The model hasn't run. Check if it's due to missing data or zero/empty data
@@ -180,7 +185,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetTextI18n")
-    private fun updateUIWithScore(riskScore: Int) {
+    private fun updateUIWithScore(riskScore: Int, confidence: Float) {
         runOnUiThread {
             val (drawableResId, textColorHex) = when {
                 riskScore <= 20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")
@@ -193,6 +198,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
             binding.dashboardPRGRiskScore.progress = riskScore
             binding.dashboardTXTScore.text = "$riskScore%"
             binding.dashboardTXTScore.setTextColor(textColorHex.toColorInt())
+            binding.dashboardTXTConfidence.text = "Confidence: ${confidence.toInt()}%"
         }
     }
 
@@ -203,6 +209,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
             binding.dashboardPRGRiskScore.progress = 0
             binding.dashboardTXTScore.text = "--%"
             binding.dashboardTXTScore.setTextColor("#9E9E9E".toColorInt()) // Gray color
+            binding.dashboardTXTConfidence.text = "Confidence: --%"
 
             binding.dashboardTXTAiRecommendation.text = "Pending: Please complete today's Stress Survey and Watch Sync to generate your Injury Risk Score."
         }

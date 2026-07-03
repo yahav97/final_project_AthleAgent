@@ -1,54 +1,77 @@
 package com.yahav.athleagent.utilities
 
 import android.content.Context
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Toast
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
+import com.yahav.athleagent.R
 import java.lang.ref.WeakReference
 
-// Singleton utility class for managing UI feedback mechanisms like Toasts and Snackbars
+// Singleton utility class for managing professional UI feedback
 class SignalManager private constructor(context: Context) {
 
-    // Use a WeakReference to prevent memory leaks associated with holding a Context
     private val contextRef = WeakReference(context)
 
-    enum class ToastLength(val length: Int) {
-        SHORT(Toast.LENGTH_SHORT),
-        LONG(Toast.LENGTH_LONG)
+    enum class SignalType {
+        SUCCESS, ERROR, INFO
     }
 
     companion object {
         @Volatile
         private var instance: SignalManager? = null
 
-        // Initializes the singleton instance (should be called once, typically in the Application class)
         fun init(context: Context): SignalManager {
             return instance ?: synchronized(this) {
                 instance ?: SignalManager(context).also { instance = it }
             }
         }
 
-        // Returns the initialized singleton instance, throwing an exception if not initialized
         fun getInstance(): SignalManager {
             return instance ?: throw IllegalStateException(
-                "SignalManager must be initialized by calling init(context) before use."
+                "SignalManager must be initialized before use."
             )
         }
     }
 
-    // Displays a standard Android Toast message
-    fun toast(text: String, duration: ToastLength = ToastLength.SHORT) {
-        contextRef.get()?.let { context ->
-            Toast.makeText(context, text, duration.ordinal).show()
+    /**
+     * Displays a professional, custom-styled Snackbar.
+     * Replaces standard Snackbars and Toasts for a unified look.
+     */
+    fun showSignal(view: View, message: String, type: SignalType = SignalType.INFO) {
+        val snackbar = Snackbar.make(view, "", Snackbar.LENGTH_LONG)
+        val context = view.context
+        val snackbarLayout = snackbar.view as Snackbar.SnackbarLayout
+        val customView = LayoutInflater.from(context).inflate(R.layout.layout_custom_snackbar, snackbarLayout, false)
+        
+        // Setup background
+        snackbar.view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        snackbarLayout.setPadding(0, 0, 0, 0)
+        
+        val textLabel = customView.findViewById<TextView>(R.id.snackbar_text)
+        val iconImage = customView.findViewById<ImageView>(R.id.snackbar_icon)
+        
+        textLabel.text = message
+        
+        // Apply type-specific styling
+        when (type) {
+            SignalType.SUCCESS -> {
+                iconImage.setImageResource(R.drawable.baseline_done_outline_24)
+                iconImage.setColorFilter(ContextCompat.getColor(context, R.color.green))
+            }
+            SignalType.ERROR -> {
+                iconImage.setImageResource(android.R.drawable.ic_dialog_alert)
+                iconImage.setColorFilter(ContextCompat.getColor(context, R.color.red))
+            }
+            SignalType.INFO -> {
+                iconImage.setImageResource(android.R.drawable.ic_dialog_info)
+                iconImage.setColorFilter(ContextCompat.getColor(context, R.color.brand_button_light_muted))
+            }
         }
-    }
-
-    // Displays a custom, styled Material Snackbar
-    fun snackbar(view: View, text: String) {
-        Snackbar.make(view, text, Snackbar.LENGTH_LONG)
-            // Set the desired background color
-            .setBackgroundTint(view.context.getColor(com.yahav.athleagent.R.color.text))
-            .setTextColor(view.context.getColor(com.yahav.athleagent.R.color.background_white_ghost))
-            .show()
+        
+        snackbarLayout.addView(customView, 0)
+        snackbar.show()
     }
 }
