@@ -11,6 +11,8 @@ from services.model_features import DEFAULT_FEATURE_VALUES
 from services.prediction.confidence import (
     HISTORY_ROLLING_FEATURES,
     apply_history_confidence_fallback,
+    compute_prediction_confidence_percent,
+    history_score_from_confidence,
     parse_history_confidence,
 )
 from services.preprocessing import injury_request_to_model_dataframe
@@ -56,6 +58,26 @@ class TestParseHistoryConfidence:
     )
     def test_normalizes_valid_and_invalid_labels(self, raw, expected):
         assert parse_history_confidence(raw) == expected
+
+
+class TestHistoryScoreFromConfidence:
+    @pytest.mark.parametrize(
+        ("confidence", "expected"),
+        [("high", 0.95), ("medium", 0.7), ("low", 0.45), ("unknown", 0.45)],
+    )
+    def test_maps_labels_to_configured_scores(self, confidence, expected):
+        assert history_score_from_confidence(confidence) == pytest.approx(expected)
+
+
+class TestPredictionConfidenceBlend:
+    def test_blends_history_and_quality_scores(self):
+        # 0.6 * 0.95 + 0.4 * 0.8 = 0.89 → 89.0
+        score = compute_prediction_confidence_percent("high", 0.8)
+        assert score == pytest.approx(89.0)
+
+    def test_clamps_to_0_100(self):
+        assert compute_prediction_confidence_percent("low", 0.0) == pytest.approx(27.0)
+        assert compute_prediction_confidence_percent("high", 1.0) == pytest.approx(97.0)
 
 
 class TestApplyHistoryConfidenceFallback:

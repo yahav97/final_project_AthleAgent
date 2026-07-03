@@ -77,11 +77,13 @@ def setup_logging(
     root.handlers.clear()
     root.propagate = False
 
-    formatter: logging.Formatter
+    file_formatter: logging.Formatter
     if resolved_format == "json":
-        formatter = _build_json_formatter()
+        file_formatter = _build_json_formatter()
     else:
-        formatter = _build_text_formatter()
+        file_formatter = _build_text_formatter()
+    # Human-readable lines on stdout (docker compose logs); structured JSON in the file.
+    console_formatter = _build_text_formatter()
 
     context_filter = ContextFilter()
 
@@ -93,12 +95,12 @@ def setup_logging(
             backupCount=settings.LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(file_formatter)
         file_handler.addFilter(context_filter)
         root.addHandler(file_handler)
 
     stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(formatter)
+    stream_handler.setFormatter(console_formatter)
     stream_handler.addFilter(context_filter)
 
     root.addHandler(stream_handler)

@@ -411,8 +411,9 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 | Test file | Covers |
 |-----------|--------|
 | `tests/integration/test_routes_predict_daily.py` | Production predict route, error paths |
-| `tests/integration/test_inference_edge_cases.py` | Validation errors, `/status/ml` load |
-| `tests/unit/test_prediction_service.py` | Bundle, confidence, Firestore mapping, predict orchestration |
+| `tests/integration/test_routes_ml_status.py` | `/status/ml` schema and idempotency |
+| `tests/unit/test_prediction_service.py` | Bundle, Firestore mapping, predict orchestration |
+| `tests/unit/test_confidence_fallback.py` | History confidence parsing, rolling-feature fallback, blend scoring |
 | `tests/unit/test_field_transforms.py` | Age, distance, HR, injured-yesterday parsing |
 | `tests/unit/test_history_repository.py` | Snapshot fetch, rolling features, day quality |
 | `tests/unit/test_request_features.py` | Request → base model feature helpers |

@@ -149,7 +149,10 @@ Run **integration tests** (FastAPI routes):
 python -m pytest tests/ -v -m integration
 ```
 
-Shared fixtures live in `tests/conftest.py`. Unit tests are under `tests/unit/`.
+Shared fixtures live in `tests/conftest.py`. Layout:
+
+- `tests/unit/` — pure backend logic (preprocessing, prediction, history, config, …)
+- `tests/integration/` — FastAPI routes and OpenAPI contract
 
 **CI:** On push/PR to `main` (when `backend/` or promoted ML artifacts change), GitHub Actions runs the same suite — see `.github/workflows/backend-tests.yml`.
 

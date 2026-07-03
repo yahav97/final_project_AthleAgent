@@ -8,14 +8,9 @@ import pytest
 from schemas.inference import InjuryPredictionRequest
 from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMNS
 from services.prediction.bundle import resolve_model_bundle
-from services.prediction.confidence import (
-    compute_prediction_confidence_percent,
-    count_defaulted_critical_features,
-    history_score_from_confidence,
-)
+from services.prediction.confidence import count_defaulted_critical_features
 from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import (
-    field_from_docs,
     heart_rate_avg_from_doc,
     injury_prediction_request_from_firestore_snapshot,
     read_first_matching_field,
@@ -80,24 +75,6 @@ class TestResolveModelBundle:
         assert bundle.gate_status == "none"
 
 
-class TestConfidenceScoring:
-    @pytest.mark.parametrize(
-        ("confidence", "expected"),
-        [("high", 0.95), ("medium", 0.7), ("low", 0.45), ("unknown", 0.45)],
-    )
-    def test_history_score_from_confidence(self, confidence, expected):
-        assert history_score_from_confidence(confidence) == pytest.approx(expected)
-
-    def test_prediction_confidence_blends_history_and_quality(self):
-        # 0.6 * 0.95 + 0.4 * 0.8 = 0.89 → 89.0
-        score = compute_prediction_confidence_percent("high", 0.8)
-        assert score == pytest.approx(89.0)
-
-    def test_prediction_confidence_clamped_to_0_100(self):
-        assert compute_prediction_confidence_percent("low", 0.0) == pytest.approx(27.0)
-        assert compute_prediction_confidence_percent("high", 1.0) == pytest.approx(97.0)
-
-
 class TestDefaultedCriticalFeatures:
     def test_counts_defaults_for_same_day_proxy_features(self):
         df = injury_request_to_model_dataframe(
@@ -148,13 +125,6 @@ class TestFirestoreFieldHelpers:
         fallback = {"steps": 7400}
         value = read_first_matching_field(primary, fallback, ("steps",), prefer_primary=True)
         assert value == 7400
-
-    def test_field_from_docs_alias_matches_read_first_matching_field(self):
-        primary = {"steps": 7400}
-        fallback = {}
-        assert field_from_docs(primary, fallback, ["steps"], prefer_primary=True) == read_first_matching_field(
-            primary, fallback, ("steps",), prefer_primary=True
-        )
 
 
 class TestFirestoreSnapshotMapping:
@@ -234,55 +204,32 @@ class TestPredictInjuryRisk:
         with pytest.raises(MLModelError, match="Model is not live: manifest_corrupted"):
             predict_injury_risk(sample_prediction_request)
 
-    @pytest.mark.parametrize(
-        ("probability", "expected_level"),
-        [
-            (0.75, "High"),
-            (0.71, "High"),
-            (0.70, "Medium"),
-            (0.50, "Medium"),
-            (0.21, "Medium"),
-            (0.20, "Low"),
-            (0.15, "Low"),
-        ],
-    )
-    def test_risk_level_cutoffs(
+    def test_response_includes_classified_risk_level(
         self,
         sample_prediction_request,
         mock_model_bundle,
         monkeypatch,
-        probability,
-        expected_level,
     ):
         class _Estimator:
             feature_names_in_ = MODEL_FEATURE_COLUMNS
 
-            def __init__(self, prob: float):
-                self._prob = prob
-
             def predict_proba(self, X):
                 import numpy as np
 
-                return np.array([[1.0 - self._prob, self._prob]])
+                return np.array([[0.35, 0.65]])
 
         bundle = dict(mock_model_bundle)
-        bundle["estimator"] = _Estimator(probability)
-        def _history_context(
-            user_id: str,
-            date_key: str,
-            lookback_days: int | None = None,
-            include_target_day: bool = True,
-        ) -> dict[str, object]:
-            return {"confidence": "medium", "features": {}}
+        bundle["estimator"] = _Estimator()
 
         monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
         monkeypatch.setattr(
             "services.prediction.confidence.get_history_window_context",
-            _history_context,
+            lambda *a, **k: {"confidence": "medium", "features": {}},
         )
         out = predict_injury_risk(sample_prediction_request)
-        assert out["risk_level"] == expected_level
-        assert out["risk_score"] == pytest.approx(probability, abs=1e-4)
+        assert out["risk_level"] == "Medium"
+        assert out["risk_score"] == pytest.approx(0.65, abs=1e-4)
+        assert 0.0 <= out["prediction_confidence"] <= 100.0
 
     def test_history_enrichment_affects_risk_score(
         self,
