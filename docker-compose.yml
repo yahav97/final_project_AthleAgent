@@ -9,6 +9,7 @@ services:
         required: false
     environment:
       APP_ENV: demo
+      PORT: 8000
       FIREBASE_SERVICE_ACCOUNT_KEY: /app/backend/firebase-key.json
       LOG_DIR: /app/logs
     volumes:

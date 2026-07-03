@@ -220,10 +220,10 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # CORS
     # -------------------------------------------------------------------------
+    # Web dev origins only — must not include the API port (PORT, default 8000).
     CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://localhost:8080",
-        "http://localhost:8000",
     ]
 
     @field_validator("CORS_ORIGINS", "REQUEST_LOG_SKIP_PATHS", mode="before")
