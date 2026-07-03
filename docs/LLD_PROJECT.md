@@ -50,8 +50,10 @@ final_project_AthleAgent/
 │   └── external/google_auth.py         # (לא מחובר)
 │
 └── ML_model/
-    ├── data_generator.py
-    ├── train_model.py
+    ├── generation/                 # simulator, config, postprocess
+    ├── training/                   # pipeline, policy, models
+    ├── data_generator.py           # CLI → generation/
+    ├── train_model.py              # CLI → training/
     ├── validate_metrics.py
     ├── run_pipeline.py
     └── artifacts/
@@ -250,15 +252,19 @@ POST /predict/daily {userId, date}
     ├─ injury_prediction_request_from_firestore_snapshot()
     │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
     │
-    ├─ injury_request_to_model_dataframe()
+    ├─ resolve_request_nutrition()                       [nutrition_defaults]
+    │
+    ├─ injury_request_to_model_dataframe()               [preprocessing/]
     │     preprocessing + feature_engineering
     │
-    ├─ _apply_history_confidence_fallback()
-    │     7-day rolling: ACWR, sleep_debt, hrv_drop
+    ├─ apply_history_confidence_fallback()             [prediction/confidence]
+    │     7-day rolling: ACWR, sleep_debt, hrv_drop    [history/rolling_features]
     │
-    ├─ calculate_data_quality_score()
+    ├─ calculate_data_quality_score()                    [preprocessing/quality]
     │
-    ├─ model.predict_proba() → proba
+    ├─ compute_prediction_confidence_percent()         [prediction/confidence]
+    │
+    ├─ model.predict_proba() → proba                     [prediction/bundle]
     │     classify_risk_level: Low ≤ 20%, Medium 21–70%, High > 70%
     │
     └─ save_daily_prediction_result()
@@ -286,8 +292,8 @@ POST /predict/daily {userId, date}
 
 ```mermaid
 flowchart LR
-    A[data_generator.py] --> B[athlete_injury_data.csv]
-    B --> C[train_model.py]
+    A[generation/simulator] --> B[athlete_injury_data.csv]
+    B --> C[training/pipeline]
     C --> D[artifacts/run_id/]
     D --> E[validate_metrics.py]
     E --> F{gates pass?}
@@ -295,6 +301,8 @@ flowchart LR
     F -->|no| H[blocked]
     G --> I[model_loader.py at startup]
 ```
+
+> נקודות כניסה CLI: `data_generator.py` → `generation/`, `train_model.py` → `training/`.
 
 ### 4.2 Model Bundle Format (joblib)
 
@@ -443,11 +451,12 @@ cd backend && python -m pytest tests/ -v
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
 | Inference | — | `prediction/service.py` |
-| Features | — | `preprocessing/`, `feature_engineering.py`, `model_features.py` |
+| Features | — | `preprocessing/`, `history/day_quality.py`, `feature_engineering.py`, `model_features.py` |
+| Confidence | — | `prediction/confidence.py`, `preprocessing/quality.py` |
 | Persist | — | `history/repository.save_daily_prediction_result` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
-| Train | — | `ML_model/train_model.py` |
+| Train | — | `ML_model/training/pipeline.py` (CLI: `train_model.py`) |
 
 ---
 

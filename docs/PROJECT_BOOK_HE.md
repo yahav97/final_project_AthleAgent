@@ -7,7 +7,7 @@
 | **מנחה** | מר איל איזנשטיין |
 | **מחלקה** | מדעי המחשב |
 | **תאריך** | יולי 2026 |
-| **גרסת מסמך** | 1.1 |
+| **גרסת מסמך** | 1.2 |
 
 ---
 
@@ -538,17 +538,17 @@ final_project_AthleAgent/
 | נתיב | תפקיד |
 |------|--------|
 | **`main.py`** | FastAPI app, CORS, lifespan, טעינת מודל ב-startup |
-| **`config.py`** | Settings (Pydantic): gates, risk bands, logging, feature flags |
+| **`config.py`** | Settings (Pydantic): מפת מדיניות מרכזית — `ML_MIN_*`, `RISK_*_CUTOFF`, `HISTORY_*`, `CONFIDENCE_*`, `NUTRITION_DEFAULT_*` (ראו [§8.6](#86-prediction_confidence--איכות-הקלט)) |
 | **`injury_model.pkl`** | symlink/copy למודל promoted (נטען ע"י `model_loader`) |
 | **`firebase-key.json`** | Service Account ל-Firestore Admin — **לא ב-git** |
 | **`api/routes/`** | `health.py`, `predict.py`, `observability.py` |
 | **`middleware/`** | `request_logging.py` — לוג בקשות + `X-Request-ID` |
 | **`ml/model_loader.py`** | טעינת joblib, בדיקת gates, Live/Blocked |
 | **`schemas/`** | Pydantic: `inference.py`, `observability.py`, `enums.py`, `types.py` |
-| **`services/prediction/`** | inference, Firestore mapping, confidence |
-| **`services/history/`** | `repository.py` — קריאה/כתיבה Firestore, rolling features |
-| **`services/preprocessing/`** | `request_features`, `validation`, `scales` — train-serve parity |
-| **`services/` (שורש) | `feature_engineering`, `risk_levels`, `nutrition_defaults` |
+| **`services/prediction/`** | `service.py` (orchestration), `firestore_mapping`, `confidence`, `bundle` |
+| **`services/history/`** | `repository`, `rolling_features`, `day_quality`, `history_merge`, `date_utils`, `firestore_client` |
+| **`services/preprocessing/`** | `request_features`, `request_mapping`, `validation`, `scales`, `quality`, `helpers`, `constants` |
+| **`services/` (שורש) | `feature_engineering`, `field_transforms`, `model_features`, `risk_levels`, `nutrition_defaults` |
 | **`data/model_feature_contract.json`** | חוזה 35 פיצ'רים + 15 שלמים |
 | **`utils/`** | `logging.py`, `exceptions.py`, `client_event_limiter.py`, `request_context.py` |
 | **`scripts/`** | `seed_demo_athlete_firestore.py` — דאטה לדמו; `trace_request.sh` |
@@ -563,19 +563,21 @@ final_project_AthleAgent/
 
 | נתיב | תפקיד |
 |------|--------|
-| **`data_generator.py`** | יצירת `athlete_injury_data.csv` סינתטי (340,000 שורות) |
+| **`generation/`** | לוגיקת דאטה סינתטי: `config`, `simulator`, `postprocess` |
+| **`training/`** | לוגיקת אימון: `pipeline`, `policy`, `models`, `constants` |
+| **`data_generator.py`** | CLI wrapper — מפנה ל-`generation/simulator.py` |
 | **`create_benchmark_set.py`** | holdout קבוע `benchmark_holdout.csv` |
-| **`train_model.py`** | CV, השוואת 5 מועמדים, refit, artifacts |
+| **`train_model.py`** | CLI wrapper — מפנה ל-`training/pipeline.py` |
 | **`validate_metrics.py`** | gates לפני promotion |
 | **`run_pipeline.py`** | end-to-end: generate → train → validate → `promoted.json` |
 | **`feature_contract.py`** | חוזה משותף עם backend — `workout_intensity_minutes()` |
-| **`policy_config.py`** | ספי Recall, FPR, F1 |
+| **`policy_config.py`** | ספי Recall, FPR, F1 — נטען גם ב-`backend/config.py` |
 | **`artifacts/`** | תוצאות אימון לפי `run_id/` + `promoted.json` |
 | **`artifacts/<run_id>/`** | `injury_model.pkl`, `run_manifest.json`, CSVs, calibration |
 | **`fixtures/`** | `athlete_injury_demo.csv` — דאטה קטן לנוטבוק (ב-git) |
 | **`notebooks/`** | `model_improvement_journey.ipynb` — מסע שיפור המודל |
 | **`docs/MODEL_SELECTION.md`** | פרוטוקול בחירת מודל |
-| **`athlete_injury_data.csv`** | דאטה מלא (gitignored, נוצר ע"י generator) |
+| **`athlete_injury_data.csv`** | דאטה מלא (gitignored, נוצר ע"י `generation/`) |
 | **`benchmark_holdout.csv`** | holdout קבוע לבחירת מודל |
 
 ### 6.7 פירוט — `docs/`
@@ -609,7 +611,7 @@ final_project_AthleAgent/
 
 ### 7.1 נקודת פתיחה — הבעיה בדאטה
 
-אין לנו מאגר ציבורי גדול של ספורטאים עם תיוג יומי "נפצע / לא נפצע". לכן בנינו **דאטה סינתטי** ב-`data_generator.py`:
+אין לנו מאגר ציבורי גדול של ספורטאים עם תיוג יומי "נפצע / לא נפצע". לכן בנינו **דאטה סינתטי** ב-`generation/simulator.py` (נקרא דרך `data_generator.py`):
 
 - 1,000 ספורטאים × 340 יום = **340,000 שורות**
 - מודל סיכון מבוסס מחקר ספורט:
@@ -699,7 +701,7 @@ flowchart TD
 | Medium | 21–70% | צהוב/כתום |
 | High | 71–100% | אדום |
 
-קוד: `backend/services/risk_levels.py`
+קוד: `backend/services/risk_levels.py` — ספים נטענים מ-`config.settings` (`RISK_HIGH_CUTOFF=0.70`, `RISK_MEDIUM_CUTOFF=0.20`)
 
 ### 8.3 35 הפיצ'רים
 
@@ -726,32 +728,74 @@ flowchart TD
 
 ### 8.5 Pipeline חיזוי (Backend)
 
+כניסה: `prediction/service.predict_injury_risk_from_firestore` → `predict_injury_risk`
+
 ```
 POST /predict/daily {userId, date}
     │
-    ├─ fetch_daily_firestore_snapshot()
+    ├─ fetch_daily_firestore_snapshot()                    [history/repository]
     │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1}
     │
-    ├─ injury_prediction_request_from_firestore_snapshot()
-    │     מדיניות date-split + nutrition defaults
+    ├─ injury_prediction_request_from_firestore_snapshot() [prediction/firestore_mapping]
+    │     מדיניות date-split
     │
-    ├─ injury_request_to_model_dataframe()
-    │     preprocessing + feature_engineering
+    ├─ resolve_request_nutrition()                           [nutrition_defaults]
     │
-    ├─ apply_history_confidence_fallback()
-    │     rolling 7 ימים: ACWR, sleep_debt, hrv_drop
+    ├─ injury_request_to_model_dataframe()                 [preprocessing/]
+    │     request_features + feature_engineering
     │
-    ├─ calculate_data_quality_score()
-    │     prediction_confidence = 0.6×history + 0.4×quality
+    ├─ apply_history_confidence_fallback()                 [prediction/confidence]
+    │     rolling 7 ימים: ACWR, sleep_debt, hrv_drop [history/rolling_features]
     │
-    ├─ model.predict_proba() → proba
-    │     classify_risk_level(proba)
+    ├─ calculate_data_quality_score()                      [preprocessing/quality]
     │
-    └─ save_daily_prediction_result()
+    ├─ compute_prediction_confidence_percent()             [prediction/confidence]
+    │     0.6×history_score + 0.4×quality_score — ראו §8.6
+    │
+    ├─ resolve_model_bundle() → predict_proba() → proba    [prediction/bundle + ml/model_loader]
+    │     classify_risk_level(proba)                       [risk_levels]
+    │
+    └─ save_daily_prediction_result()                      [history/repository]
           merge → daily_health/{date}
 ```
 
-### 8.6 ML Gates (Live)
+> המודל **תמיד** מחזיר סיכון; `prediction_confidence` יורד כשהקלט חלקי — **לא** דוחה את הבקשה.
+
+### 8.6 `prediction_confidence` — איכות הקלט
+
+ה-confidence **נפרד מהסיכון** — מודד כמה אמינים הנתונים שעליהם מבוסס החיזוי.
+
+**נוסחה** (`prediction/confidence.py` + `config.py`):
+
+```
+prediction_confidence = (CONFIDENCE_HISTORY_WEIGHT × history_score + CONFIDENCE_QUALITY_WEIGHT × quality_score) × 100
+```
+
+| רכיב | משקל (ברירת מחדל) | מה נמדד |
+|------|-------------------|---------|
+| **history_score** | 60% | כמה "ימי שעון אמיתיים" יש בחלון 7 ימים |
+| **quality_score** | 40% | שלמות שדות הבוקר (שינה, צעדים, HRV…) — 0 עד 1 |
+
+**יום איכותי בהיסטוריה** (`history/day_quality.py`): בשורה ממוזגת (עומס@אתמול + שינה@היום) צריך לפחות **3 מתוך 4** קטגוריות עם ערך תקין (`HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS`):
+
+| קטגוריה | דוגמאות שדות |
+|---------|--------------|
+| עומס (load) | `steps`, `distanceMeters` |
+| שינה (sleep) | `sleepMinutes` |
+| דופק (heart) | `heartRateAvg`, `hrvRmssd`, `restingHeartRate` |
+| אנרגיה (energy) | `activeCalories`, `totalCalories`, `bmrCalories` |
+
+| ימי איכות בחלון 7 | רמת היסטוריה | `history_score` |
+|-------------------|--------------|-----------------|
+| ≥ 7 | HIGH | 0.95 |
+| 4–6 | MEDIUM | 0.70 |
+| 0–3 | LOW | 0.45 |
+
+**quality_score** (`preprocessing/quality.py`): מתחיל מ-1.0, יורד **−0.08** לכל שדה מדידה חסר/אפס, **−0.12** אם תזונה ממוצעת (`nutritionImputed`).
+
+**דוגמה:** היסטוריה HIGH (0.95) + קלט חלקי (0.8) → `(0.6×0.95 + 0.4×0.8)×100 ≈ 89`.
+
+### 8.7 ML Gates (Live)
 
 הבקאנד **לא משרת** חיזוי אם המודל לא עובר:
 
@@ -762,7 +806,7 @@ POST /predict/daily {userId, date}
 
 בדיקה: `GET /status/ml` → `"status": "Live"` או `"Blocked"`
 
-### 8.7 כיול לפי רמות (Holdout)
+### 8.8 כיול לפי רמות (Holdout)
 
 | רמת ציון | % דגימות | שיעור פציעה בפועל |
 |----------|----------|-------------------|
@@ -772,7 +816,7 @@ POST /predict/daily {userId, date}
 
 → כשהציון גבוה, באמת יש יותר פציעות — המודל מכויל.
 
-### 8.8 Recall גבוה, Precision נמוך — בכוונה
+### 8.9 Recall גבוה, Precision נמוך — בכוונה
 
 במניעת פציעות עדיף **להזהיר מוקדם** (False Positive) מאשר לפספס פציעה (False Negative). Recall של ~81% אומר שרוב ימי הסיכון האמיתיים מזוהים; Precision של ~29% אומר שחלק מההתראות יהיו "יתר על המידה" — trade-off מקובל בתחום מניעה.
 
@@ -829,7 +873,7 @@ POST /predict/daily {userId, date}
 | מחלקה / מודול | אחריות |
 |---------------|--------|
 | `main.py` | FastAPI app, CORS, lifespan, `load_model()` |
-| `config.py` | Settings (Pydantic), paths, defaults |
+| `config.py` | Settings (Pydantic): `ML_MIN_*`, `RISK_*`, `HISTORY_*`, `CONFIDENCE_*`, logging |
 | `api/routes/health.py` | `GET /`, `GET /health` |
 | `api/routes/predict.py` | `POST /predict/daily`, `GET /status/ml` |
 | `api/routes/observability.py` | `POST /api/v1/observability/client-events` |
@@ -839,21 +883,29 @@ POST /predict/daily {userId, date}
 
 | מחלקה / פונקציה | אחריות |
 |-----------------|--------|
-| `prediction/service.predict_injury_risk_from_firestore` | כניסה ראשית: snapshot → predict |
-| `prediction/service.predict_injury_risk` | לוגיקת inference |
-| `prediction/firestore_mapping` | Firestore dict → `InjuryPredictionRequest` |
-| `prediction/confidence` | history confidence + blend |
-| `prediction/bundle` | parse joblib bundle |
-| `history/repository` | קריאה/כתיבה Firestore |
+| `prediction/service.predict_injury_risk_from_firestore` | כניסה ראשית: snapshot → predict → persist |
+| `prediction/service.predict_injury_risk` | orchestration: nutrition → features → ML → תשובה |
+| `prediction/firestore_mapping` | Firestore dict → `InjuryPredictionRequest` (date-split) |
+| `prediction/confidence.apply_history_confidence_fallback` | enrichment היסטורי 7 ימים + `HistoryConfidence` |
+| `prediction/confidence.compute_prediction_confidence_percent` | blend 60/40 history + quality |
+| `prediction/bundle.resolve_model_bundle` | parse joblib → `ResolvedModelBundle` |
+| `history/repository` | קריאה/כתיבה Firestore, `fetch_user_history` |
 | `history/rolling_features` | ACWR, sleep_debt, hrv_drop על 7 ימים |
+| `history/day_quality` | יום איכותי = ≥3/4 קטגוריות שעון |
+| `history/history_merge` | מיזוג שורות עומס@אתמול + שינה@היום |
+| `history/date_utils` | מפתחות תאריך `yyyy-MM-dd` |
+| `history/firestore_client` | Firebase Admin SDK singleton |
 | `preprocessing/request_features` | API → base model feature dict |
 | `preprocessing/request_mapping` | base + derived → DataFrame |
 | `preprocessing/validation` | `ModelServingContract`, column alignment |
-| `feature_engineering.py` | פיצ'רים נגזרים |
+| `preprocessing/quality.calculate_data_quality_score` | `quality_score`, `weak_fields` |
+| `preprocessing/helpers` | `safe_float`, `is_absent_or_weak` |
+| `preprocessing/scales` | עיגול סקר 1–10 |
+| `feature_engineering.py` | פיצ'רים נגזרים (ACWR proxies) |
 | `field_transforms.py` | המרות שדות Firestore |
-| `model_features.py` | טעינת חוזה 35 פיצ'רים |
-| `risk_levels.py` | `classify_risk_level` |
-| `nutrition_defaults.py` | ממוצעי אוכלוסייה כשתזונה חסרה |
+| `model_features.py` | טעינת חוזה 35 פיצ'רים + `coerce_whole_number_features` |
+| `risk_levels.classify_risk_level` | Low/Medium/High — ספים מ-`config.settings` |
+| `nutrition_defaults.resolve_request_nutrition` | ממוצעי אוכלוסייה כשתזונה חסרה |
 
 ### 9.6 Backend — Schemas
 
@@ -869,13 +921,19 @@ POST /predict/daily {userId, date}
 |-------|--------|
 | `ml/model_loader.py` | טעינת joblib, בדיקת gates, Live/Blocked |
 
-### 9.8 ML_model — סקריפטים
+### 9.8 ML_model — סקריפטים וחבילות
 
-| קובץ | אחריות |
-|------|--------|
-| `data_generator.py` | יצירת `athlete_injury_data.csv` סינתטי |
+| קובץ / חבילה | אחריות |
+|--------------|--------|
+| `generation/simulator.py` | סימולציית 340,000 שורות סינתטיות |
+| `generation/config.py` | פרמטרים: 1,000 ספורטאים × 340 יום |
+| `generation/postprocess.py` | דוח איכות דאטה (`quality_report`) |
+| `training/pipeline.py` | CV, השוואת מועמדים, refit, artifacts |
+| `training/policy.py` | בחירת threshold, risk bins, gates |
+| `training/models.py` | קטלוג 5 מועמדים (XGBoost, RF, …) |
+| `data_generator.py` | CLI wrapper → `generation/` |
 | `create_benchmark_set.py` | holdout קבוע `benchmark_holdout.csv` |
-| `train_model.py` | CV, השוואת מועמדים, refit, artifacts |
+| `train_model.py` | CLI wrapper → `training/` |
 | `validate_metrics.py` | gates לפני promotion |
 | `run_pipeline.py` | end-to-end + `promoted.json` |
 | `policy_config.py` | ספי Recall, FPR, F1 |
@@ -942,9 +1000,9 @@ if (todaySleep > 0L && yesterdaySteps > 0L && hasTodaySurvey) {
 
 ### 10.5 Train-Serve Parity
 
-**הבעיה:** פיצ'רים שונים בין `data_generator.py` (אימון) ל-`feature_engineering.py` (שרת) גורמים לציונים שונים על אותם נתונים.
+**הבעיה:** פיצ'רים שונים בין `generation/simulator.py` (אימון) ל-`feature_engineering.py` (שרת) גורמים לציונים שונים על אותם נתונים.
 
-**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) כולל `integer_feature_columns` (15 שדות שלמים — סקר, קלוריות, HR וכו'). נוסחאות משותפות: `workout_intensity_minutes()` ב-`ML_model/feature_contract.py` וב-`request_features.py`; עיגול סקר ב-`scales.py`; `coerce_whole_number_features()` לפני inference. בדיקות: `test_feature_type_contract.py`.
+**הפתרון:** חוזה קבוע של 35 פיצ'רים (`model_feature_contract.json`) כולל `integer_feature_columns` (15 שדות שלמים — סקר, קלוריות, HR וכו'). נוסחאות משותפות: `workout_intensity_minutes()` ב-`ML_model/feature_contract.py` וב-`preprocessing/request_features.py`; עיגול סקר ב-`scales.py`; `coerce_whole_number_features()` ב-`model_features.py` לפני inference. בדיקות: `test_feature_type_contract.py`.
 
 ### 10.6 Docker / Firebase Key חסר
 
