@@ -13,34 +13,35 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/athlete_dashboard_headline"
-        android:textSize="26sp"
+        android:textSize="@dimen/headline_text_size"
         android:fontFamily="@font/roboto_bold"
         android:textColor="@color/text"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="20dp"
-        android:layout_marginStart="8dp"/>
+        android:layout_marginTop="@dimen/spacing_8"
+        android:layout_marginBottom="@dimen/spacing_20"
+        android:layout_marginStart="@dimen/spacing_8"/>
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/dashboard_CARD_risk"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="@dimen/spacing_8"
         app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="32dp"
-        app:cardElevation="8dp"
+        app:cardCornerRadius="@dimen/radius_large"
+        app:cardElevation="@dimen/elevation_medium"
         app:strokeWidth="0dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="16dp"
+            android:paddingHorizontal="@dimen/spacing_24"
+            android:paddingTop="@dimen/spacing_12"
+            android:paddingBottom="@dimen/spacing_4"
             android:gravity="center">
 
             <RelativeLayout
-                android:layout_width="200dp"
-                android:layout_height="200dp">
+                android:layout_width="@dimen/dial_size_athlete"
+                android:layout_height="@dimen/dial_size_athlete">
 
                 <ProgressBar
                     android:id="@+id/dashboard_PRG_riskScore"
@@ -53,17 +54,17 @@
                     android:progressDrawable="@drawable/progress_drawable_green" />
 
                 <androidx.appcompat.widget.LinearLayoutCompat
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
                     android:orientation="vertical"
-                    android:layout_centerInParent="true"
                     android:gravity="center">
 
                     <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/dashboard_TXT_risk_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/daily_risk_score"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/text_size_label_medium"
                         android:fontFamily="@font/roboto_bold"
                         android:textColor="@color/charcoal_black"/>
 
@@ -72,19 +73,20 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="--%"
-                        android:textSize="48sp"
+                        android:textSize="@dimen/text_size_score_large"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_dark_muted"/>
+                        android:textColor="@color/brand_button_dark_muted"
+                        android:layout_marginTop="-10dp"
+                        android:layout_marginBottom="-10dp"/>
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/dashboard_TXT_confidence"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Confidence: --%"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/text_size_label_medium"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_light_muted"
-                        android:layout_marginTop="2dp"/>
+                        android:textColor="@color/brand_button_light_muted"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </RelativeLayout>
 
@@ -93,12 +95,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/analyzing_data"
-                android:textSize="16sp"
+                android:textSize="@dimen/text_size_label_medium"
                 android:textColor="@color/text"
                 android:textAlignment="center"
                 android:fontFamily="@font/roboto_regular"
-                android:lineSpacingExtra="4dp"
-                android:layout_marginTop="20dp"/>
+                android:lineSpacingExtra="2dp"
+                android:layout_marginTop="@dimen/spacing_4"/>
         </androidx.appcompat.widget.LinearLayoutCompat>
     </com.google.android.material.card.MaterialCardView>
 
@@ -108,38 +110,38 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="32dp"
-        app:cardElevation="8dp"
+        app:cardCornerRadius="@dimen/radius_large"
+        app:cardElevation="@dimen/elevation_medium"
         app:strokeWidth="0dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="16dp">
+            android:paddingHorizontal="@dimen/spacing_24"
+            android:paddingVertical="@dimen/spacing_16">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="@dimen/spacing_12">
 
                 <androidx.appcompat.widget.AppCompatImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/spacing_24"
+                    android:layout_height="@dimen/spacing_24"
                     android:contentDescription="@string/risk_logo"
                     android:src="@android:drawable/ic_dialog_info"
                     app:tint="@color/brand_button_light_muted"
-                    android:layout_marginEnd="8dp"/>
+                    android:layout_marginEnd="@dimen/spacing_8"/>
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/risk_score_last_7_days"
                     android:fontFamily="@font/roboto_bold"
-                    android:textSize="18sp"
+                    android:textSize="@dimen/text_size_label_medium"
                     android:textColor="@color/text"/>
             </androidx.appcompat.widget.LinearLayoutCompat>
 
@@ -147,7 +149,7 @@
                 android:id="@+id/dashboard_CHART_history"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_marginTop="8dp"/>
+                android:layout_marginTop="@dimen/spacing_8"/>
 
         </androidx.appcompat.widget.LinearLayoutCompat>
     </com.google.android.material.card.MaterialCardView>

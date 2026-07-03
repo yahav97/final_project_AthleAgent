@@ -80,7 +80,23 @@
     <dimen name="stickers_size">30sp</dimen>
     <dimen name="text_score">46sp</dimen>
 
-    <dimen name="logo_radius">16dp</dimen>
+    <dimen name="dial_size_athlete">280dp</dimen>
+    <dimen name="dial_size_coach">230dp</dimen>
+    <dimen name="text_size_score_large">64sp</dimen>
+    <dimen name="text_size_score_medium">48sp</dimen>
+    <dimen name="text_size_label_medium">18sp</dimen>
+    <dimen name="text_size_label_small">14sp</dimen>
+    <dimen name="text_size_button_large">20sp</dimen>
+    <dimen name="text_size_button_medium">18sp</dimen>
+    <dimen name="text_size_input_label">16sp</dimen>
+    <dimen name="radius_large">32dp</dimen>
+    <dimen name="radius_medium">16dp</dimen>
+    <dimen name="elevation_medium">8dp</dimen>
+    <dimen name="elevation_small">4dp</dimen>
+    <dimen name="input_padding_vertical">18dp</dimen>
+    <dimen name="margin_input_horizontal">40dp</dimen>
+    <dimen name="button_height_large">64dp</dimen>
+    <dimen name="button_height_medium">60dp</dimen>
     <dimen name="logo_shadow">12dp</dimen>
     <dimen name="google_icon_padding">13dp</dimen>
 

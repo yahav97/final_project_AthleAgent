@@ -84,7 +84,12 @@
     <color name="cs_secondary_dark">#5B21B6</color>
     <color name="cs_accent_green">#39E29D</color>
     <color name="cs_accent_yellow">#FFE66D</color>
-    <color name="green">#388E3C</color>
+    <color name="green">#00F59B</color>
+    <color name="yellow_vibrant">#FEEB3B</color>
+    <color name="orange_vibrant">#FF9800</color>
+    <color name="red_vibrant">#FF1744</color>
+    <color name="input_label_floating">#37474F</color>
+    <color name="input_label_hint">#78909C</color>
     <color name="inactive">#E5E5EA</color>
 
     <color name="cs_cta_bg">#FF6B9C</color>

@@ -27,8 +27,8 @@
                 android:layout_width="@dimen/logo_size"
                 android:layout_height="@dimen/logo_height"
                 android:layout_marginTop="@dimen/spacing_68"
-                app:cardCornerRadius="@dimen/logo_radius"
-                app:cardElevation="8dp"
+                app:cardCornerRadius="@dimen/radius_medium"
+                app:cardElevation="@dimen/elevation_medium"
                 app:strokeWidth="0dp">
 
                 <androidx.appcompat.widget.AppCompatImageView
@@ -42,20 +42,21 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/login_BTN_google"
                 style="@style/Widget.Material3.Button.ElevatedButton"
-                android:layout_width="@dimen/button_width"
-                android:layout_height="@dimen/spacing_56"
-                android:layout_marginTop="@dimen/spacing_68"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height_medium"
+                android:layout_marginHorizontal="@dimen/margin_input_horizontal"
+                android:layout_marginTop="@dimen/spacing_60"
                 android:fontFamily="@font/roboto_bold"
                 android:text="@string/google_login"
                 android:textColor="@color/text"
-                android:textSize="@dimen/text_size_body"
+                android:textSize="@dimen/text_size_label_medium"
                 app:backgroundTint="@color/white"
-                app:cornerRadius="16dp"
-                app:elevation="2dp"
+                app:cornerRadius="@dimen/radius_medium"
+                app:elevation="@dimen/elevation_small"
                 app:icon="@drawable/google"
                 app:iconGravity="textStart"
                 app:iconPadding="@dimen/google_icon_padding"
-                app:iconSize="@dimen/spacing_24"
+                app:iconSize="@dimen/spacing_28"
                 app:iconTint="@null"
                 app:strokeColor="@color/bright_gray"
                 app:strokeWidth="1dp" />
@@ -68,23 +69,15 @@
                 android:fontFamily="@font/roboto_bold"
                 android:text="@string/Or"
                 android:textColor="@color/lm_text_muted"
-                android:textSize="@dimen/text_size_body" />
+                android:textSize="@dimen/text_size_input_label" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/login_TIL_username"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="@dimen/button_width"
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/spacing_24"
-                app:boxCornerRadiusBottomEnd="16dp"
-                app:boxCornerRadiusBottomStart="16dp"
-                app:boxCornerRadiusTopEnd="16dp"
-                app:boxCornerRadiusTopStart="16dp"
-                app:boxStrokeColor="@color/brand_button_light_muted"
-                app:boxStrokeWidth="1dp"
-                app:hintTextColor="@color/brand_button_dark_muted"
-                app:startIconDrawable="@android:drawable/ic_menu_myplaces"
-                app:startIconTint="@color/brand_button_light_muted">
+                android:layout_marginHorizontal="@dimen/margin_input_horizontal"
+                android:layout_marginTop="@dimen/spacing_24">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/login_ET_username"
@@ -93,26 +86,21 @@
                     android:fontFamily="@font/roboto_regular"
                     android:hint="@string/User_name_text"
                     android:inputType="textEmailAddress"
-                    android:paddingVertical="16dp"
-                    android:textColor="@color/text" />
+                    android:paddingVertical="@dimen/input_padding_vertical"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/text_size_input_label"
+                    android:imeOptions="actionNext"
+                    android:importantForAutofill="no" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/login_TIL_password"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="@dimen/button_width"
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/margin_input_horizontal"
                 android:layout_marginTop="@dimen/spacing_12"
-                app:boxCornerRadiusBottomEnd="16dp"
-                app:boxCornerRadiusBottomStart="16dp"
-                app:boxCornerRadiusTopEnd="16dp"
-                app:boxCornerRadiusTopStart="16dp"
-                app:boxStrokeColor="@color/brand_button_light_muted"
-                app:boxStrokeWidth="1dp"
-                app:hintTextColor="@color/brand_button_dark_muted"
-                app:passwordToggleEnabled="true"
-                app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
-                app:startIconTint="@color/brand_button_light_muted">
+                app:passwordToggleEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/login_ET_password"
@@ -121,23 +109,27 @@
                     android:fontFamily="@font/roboto_regular"
                     android:hint="@string/Password_text"
                     android:inputType="textPassword"
-                    android:paddingVertical="16dp"
-                    android:textColor="@color/text" />
+                    android:paddingVertical="@dimen/input_padding_vertical"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/text_size_input_label"
+                    android:imeOptions="actionDone"
+                    android:importantForAutofill="no" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/login_BTN_login"
-                android:layout_width="@dimen/button_width"
-                android:layout_height="@dimen/spacing_56"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height_medium"
+                android:layout_marginHorizontal="@dimen/margin_input_horizontal"
                 android:layout_marginTop="@dimen/spacing_32"
                 android:background="@drawable/btn_gradient"
                 android:fontFamily="@font/roboto_bold"
                 android:text="@string/login_account_text"
                 android:textColor="@color/white"
-                android:textSize="@dimen/login_text_size"
+                android:textSize="@dimen/text_size_button_large"
                 app:backgroundTint="@null"
-                app:cornerRadius="16dp"
-                app:elevation="4dp" />
+                app:cornerRadius="@dimen/radius_medium"
+                app:elevation="@dimen/elevation_small" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/login_LBL_forgotPassword"
@@ -192,8 +184,8 @@
             android:layout_width="@dimen/logo_size"
             android:layout_height="@dimen/logo_height"
             android:layout_centerInParent="true"
-            app:cardCornerRadius="@dimen/logo_radius"
-            app:cardElevation="@dimen/logo_shadow"
+            app:cardCornerRadius="@dimen/radius_medium"
+            app:cardElevation="@dimen/elevation_medium"
             app:strokeWidth="0dp">
 
             <androidx.appcompat.widget.AppCompatImageView

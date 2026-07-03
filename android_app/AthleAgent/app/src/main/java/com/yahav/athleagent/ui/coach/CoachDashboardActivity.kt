@@ -92,8 +92,9 @@ class CoachDashboardActivity : AppCompatActivity() {
                 athleteUids.forEach { uid ->
                     db.collection("users").document(uid).get()
                         .addOnSuccessListener { userDoc ->
-                            val name = userDoc.getString("fullName") ?: "Unknown Athlete"
-                            athleteList.add(AthleteItem(uid, name))
+                            val fullName = userDoc.getString("fullName") ?: "Unknown"
+                            val firstName = fullName.split(" ").firstOrNull() ?: fullName
+                            athleteList.add(AthleteItem(uid, firstName))
                             adapter.notifyDataSetChanged()
                         }
                 }
@@ -240,10 +241,10 @@ class CoachDashboardActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun updateRiskUI(riskScore: Int, confidence: Float, aiRecommendation: String) {
         val (drawableResId, textColorHex) = when (riskScore) {
-            in 0..20 -> Pair(R.drawable.progress_drawable_green, "#388E3C")
-            in 21..50 -> Pair(R.drawable.progress_drawable_yellow, "#E6B300")
-            in 51..70 -> Pair(R.drawable.progress_drawable_orange, "#F57C00")
-            else -> Pair(R.drawable.progress_drawable_red, "#B71C1C")
+            in 0..35 -> Pair(R.drawable.progress_drawable_green, "#00F59B")
+            in 36..55 -> Pair(R.drawable.progress_drawable_yellow, "#FEEB3B")
+            in 56..75 -> Pair(R.drawable.progress_drawable_orange, "#FF9800")
+            else -> Pair(R.drawable.progress_drawable_red, "#FF1744")
         }
 
         binding.coachDashPRGRiskScore.progressDrawable = ContextCompat.getDrawable(this, drawableResId)

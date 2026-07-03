@@ -86,7 +86,8 @@
 
     <string name="set_your_account">SET YOUR ACCOUNT</string>
     <string name="coach">Coach</string>
-    <string name="full_name_hint">Full Name</string>
+    <string name="Full_Name_text">Full Name</string>
+    <string name="birth_date">Birth Date</string>
     <string name="email_address_hint">Email Address</string>
     <string name="sync_title">Daily Health Sync</string>
     <string name="sync_subtitle">Sync your latest sleep and activity data to calculate today\'s injury risk.</string>

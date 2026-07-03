@@ -1,226 +1,176 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_white_alice_blue"
-    android:fillViewport="true"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
     tools:context=".ui.auth.RegisterActivity">
 
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/register_form_container"
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:padding="@dimen/spacing_16">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
-        <com.google.android.material.card.MaterialCardView
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/register_form_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/white"
-            app:cardCornerRadius="32dp"
-            app:cardElevation="12dp"
-            app:strokeWidth="0dp">
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/margin_input_horizontal"
+            android:paddingVertical="@dimen/spacing_32">
 
-            <androidx.appcompat.widget.LinearLayoutCompat
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="@dimen/logo_size"
+                android:layout_height="@dimen/logo_height"
+                android:layout_marginTop="@dimen/spacing_20"
+                app:cardCornerRadius="@dimen/radius_medium"
+                app:cardElevation="@dimen/elevation_medium"
+                app:strokeWidth="0dp">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    app:srcCompat="@drawable/logon" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_24"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/create_account_text"
+                android:textColor="@color/text"
+                android:textSize="@dimen/headline_text_size" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/register_TOGGLE_role"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/spacing_32">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:layout_marginBottom="@dimen/spacing_32"
-                    android:fontFamily="@font/roboto_bold"
-                    android:text="@string/set_your_account"
-                    android:textColor="@color/text"
-                    android:textSize="24sp" />
-
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/register_TOGGLE_role"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_40"
-                    app:checkedButton="@id/register_BTN_athlete_role"
-                    app:selectionRequired="true"
-                    app:singleSelection="true">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/register_BTN_athlete_role"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="60dp"
-                        android:layout_weight="1"
-                        android:fontFamily="@font/roboto_bold"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:text="@string/athlete"
-                        android:textAllCaps="false"
-                        android:textColor="@color/text"
-                        android:textSize="@dimen/text_size_body"
-                        app:cornerRadius="16dp"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:strokeWidth="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/register_BTN_coach_role"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="60dp"
-                        android:layout_weight="1"
-                        android:fontFamily="@font/roboto_bold"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:text="@string/coach"
-                        android:textAllCaps="false"
-                        android:textColor="@color/text"
-                        android:textSize="@dimen/text_size_body"
-                        app:cornerRadius="16dp"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:strokeWidth="1dp" />
-
-                </com.google.android.material.button.MaterialButtonToggleGroup>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_16"
-                    app:boxCornerRadiusBottomEnd="16dp"
-                    app:boxCornerRadiusBottomStart="16dp"
-                    app:boxCornerRadiusTopEnd="16dp"
-                    app:boxCornerRadiusTopStart="16dp"
-                    app:boxStrokeColor="@color/brand_button_light_muted"
-                    app:startIconDrawable="@android:drawable/ic_menu_myplaces"
-                    app:startIconTint="@color/brand_button_light_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_name"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/roboto_regular"
-                        android:hint="@string/full_name_hint"
-                        android:inputType="textPersonName"
-                        android:paddingVertical="16dp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/register_TIL_birthDate"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_16"
-                    android:hint="Birth Date"
-                    app:boxCornerRadiusBottomEnd="16dp"
-                    app:boxCornerRadiusBottomStart="16dp"
-                    app:boxCornerRadiusTopEnd="16dp"
-                    app:boxCornerRadiusTopStart="16dp"
-                    app:boxStrokeColor="@color/brand_button_light_muted"
-                    app:endIconDrawable="@drawable/baseline_calendar_month_24"
-                    app:endIconMode="custom"
-                    app:endIconTint="@color/brand_button_light_muted"
-                    app:startIconDrawable="@android:drawable/ic_menu_today"
-                    app:startIconTint="@color/brand_button_light_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_birthDate"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:clickable="true"
-                        android:cursorVisible="false"
-                        android:focusable="false"
-                        android:fontFamily="@font/roboto_regular"
-                        android:inputType="none"
-                        android:paddingVertical="16dp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/register_TIL_injury_history"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_16"
-                    app:boxCornerRadiusBottomEnd="16dp"
-                    app:boxCornerRadiusBottomStart="16dp"
-                    app:boxCornerRadiusTopEnd="16dp"
-                    app:boxCornerRadiusTopStart="16dp"
-                    app:boxStrokeColor="@color/brand_button_light_muted"
-                    app:startIconDrawable="@android:drawable/ic_menu_info_details"
-                    app:startIconTint="@color/brand_button_light_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_injury_history"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/roboto_regular"
-                        android:hint="@string/previous_injuries_count"
-                        android:inputType="number"
-                        android:paddingVertical="16dp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_16"
-                    app:boxCornerRadiusBottomEnd="16dp"
-                    app:boxCornerRadiusBottomStart="16dp"
-                    app:boxCornerRadiusTopEnd="16dp"
-                    app:boxCornerRadiusTopStart="16dp"
-                    app:boxStrokeColor="@color/brand_button_light_muted"
-                    app:startIconDrawable="@android:drawable/ic_dialog_email"
-                    app:startIconTint="@color/brand_button_light_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_email"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/roboto_regular"
-                        android:hint="@string/email_address_hint"
-                        android:inputType="textEmailAddress"
-                        android:paddingVertical="16dp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_40"
-                    app:boxCornerRadiusBottomEnd="16dp"
-                    app:boxCornerRadiusBottomStart="16dp"
-                    app:boxCornerRadiusTopEnd="16dp"
-                    app:boxCornerRadiusTopStart="16dp"
-                    app:boxStrokeColor="@color/brand_button_light_muted"
-                    app:passwordToggleEnabled="true"
-                    app:passwordToggleTint="@color/brand_button_light_muted"
-                    app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
-                    app:startIconTint="@color/brand_button_light_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/register_ET_password"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/roboto_regular"
-                        android:hint="@string/Password_text"
-                        android:inputType="textPassword"
-                        android:paddingVertical="16dp" />
-                </com.google.android.material.textfield.TextInputLayout>
+                android:layout_marginTop="@dimen/spacing_24"
+                android:gravity="center"
+                app:checkedButton="@id/register_BTN_athlete_role"
+                app:selectionRequired="true"
+                app:singleSelection="true">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/register_BTN_register"
+                    android:id="@+id/register_BTN_athlete_role"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_medium"
+                    android:layout_weight="1"
+                    android:text="@string/athlete"
+                    app:cornerRadius="@dimen/radius_medium" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/register_BTN_coach_role"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height_medium"
+                    android:layout_weight="1"
+                    android:text="@string/coach"
+                    app:cornerRadius="@dimen/radius_medium" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_16"
+                android:hint="@string/Full_Name_text">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/register_ET_name"
                     android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:background="@drawable/btn_gradient"
-                    android:fontFamily="@font/roboto_bold"
-                    android:text="@string/create_account_text"
-                    android:textColor="@color/white"
-                    android:textSize="@dimen/login_text_size"
-                    app:backgroundTint="@null"
-                    app:cornerRadius="16dp"
-                    app:elevation="4dp" />
-            </androidx.appcompat.widget.LinearLayoutCompat>
-        </com.google.android.material.card.MaterialCardView>
-    </androidx.appcompat.widget.LinearLayoutCompat>
-</ScrollView>
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName"
+                    android:paddingVertical="@dimen/input_padding_vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_12"
+                android:hint="@string/User_name_text">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/register_ET_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textEmailAddress"
+                    android:paddingVertical="@dimen/input_padding_vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_12"
+                android:hint="@string/Password_text"
+                app:passwordToggleEnabled="true">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/register_ET_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:paddingVertical="@dimen/input_padding_vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/register_TIL_birthDate"
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_12"
+                android:hint="@string/birth_date"
+                app:endIconDrawable="@android:drawable/ic_menu_my_calendar"
+                app:endIconMode="custom">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/register_ET_birthDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:focusable="false"
+                    android:inputType="none"
+                    android:paddingVertical="@dimen/input_padding_vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/register_TIL_injuryHistory"
+                style="@style/AppTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_12"
+                android:hint="@string/previous_injuries_count">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/register_ET_injuryHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:paddingVertical="@dimen/input_padding_vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/register_BTN_register"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height_large"
+                android:layout_marginTop="@dimen/spacing_24"
+                android:background="@drawable/btn_gradient"
+                android:fontFamily="@font/roboto_bold"
+                android:text="@string/create_account_text"
+                android:textColor="@color/white"
+                android:textSize="@dimen/text_size_button_large"
+                app:backgroundTint="@null"
+                app:cornerRadius="@dimen/radius_medium"
+                app:elevation="@dimen/elevation_small" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </ScrollView>
+</androidx.appcompat.widget.LinearLayoutCompat>
