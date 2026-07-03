@@ -571,7 +571,12 @@ def generate_synthetic_data(
     return final_df
 
 
-def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
+def _write_quality_report(
+    df: pd.DataFrame,
+    output_dir: str,
+    *,
+    expected_rows: int | None = None,
+) -> str:
     """Write dataset quality diagnostics JSON and return path."""
     class_counts = df["injury_today"].value_counts().to_dict()
     injury_rate = float(df["injury_today"].mean())
@@ -579,7 +584,7 @@ def _write_quality_report(df: pd.DataFrame, output_dir: str) -> str:
     corr = df.loc[:, corr_cols].corr()
     report = {
         "rows": int(len(df)),
-        "expected_rows": int(NUM_ATHLETES * DAYS_PER_ATHLETE),
+        "expected_rows": int(expected_rows if expected_rows is not None else len(df)),
         "columns": int(df.shape[1]),
         "injury_rate": injury_rate,
         "class_counts": {str(k): int(v) for k, v in class_counts.items()},
@@ -626,6 +631,10 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_path = os.path.join(script_dir, "athlete_injury_data.csv")
     df.to_csv(output_path, index=False)
-    report_path = _write_quality_report(df, script_dir)
+    report_path = _write_quality_report(
+        df,
+        script_dir,
+        expected_rows=args.num_athletes * args.days,
+    )
     print(f"SUCCESS: Created {output_path}")
     print(f"QUALITY REPORT: {report_path}")
