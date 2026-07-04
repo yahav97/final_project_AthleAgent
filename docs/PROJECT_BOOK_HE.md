@@ -927,7 +927,7 @@ prediction_confidence = (CONFIDENCE_HISTORY_WEIGHT × history_score + CONFIDENCE
 |--------------|--------|
 | `generation/simulator.py` | סימולציית 340,000 שורות סינתטיות |
 | `generation/config.py` | פרמטרים: 1,000 ספורטאים × 340 יום |
-| `generation/postprocess.py` | דוח איכות דאטה (`quality_report`) |
+| `generation/postprocess.py` | פיצ'רים נגזרים וולידציית שורות |
 | `training/pipeline.py` | CV, השוואת מועמדים, refit, artifacts |
 | `training/policy.py` | בחירת threshold, risk bins, gates |
 | `training/models.py` | קטלוג 5 מועמדים (XGBoost, RF, …) |

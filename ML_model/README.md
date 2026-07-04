@@ -7,7 +7,7 @@
 | [`artifacts/promoted.json`](artifacts/promoted.json) | Production model pointer (updated by `run_pipeline.py`) |
 | `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook |
 | `data_generator.py` | CLI → builds full `athlete_injury_data.csv` (gitignored, 1,000×340 = 340k rows) |
-| `generation/` | Synthetic simulator, post-processing, quality report |
+| `generation/` | Synthetic simulator and post-processing |
 | `feature_contract.py` | Shared JSON loader — `integer_feature_columns`, `workout_intensity_minutes()`, `assert_whole_number_columns()` |
 | `policy_config.py` | Selection gates (Recall, FPR, F1, …) — notebook can override live |
 | `train_model.py` | CLI → full pipeline → `artifacts/<run_id>/` |
@@ -40,7 +40,7 @@ ML_model/
 ├── generation/
 │   ├── config.py        # scale defaults (athletes, days, seed)
 │   ├── simulator.py     # day-by-day simulation + reference features
-│   └── postprocess.py   # derived features, validation, quality report
+│   └── postprocess.py   # derived features and row-count validation
 ├── training/
 │   ├── constants.py     # shared constants + dataclasses
 │   ├── models.py        # 5 candidate estimators

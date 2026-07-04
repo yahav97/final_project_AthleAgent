@@ -1,9 +1,6 @@
-"""Post-simulation feature engineering, validation, and quality report."""
+"""Post-simulation feature engineering and dataset validation."""
 
 from __future__ import annotations
-
-import json
-import os
 
 import numpy as np
 import pandas as pd
@@ -91,47 +88,3 @@ def finalize_dataset(
             "Check rolling-window min_periods and dropna logic."
         )
     return final_df
-
-
-def write_quality_report(
-    df: pd.DataFrame,
-    output_dir: str,
-    *,
-    expected_rows: int | None = None,
-) -> str:
-    """Write dataset quality diagnostics JSON and return path."""
-    class_counts = df["injury_today"].value_counts().to_dict()
-    injury_rate = float(df["injury_today"].mean())
-    corr_cols = ["daily_distance_km", "sleep_hours", "stress_level", "muscle_soreness", "acwr_ratio", "hrv_drop"]
-    corr = df.loc[:, corr_cols].corr()
-    report = {
-        "rows": int(len(df)),
-        "expected_rows": int(expected_rows if expected_rows is not None else len(df)),
-        "columns": int(df.shape[1]),
-        "injury_rate": injury_rate,
-        "class_counts": {str(k): int(v) for k, v in class_counts.items()},
-        "acwr_ratio_range": [float(df["acwr_ratio"].min()), float(df["acwr_ratio"].max())],
-        "sleep_debt_3d_range": [float(df["sleep_debt_3d"].min()), float(df["sleep_debt_3d"].max())],
-        "hrv_drop_range": [float(df["hrv_drop"].min()), float(df["hrv_drop"].max())],
-        "spo2_range": [float(df["spo2"].min()), float(df["spo2"].max())],
-        "respiratory_rate_range": [float(df["respiratory_rate"].min()), float(df["respiratory_rate"].max())],
-        "vo2_max_range": [float(df["vo2_max"].min()), float(df["vo2_max"].max())],
-        "elevation_gained_range": [float(df["elevation_gained_m"].min()), float(df["elevation_gained_m"].max())],
-        "high_risk_condition_rates": {
-            "acwr_gt_1_4": float((df["acwr_ratio"] > 1.4).mean()),
-            "sleep_debt_gt_5": float((df["sleep_debt_3d"] > 5.0).mean()),
-            "hrv_drop_lt_minus8": float((df["hrv_drop"] < -8.0).mean()),
-            "stress_ge_8": float((df["stress_level"] >= 8).mean()),
-            "spo2_lt_94": float((df["spo2"] < 94.0).mean()),
-        },
-        "feature_correlations": {
-            "distance_sleep": float(corr.loc["daily_distance_km", "sleep_hours"]),
-            "distance_soreness": float(corr.loc["daily_distance_km", "muscle_soreness"]),
-            "stress_sleep": float(corr.loc["stress_level", "sleep_hours"]),
-            "stress_hrvdrop": float(corr.loc["stress_level", "hrv_drop"]),
-        },
-    }
-    output_path = os.path.join(output_dir, "dataset_quality_report.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
-    return output_path

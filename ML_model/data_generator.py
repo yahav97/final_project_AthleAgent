@@ -21,7 +21,6 @@ from generation.config import (  # noqa: E402
     EXPECTED_DATASET_ROWS,
     NUM_ATHLETES,
 )
-from generation.postprocess import write_quality_report  # noqa: E402
 from generation.simulator import compute_training_reference_features, generate_synthetic_data  # noqa: E402
 
 __all__ = [
@@ -49,10 +48,4 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_path = os.path.join(script_dir, "athlete_injury_data.csv")
     df.to_csv(output_path, index=False)
-    report_path = write_quality_report(
-        df,
-        script_dir,
-        expected_rows=args.num_athletes * args.days,
-    )
     print(f"SUCCESS: Created {output_path}")
-    print(f"QUALITY REPORT: {report_path}")
