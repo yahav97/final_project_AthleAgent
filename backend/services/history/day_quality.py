@@ -7,41 +7,22 @@ from typing import Any
 from config import settings
 from services.preprocessing.helpers import is_absent_or_weak
 
-# Alternative Firestore / API field names for one wearable signal category.
 WatchSyncFieldNames = tuple[str, ...]
 
 # Evaluated on merged wake-up-day rows (physical@W-1, sleep@W) from fetch_user_history.
-LOAD_FIELD_NAMES: WatchSyncFieldNames = (
-    "distanceMeters",
-    "distance_meters",
-    "daily_distance_meters",
-    "steps",
-    "daily_steps",
-)
-SLEEP_FIELD_NAMES: WatchSyncFieldNames = ("sleepMinutes", "sleep_minutes")
+LOAD_FIELD_NAMES: WatchSyncFieldNames = ("distanceMeters", "steps")
+SLEEP_FIELD_NAMES: WatchSyncFieldNames = ("sleepMinutes",)
 HEART_FIELD_NAMES: WatchSyncFieldNames = (
     "heartRateAvg",
-    "avgHeartRate",
-    "heart_rate_avg",
     "restingHeartRate",
-    "resting_heart_rate",
-    "resting_hr",
     "hrvRmssd",
-    "hrv_rmssd",
-    "hrv_score",
 )
 ENERGY_FIELD_NAMES: WatchSyncFieldNames = (
     "activeCalories",
-    "active_calories",
-    "active_calories_burned",
     "totalCalories",
-    "total_calories",
-    "daily_calories",
     "bmrCalories",
-    "bmr_calories",
 )
 
-# Named categories → field-name aliases. Threshold from settings.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS.
 WATCH_SYNC_SIGNAL_GROUPS: dict[str, WatchSyncFieldNames] = {
     "load": LOAD_FIELD_NAMES,
     "sleep": SLEEP_FIELD_NAMES,

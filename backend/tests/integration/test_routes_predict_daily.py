@@ -131,14 +131,17 @@ class TestPredictDailyErrors:
         assert "Model is not live" in data["detail"]
         assert data["code"] == "model_not_live:manifest_corrupted"
 
-    def test_missing_age_returns_422_through_http(
+    def test_missing_birth_date_still_predicts_through_http(
         self,
         api_client,
+        mock_model_bundle,
         monkeypatch,
     ):
+        from api.routes import predict as predict_routes
+
         snapshot_without_age = {
             "profile": {},
-            "daily_health": {"sleepMinutes": 480, "steps": 50},
+            "daily_health": {"sleepMinutes": 480},
             "daily_health_yesterday": {
                 "steps": 8300,
                 "distanceMeters": 7200,
@@ -155,13 +158,34 @@ class TestPredictDailyErrors:
             "services.prediction.service.fetch_daily_firestore_snapshot",
             lambda uid, d: dict(snapshot_without_age),
         )
+        monkeypatch.setattr(
+            "services.prediction.confidence.get_history_window_context",
+            lambda *a, **k: {"confidence": "low", "features": {}},
+        )
+
+        class _Estimator:
+            feature_names_in_ = mock_model_bundle["feature_columns"]
+
+            def predict_proba(self, X):
+                import numpy as np
+
+                return np.array([[0.35, 0.65]])
+
+        bundle = dict(mock_model_bundle)
+        bundle["estimator"] = _Estimator()
+        monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
+
+        def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
+            return None
+
+        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
 
         response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
 
-        assert response.status_code == 422
+        assert response.status_code == 200
         data = response.json()
-        assert "age is required" in data["detail"]
-        assert data["code"] == "missing_age"
+        assert data["risk_level"] in ("Low", "Medium", "High")
+        assert float(data["prediction_confidence"]) < 100.0
 
 
 class TestPredictDailyAuth:

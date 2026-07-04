@@ -10,18 +10,15 @@ from services.model_features import DEFAULT_FEATURE_VALUES, MODEL_FEATURE_COLUMN
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import count_defaulted_critical_features
 from services.nutrition_defaults import resolve_request_nutrition
-from services.prediction.firestore_mapping import (
-    heart_rate_avg_from_doc,
-    injury_prediction_request_from_firestore_snapshot,
-    read_first_matching_field,
-)
+from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
+from services.field_transforms import heart_rate_avg_from_doc
 from services.prediction.service import (
     persist_prediction_result_or_raise,
     predict_injury_risk,
     predict_injury_risk_from_firestore,
 )
 from services.preprocessing import injury_request_to_model_dataframe
-from utils.exceptions import DatabaseError, MLModelError, ValidationError
+from utils.exceptions import DatabaseError, MLModelError
 
 
 pytestmark = pytest.mark.unit
@@ -106,25 +103,11 @@ class TestDefaultedCriticalFeatures:
 
 
 class TestFirestoreFieldHelpers:
-    def test_heart_rate_avg_prefers_heart_rate_avg(self):
-        assert heart_rate_avg_from_doc({"heartRateAvg": 58, "avgHeartRate": 62}) == 58
+    def test_heart_rate_avg_reads_canonical_field(self):
+        assert heart_rate_avg_from_doc({"heartRateAvg": 58}) == 58
 
-    def test_heart_rate_avg_falls_back_to_avg_heart_rate(self):
-        assert heart_rate_avg_from_doc({"avgHeartRate": 62}) == 62
-
-    def test_read_first_matching_field_prefers_primary_non_zero(self):
-        primary = {"steps": 0, "distanceMeters": 5000}
-        fallback = {"steps": 9000}
-        value = read_first_matching_field(
-            primary, fallback, ("steps", "distanceMeters"), prefer_primary=True
-        )
-        assert value == 5000
-
-    def test_read_first_matching_field_falls_back_when_primary_missing(self):
-        primary = {}
-        fallback = {"steps": 7400}
-        value = read_first_matching_field(primary, fallback, ("steps",), prefer_primary=True)
-        assert value == 7400
+    def test_heart_rate_avg_missing_returns_none(self):
+        assert heart_rate_avg_from_doc({}) is None
 
 
 class TestFirestoreSnapshotMapping:
@@ -174,6 +157,16 @@ class TestFirestoreSnapshotMapping:
         assert req.distanceMeters == 0
         assert req.heartRateAvg is None
 
+    def test_missing_birth_date_flags_age_imputed(self, firestore_snapshot):
+        from services.profile_defaults import resolve_request_age
+
+        snap = dict(firestore_snapshot)
+        snap["profile"] = {"historyInjuryCount": 2}
+        mapped = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
+        assert mapped.age is None
+        req = resolve_request_age(mapped)
+        assert req.ageImputed is True
+
     def test_nutrition_imputed_when_yesterday_meals_missing(self, firestore_snapshot):
         snap = dict(firestore_snapshot)
         snap["daily_nutrition_yesterday"] = {}
@@ -189,11 +182,42 @@ class TestFirestoreSnapshotMapping:
 
 
 class TestPredictInjuryRisk:
-    def test_raises_when_age_missing(self):
-        payload = InjuryPredictionRequest(userId="u1", date="2026-04-30", sleepMinutes=420, steps=5000)
-        with pytest.raises(ValidationError) as exc_info:
-            predict_injury_risk(payload)
-        assert exc_info.value.code == "missing_age"
+    def test_missing_age_uses_profile_default(
+        self,
+        sample_prediction_request,
+        mock_model_bundle,
+        monkeypatch,
+    ):
+        class _Estimator:
+            feature_names_in_ = MODEL_FEATURE_COLUMNS
+
+            def predict_proba(self, X):
+                import numpy as np
+
+                assert float(X["age"].iloc[0]) == pytest.approx(22.0)
+                return np.array([[0.35, 0.65]])
+
+        bundle = dict(mock_model_bundle)
+        bundle["estimator"] = _Estimator()
+        payload = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=5000,
+            stressLevel=40,
+            muscleSoreness=3,
+            energyLevel=70,
+            ageImputed=True,
+        )
+
+        monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
+        monkeypatch.setattr(
+            "services.prediction.confidence.get_history_window_context",
+            lambda *a, **k: {"confidence": "low", "features": {}},
+        )
+        out = predict_injury_risk(payload)
+        assert out["risk_level"] == "Medium"
+        assert 0.0 <= out["prediction_confidence"] <= 100.0
 
     def test_raises_when_model_blocked(self, sample_prediction_request, monkeypatch):
         monkeypatch.setattr("services.prediction.service.get_model", lambda: None)

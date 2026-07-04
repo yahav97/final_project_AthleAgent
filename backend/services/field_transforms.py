@@ -6,6 +6,7 @@ import math
 from datetime import date, datetime
 from typing import Any, Mapping
 
+from config import settings
 from utils.exceptions import ValidationError
 
 STEPS_TO_KM = 0.0008
@@ -22,15 +23,6 @@ def parse_date_key(value: str) -> date | None:
 
 def float_from_doc(doc: Mapping[str, Any], key: str, default: float = 0.0) -> float:
     return float(doc.get(key) or default)
-
-
-def first_doc_value(doc: Mapping[str, Any], *keys: str) -> object | None:
-    """Return the first non-null field from a Firestore doc (camelCase / snake_case)."""
-    for key in keys:
-        value = doc.get(key)
-        if value is not None:
-            return value
-    return None
 
 
 def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) -> float | None:
@@ -54,20 +46,17 @@ def age_from_birth_date(birth_date: object, *, as_of_date: str | None = None) ->
 
 
 def age_from_profile(profile: Mapping[str, Any], *, as_of_date: str | None = None) -> float | None:
-    """Compute model age from Firestore profile ``birth_date`` (or ``birthDate``)."""
-    birth_raw = first_doc_value(profile, "birth_date", "birthDate")
+    """Compute model age from Firestore profile ``birth_date``."""
+    birth_raw = profile.get("birth_date")
     if birth_raw is None:
         return None
     return age_from_birth_date(birth_raw, as_of_date=as_of_date)
 
 
 def resolve_model_age(age_raw: object) -> float:
-    """Require athlete age for inference — derived from profile ``birth_date`` at serve time."""
+    """Resolve model age from profile ``birth_date`` or ``settings.PROFILE_DEFAULT_AGE``."""
     if age_raw is None:
-        raise ValidationError(
-            "age is required; set birth_date on user profile",
-            code="missing_age",
-        )
+        return float(settings.PROFILE_DEFAULT_AGE)
     try:
         age = float(age_raw)
     except (TypeError, ValueError) as exc:
@@ -100,17 +89,16 @@ def parse_injured_yesterday_flag(raw: object) -> int | None:
 
 
 def injured_yesterday_from_docs(*docs: Mapping[str, Any]) -> int | None:
-    """Read injuredYesterday from the first doc that has it (checkins, then health)."""
+    """Read ``injuredYesterday`` from the first doc that has it (checkins, then health)."""
     for doc in docs:
-        raw = first_doc_value(doc, "injuredYesterday", "injured_yesterday")
+        raw = doc.get("injuredYesterday")
         if raw is not None:
             return parse_injured_yesterday_flag(raw)
     return None
 
 
 def heart_rate_avg_from_doc(doc: Mapping[str, Any]) -> object | None:
-    """Prefer ``heartRateAvg``; Firestore samples also used ``avgHeartRate``."""
-    return first_doc_value(doc, "heartRateAvg", "avgHeartRate")
+    return doc.get("heartRateAvg")
 
 
 def daily_distance_km(distance_meters: float, steps: float) -> float:

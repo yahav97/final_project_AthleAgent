@@ -4,6 +4,7 @@ Sklearn feature contract loaded from ``backend/data/model_feature_contract.json`
 The JSON is the single source of truth for:
 - ``MODEL_FEATURE_COLUMNS`` — column order passed to ``predict_proba``
 - ``DEFAULT_FEATURE_VALUES`` — population defaults when history is thin
+  (``age`` overridden at load time from ``settings.PROFILE_DEFAULT_AGE``)
 - ``TRAINING_CSV_EXCLUDE_COLUMNS`` — columns derived only at serve time
 - ``INTEGER_FEATURE_COLUMNS`` — features stored as whole numbers (train + serve)
 """
@@ -14,6 +15,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from config import settings
 
 MODEL_FEATURE_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "data" / "model_feature_contract.json"
 
@@ -49,7 +52,9 @@ def default_feature_values_from_contract() -> dict[str, float]:
     defaults = load_model_feature_contract()["default_values"]
     if not isinstance(defaults, dict) or not defaults:
         raise ValueError("model_feature_contract.json: default_values must be a non-empty object")
-    return {str(key): float(value) for key, value in defaults.items()}
+    resolved = {str(key): float(value) for key, value in defaults.items()}
+    resolved["age"] = float(settings.PROFILE_DEFAULT_AGE)
+    return resolved
 
 
 def training_csv_exclude_columns_from_contract() -> tuple[str, ...]:

@@ -1,6 +1,6 @@
 """Request/response shapes for injury risk inference."""
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from schemas.types import RiskLevel, validate_date_key
 
@@ -31,11 +31,14 @@ class InjuryPredictionRequest(BaseModel):
     # users/{uid} profile (optional until shipped on mobile)
     age: float | None = Field(
         default=None,
-        description="Athlete age in decimal years (required at inference; derived from profile birth_date)",
+        description="Athlete age in decimal years; derived from profile birth_date when present",
+    )
+    ageImputed: bool = Field(
+        default=False,
+        description="Set by backend when birth_date was missing and PROFILE_DEFAULT_AGE was used.",
     )
     historyInjuryCount: int | None = Field(
         default=None,
-        validation_alias=AliasChoices("historyInjuryCount", "history_injury_count"),
         description="Lifetime injury count from profile when available",
     )
 
@@ -55,62 +58,44 @@ class InjuryPredictionRequest(BaseModel):
     # New Health Connect fields
     hrvRmssd: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("hrvRmssd", "hrv_rmssd"),
         description="HRV RMSSD in ms from HeartRateVariabilityRmssd",
     )
     restingHeartRate: int | None = Field(
         default=None,
-        validation_alias=AliasChoices("restingHeartRate", "resting_heart_rate"),
         description="Resting HR bpm from RestingHeartRate record",
     )
-    bodyFatPct: float | None = Field(
-        default=None,
-        validation_alias=AliasChoices("bodyFatPct", "body_fat_pct"),
-    )
+    bodyFatPct: float | None = None
     vo2Max: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("vo2Max", "vo2_max"),
         description="VO2max ml/kg/min from Vo2Max record",
     )
-    elevationGainedMeters: float | None = Field(
-        default=None,
-        validation_alias=AliasChoices("elevationGainedMeters", "elevation_gained_meters"),
-    )
+    elevationGainedMeters: float | None = None
     floorsClimbed: int | None = None
     avgSpeed: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("avgSpeed", "avg_speed"),
         description="Average speed km/h from SpeedSeries",
     )
-    maxSpeed: float | None = Field(
-        default=None,
-        validation_alias=AliasChoices("maxSpeed", "max_speed"),
-    )
+    maxSpeed: float | None = None
     avgPower: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("avgPower", "avg_power"),
         description="Average power watts from PowerSeries (0 if no power meter)",
     )
     avgCadence: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("avgCadence", "avg_cadence"),
         description="Average step cadence spm from StepsCadenceSeries",
     )
     respiratoryRate: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("respiratoryRate", "respiratory_rate"),
         description="Breaths per minute from RespiratoryRate",
     )
     oxygenSaturation: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("oxygenSaturation", "oxygen_saturation"),
         description="SpO2 % from OxygenSaturation",
     )
 
     # users/{uid}/daily_checkins (daily survey)
     injuredYesterday: int | None = Field(
         default=None,
-        validation_alias=AliasChoices("injuredYesterday", "injured_yesterday"),
         description="0/1 — injured on previous calendar day (daily_checkins/{date})",
     )
     energyLevel: int | None = None
@@ -123,7 +108,6 @@ class InjuryPredictionRequest(BaseModel):
     mealsLoggedCount: int | None = None
     nutritionTotalCalories: float | None = Field(
         default=None,
-        validation_alias=AliasChoices("nutritionTotalCalories", "nutrition_total_calories"),
         description="Meal-logged kcal sum that day (Firestore totalCalories on nutrition doc); not Health burn.",
     )
     nutritionImputed: bool = Field(

@@ -205,7 +205,7 @@ Cross-trigger בין סקר לשעון — כל מסך ממתין לנתון מ�
 
 | שדה Firestore | פיצ'ר מודל | המרה |
 |---------------|------------|------|
-| `birth_date` | `age` | `yyyy-MM-dd` → גיל מלא לפי תאריך החיזוי; חסום 12–90; אם חסר/לא תקין → default 28 |
+| `birth_date` | `age` | `yyyy-MM-dd` → גיל מלא לפי תאריך החיזוי; אם חסר → `PROFILE_DEFAULT_AGE` (**22**) + `age_imputed` |
 | `historyInjuryCount` | `history_injury_count` | 0–50; default 0 |
 
 ### 5.2 שעון — פיצול תאריכים
@@ -422,7 +422,7 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 | פיצ'ר | Default | פיצ'ר | Default |
 |--------|---------|--------|---------|
 | `bmi` | 23.5 | `nutrition_intake_calories` | 2500 |
-| `age` | 28 | `daily_calories` | 2500 |
+| `age` | 22 | `daily_calories` | 2500 |
 | `body_fat_pct` | 16 | `total_calories_burned` | 2450 |
 | `vo2_max` | 48 | `stress_level` | 5 |
 | `history_injury_count` | 0 | `muscle_soreness` | 5 |

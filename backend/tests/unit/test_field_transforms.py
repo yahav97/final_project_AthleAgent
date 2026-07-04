@@ -32,10 +32,6 @@ class TestAgeFromProfile:
         profile = {"birth_date": "1995-01-01"}
         assert age_from_profile(profile, as_of_date="2026-06-16") == 31.48
 
-    def test_age_from_profile_accepts_birth_date_camel_case(self):
-        profile = {"birthDate": "1995-01-01"}
-        assert age_from_profile(profile, as_of_date="2026-06-16") == 31.48
-
     def test_computed_age_not_clamped(self):
         assert age_from_profile({"birth_date": "2020-01-01"}, as_of_date="2026-06-16") == 6.46
         assert age_from_profile({"birth_date": "1900-01-01"}, as_of_date="2026-06-16") == 126.54
@@ -55,10 +51,10 @@ class TestResolveModelAge:
     def test_rounds_to_two_decimal_places(self):
         assert resolve_model_age(31.456789) == 31.46
 
-    def test_missing_age_raises(self):
-        with pytest.raises(ValidationError) as exc_info:
-            resolve_model_age(None)
-        assert exc_info.value.code == "missing_age"
+    def test_missing_age_uses_profile_default(self):
+        from config import settings
+
+        assert resolve_model_age(None) == float(settings.PROFILE_DEFAULT_AGE)
 
     def test_invalid_age_raises(self):
         with pytest.raises(ValidationError) as exc_info:

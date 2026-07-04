@@ -14,6 +14,7 @@ Policy map (where each group is used in code):
 │ SLEEP_*                     │ feature_engineering.py, rolling_features │
 │ CONFIDENCE_*                │ prediction/confidence.py                 │
 │ NUTRITION_DEFAULT_*         │ nutrition_defaults.py                    │
+│ PROFILE_DEFAULT_AGE         │ field_transforms.py, model_features.py   │
 └─────────────────────────────┴──────────────────────────────────────────┘
 
 Prediction confidence blend (see ``compute_prediction_confidence_percent``):
@@ -165,6 +166,11 @@ class Settings(BaseSettings):
     NUTRITION_DEFAULT_CARBS: int = 300
     NUTRITION_DEFAULT_MEALS_LOGGED: int = 3
     NUTRITION_DEFAULT_CALORIES: int = 2600
+
+    # -------------------------------------------------------------------------
+    # Profile imputation when birth_date is missing on users/{uid}
+    # -------------------------------------------------------------------------
+    PROFILE_DEFAULT_AGE: int = 22
 
     # -------------------------------------------------------------------------
     # HTTP middleware & dev-only mock endpoint

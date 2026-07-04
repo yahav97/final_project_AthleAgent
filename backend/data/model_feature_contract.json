@@ -59,7 +59,7 @@
   ],
   "default_values": {
     "bmi": 23.5,
-    "age": 28.0,
+    "age": 22.0,
     "body_fat_pct": 16.0,
     "vo2_max": 48.0,
     "history_injury_count": 0.0,

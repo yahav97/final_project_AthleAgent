@@ -266,7 +266,7 @@ prediction_confidence = (0.6 × history_score + 0.4 × quality_score) × 100
 | 4–6 | MEDIUM | 0.70 |
 | 0–3 | LOW | 0.45 |
 
-**quality_score** (`preprocessing/quality.py`): מתחיל מ-1.0, יורד **−0.08** לכל שדה מדידה חסר/אפס (`SAME_DAY_MEASUREMENT_FIELDS`), **−0.12** אם תזונה ממוצעת (`nutritionImputed`).
+**quality_score** (`preprocessing/quality.py`): מתחיל מ-1.0, יורד **−0.08** לכל שדה מדידה חסר/אפס (`SAME_DAY_MEASUREMENT_FIELDS`), **−0.12** אם תזונה ממוצעת (`nutritionImputed`) או גיל ברירת מחדל (`ageImputed`, `PROFILE_DEFAULT_AGE=22`).
 
 **דוגמה מספרית:** היסטוריה HIGH (0.95) + קלט חלקי (0.8) → `(0.6×0.95 + 0.4×0.8)×100 ≈ 89`.
 

@@ -39,6 +39,12 @@ class TestDomainDefaults:
         assert s.ML_MIN_RECALL_HARD == DEFAULT_MIN_RECALL_HARD
         assert s.ML_MIN_AUC_FOR_LIVE == DEFAULT_MIN_AUC_FOR_LIVE
 
+    def test_profile_default_age(self):
+        assert settings.PROFILE_DEFAULT_AGE == 22
+        assert settings.PROFILE_DEFAULT_AGE == int(
+            __import__("services.model_features", fromlist=["DEFAULT_FEATURE_VALUES"]).DEFAULT_FEATURE_VALUES["age"]
+        )
+
     def test_ml_gate_defaults(self):
         s = Settings()
         assert s.ML_MIN_RECALL_HARD == 0.80
