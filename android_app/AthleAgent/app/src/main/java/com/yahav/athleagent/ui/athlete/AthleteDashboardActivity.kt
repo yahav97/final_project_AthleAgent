@@ -247,7 +247,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
             val generativeModel = GenerativeModel(modelName = "gemini-2.5-flash", apiKey = geminiApiKey)
 
             val prompt = """
-            You are a professional athletic performance coach and injury prevention specialist.
+            You are a professional athletic performance doctor and injury prevention specialist.
             Analyze the following athlete's data for today:
             - Injury Risk Score: $riskScore% (0 is safe, 100 is extreme risk)
             - Qualitative Risk Level: $riskLevel
@@ -263,7 +263,7 @@ class AthleteDashboardActivity : AppCompatActivity() {
                - 56-75 (High): Warning, "Orange light", strongly recommend active recovery.
                - 76-100 (Critical): Emergency, "Red light", advise immediate rest.
             2. BE PRACTICAL: Provide 1-2 specific, actionable training or recovery tips based on the data.
-            3. BE CONCISE: Keep the recommendation under 2-3 short sentences.
+            3. BE CONCISE: Keep the recommendation under 2 short sentences.
             4. Speak directly to a professional athlete who wants to maximize their season.
         """.trimIndent()
 

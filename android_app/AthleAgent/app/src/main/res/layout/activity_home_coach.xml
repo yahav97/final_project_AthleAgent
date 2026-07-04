@@ -99,7 +99,7 @@
                         android:fontFamily="@font/roboto_bold"
                         android:text="@string/you_have_2_new_athlete_join_requests"
                         android:textColor="@color/brand_button_dark_muted"
-                        android:textSize="14sp" />
+                        android:textSize="20sp" />
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </com.google.android.material.card.MaterialCardView>
 
@@ -249,7 +249,7 @@
         android:fontFamily="@font/roboto_bold"
         android:text="@string/log_out_coach"
         android:textColor="@color/text"
-        android:textSize="16sp"
+        android:textSize="20sp"
         app:iconTint="@color/text"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

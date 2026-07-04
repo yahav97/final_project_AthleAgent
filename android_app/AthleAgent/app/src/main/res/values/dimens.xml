@@ -91,6 +91,7 @@
     <dimen name="text_size_input_label">16sp</dimen>
     <dimen name="radius_large">32dp</dimen>
     <dimen name="radius_medium">16dp</dimen>
+    <dimen name="logo_radius">16dp</dimen>
     <dimen name="elevation_medium">8dp</dimen>
     <dimen name="elevation_small">4dp</dimen>
     <dimen name="input_padding_vertical">18dp</dimen>

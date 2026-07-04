@@ -52,11 +52,18 @@ class DailyCheckInActivity : AppCompatActivity() {
     }
 
     private fun initListeners() {
-        binding.checkinBTN1.setOnClickListener { updateSorenessSelection(1) }
-        binding.checkinBTN2.setOnClickListener { updateSorenessSelection(2) }
-        binding.checkinBTN3.setOnClickListener { updateSorenessSelection(3) }
-        binding.checkinBTN4.setOnClickListener { updateSorenessSelection(4) }
-        binding.checkinBTN5.setOnClickListener { updateSorenessSelection(5) }
+        binding.checkinTOGGLESoreness.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                selectedSoreness = when (checkedId) {
+                    R.id.checkin_BTN_1 -> 1
+                    R.id.checkin_BTN_2 -> 2
+                    R.id.checkin_BTN_3 -> 3
+                    R.id.checkin_BTN_4 -> 4
+                    R.id.checkin_BTN_5 -> 5
+                    else -> 3
+                }
+            }
+        }
 
         binding.checkinSWITCHInjured.setOnCheckedChangeListener { _, isChecked ->
             injuredYesterday = if (isChecked) 1 else 0
@@ -70,40 +77,6 @@ class DailyCheckInActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateSorenessSelection(score: Int) {
-        selectedSoreness = score
-
-        val buttons = listOf(
-            binding.checkinBTN1,
-            binding.checkinBTN2,
-            binding.checkinBTN3,
-            binding.checkinBTN4,
-            binding.checkinBTN5
-        )
-
-        val strokeWidthPx = (2 * resources.displayMetrics.density).toInt()
-        val cornerRadiusPx = 8f * resources.displayMetrics.density
-        val strokeColor = ContextCompat.getColor(this, R.color.brand_button_dark_muted)
-
-        val unselectedBackground = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = cornerRadiusPx
-            setStroke(strokeWidthPx, strokeColor)
-            setColor(Color.TRANSPARENT)
-        }
-
-        buttons.forEachIndexed { index, button ->
-            if (index + 1 == score) {
-                button.backgroundTintList = null
-                button.setBackgroundResource(R.drawable.btn_gradient)
-                button.setTextColor(ContextCompat.getColor(this, R.color.white))
-            } else {
-                button.backgroundTintList = null
-                button.background = unselectedBackground
-                button.setTextColor(ContextCompat.getColor(this, R.color.brand_button_dark_muted))
-            }
-        }
-    }
 
     private fun saveCheckInToFirebase() {
         SignalManager.getInstance().showSignal(binding.root, "Saving your check-in...", SignalManager.SignalType.INFO)

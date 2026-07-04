@@ -9,4 +9,26 @@
         <item name="boxCornerRadiusBottomStart">@dimen/radius_medium</item>
         <item name="boxCornerRadiusBottomEnd">@dimen/radius_medium</item>
     </style>
+
+    <!-- Segmented Button Styles -->
+    <style name="ShapeAppearanceOverlay.App.Button.Left" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">@dimen/radius_medium</item>
+        <item name="cornerSizeBottomLeft">@dimen/radius_medium</item>
+        <item name="cornerSizeTopRight">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.App.Button.None" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.App.Button.Right" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopRight">@dimen/radius_medium</item>
+        <item name="cornerSizeBottomRight">@dimen/radius_medium</item>
+        <item name="cornerSizeTopLeft">0dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+    </style>
 </resources>

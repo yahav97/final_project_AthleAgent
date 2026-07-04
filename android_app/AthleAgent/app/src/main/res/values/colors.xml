@@ -88,6 +88,7 @@
     <color name="yellow_vibrant">#FEEB3B</color>
     <color name="orange_vibrant">#FF9800</color>
     <color name="red_vibrant">#FF1744</color>
+    <color name="circular_track_bg">#E0E4EB</color>
     <color name="input_label_floating">#37474F</color>
     <color name="input_label_hint">#78909C</color>
     <color name="inactive">#E5E5EA</color>

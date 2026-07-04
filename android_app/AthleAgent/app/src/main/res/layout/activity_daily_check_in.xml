@@ -1,5 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dailyCheckIn_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_white_alice_blue"
@@ -17,36 +19,50 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="@string/daily_check_in"
-            android:textSize="28sp"
+            android:textSize="@dimen/headline_text_size"
             android:fontFamily="@font/roboto_bold"
             android:textColor="@color/text"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="32dp"/>
+            android:layout_marginTop="@dimen/spacing_16"
+            android:layout_marginBottom="@dimen/spacing_32"/>
 
         <!-- Energy Level Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="@dimen/spacing_20"
             app:cardBackgroundColor="@color/white"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="6dp"
+            app:cardCornerRadius="@dimen/radius_large"
+            app:cardElevation="@dimen/elevation_medium"
             app:strokeWidth="0dp">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="@dimen/spacing_24">
 
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/how_is_your_energy_level_today"
-                    android:textSize="18sp"
-                    android:textColor="@color/text"
-                    android:fontFamily="@font/roboto_bold"
-                    android:layout_marginBottom="16dp"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="@dimen/spacing_16">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/outline_bolt_24"
+                        app:tint="@color/brand_button_dark_muted"
+                        android:layout_marginEnd="@dimen/spacing_12"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/how_is_your_energy"
+                        android:textSize="@dimen/text_size_label_medium"
+                        android:textColor="@color/text"
+                        android:fontFamily="@font/roboto_bold"/>
+                </androidx.appcompat.widget.LinearLayoutCompat>
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/checkin_SLD_energy"
@@ -57,54 +73,41 @@
                     android:valueTo="100"
                     app:thumbColor="@color/brand_button_dark_muted"
                     app:trackColorActive="@color/brand_button_light_muted"
-                    app:trackColorInactive="@color/background_dash" />
+                    app:trackColorInactive="@color/background_dash"
+                    app:haloColor="@color/background_dash" />
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginTop="8dp">
+                    android:layout_marginTop="@dimen/spacing_4">
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/emoji_very_sad"
-                        android:textSize="24sp"
+                        android:text="@string/energy_low"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="start"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/energy_optimal"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
                         android:gravity="center"/>
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/emoji_sad"
-                        android:textSize="24sp"
-                        android:gravity="center"/>
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/emoji_neutral"
-                        android:textSize="24sp"
-                        android:gravity="center"/>
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/emoji_happy"
-                        android:textSize="24sp"
-                        android:gravity="center"/>
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/emoji_very_happy"
-                        android:textSize="24sp"
-                        android:gravity="center"/>
+                        android:text="@string/energy_peak"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="end"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </androidx.appcompat.widget.LinearLayoutCompat>
         </com.google.android.material.card.MaterialCardView>
@@ -113,128 +116,165 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="@dimen/spacing_20"
             app:cardBackgroundColor="@color/white"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="6dp"
+            app:cardCornerRadius="@dimen/radius_large"
+            app:cardElevation="@dimen/elevation_medium"
             app:strokeWidth="0dp">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/daily_check_in_muscle"
-                    android:textSize="18sp"
-                    android:textColor="@color/text"
-                    android:fontFamily="@font/roboto_bold"
-                    android:layout_marginBottom="20dp"/>
+                android:padding="@dimen/spacing_24">
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="@dimen/spacing_16">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/baseline_fitness_center_24"
+                        app:tint="@color/brand_button_dark_muted"
+                        android:layout_marginEnd="@dimen/spacing_12"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/muscle_soreness_level"
+                        android:textSize="@dimen/text_size_label_medium"
+                        android:textColor="@color/text"
+                        android:fontFamily="@font/roboto_bold"/>
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/checkin_TOGGLE_soreness"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true"
+                    app:checkedButton="@+id/checkin_BTN_3">
 
                     <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:id="@+id/checkin_BTN_1"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="4dp"
                         android:text="@string/number_1"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_dark_muted"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:cornerRadius="12dp"
-                        />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Button.Left" />
 
                     <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:id="@+id/checkin_BTN_2"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="4dp"
                         android:text="@string/number_2"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_dark_muted"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:cornerRadius="12dp"
-                        />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Button.None" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/checkin_BTN_3"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="4dp"
                         android:text="@string/number_3"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/white"
-                        android:background="@drawable/btn_gradient"
-                        app:backgroundTint="@null"
-                        app:cornerRadius="12dp"
-                        />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Button.None" />
 
                     <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:id="@+id/checkin_BTN_4"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="4dp"
                         android:text="@string/number_4"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_dark_muted"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:cornerRadius="12dp"
-                        />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Button.None" />
 
                     <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:id="@+id/checkin_BTN_5"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="64dp"
                         android:layout_weight="1"
                         android:text="@string/number_5"
                         android:fontFamily="@font/roboto_bold"
-                        android:textColor="@color/brand_button_dark_muted"
-                        app:strokeColor="@color/brand_button_light_muted"
-                        app:cornerRadius="12dp"
-                        />
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Button.Right" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/spacing_8">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/soreness_none"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="start"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/soreness_extreme"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="end"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
             </androidx.appcompat.widget.LinearLayoutCompat>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Stress & Injury Card -->
+        <!-- Stress Level Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="@dimen/spacing_20"
             app:cardBackgroundColor="@color/white"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="6dp"
+            app:cardCornerRadius="@dimen/radius_large"
+            app:cardElevation="@dimen/elevation_medium"
             app:strokeWidth="0dp">
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="@dimen/spacing_24">
 
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/stress_level_question"
-                    android:textSize="18sp"
-                    android:textColor="@color/text"
-                    android:fontFamily="@font/roboto_bold"
-                    android:layout_marginBottom="16dp"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="@dimen/spacing_16">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/baseline_psychology_24"
+                        app:tint="@color/brand_button_dark_muted"
+                        android:layout_marginEnd="@dimen/spacing_12"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/stress_level_label"
+                        android:textSize="@dimen/text_size_label_medium"
+                        android:textColor="@color/text"
+                        android:fontFamily="@font/roboto_bold"/>
+                </androidx.appcompat.widget.LinearLayoutCompat>
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/checkin_SLD_stress"
@@ -245,61 +285,94 @@
                     android:valueTo="100"
                     app:thumbColor="@color/brand_button_dark_muted"
                     app:trackColorActive="@color/brand_button_light_muted"
-                    app:trackColorInactive="@color/background_dash" />
+                    app:trackColorInactive="@color/background_dash"
+                    app:haloColor="@color/background_dash" />
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="24dp">
+                    android:layout_marginTop="@dimen/spacing_4">
 
                     <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/low"
-                        android:textSize="12sp"
-                        android:textColor="@color/lm_text_muted"/>
-
-                    <View
                         android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1"/>
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/low"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="start"/>
 
                     <com.google.android.material.textview.MaterialTextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:text="@string/high"
-                        android:textSize="12sp"
-                        android:textColor="@color/lm_text_muted"/>
+                        android:textSize="@dimen/text_small"
+                        android:textColor="@color/lm_text_muted"
+                        android:gravity="end"/>
                 </androidx.appcompat.widget.LinearLayoutCompat>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/bright_gray"
-                    android:layout_marginBottom="20dp"/>
+        <!-- Injury Report Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/spacing_32"
+            app:cardBackgroundColor="@color/white"
+            app:cardCornerRadius="@dimen/radius_large"
+            app:cardElevation="@dimen/elevation_medium"
+            app:strokeWidth="0dp">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_24">
 
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingVertical="4dp">
+                    android:layout_marginBottom="@dimen/spacing_12">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/baseline_report_problem_24"
+                        app:tint="@color/brand_button_dark_muted"
+                        android:layout_marginEnd="@dimen/spacing_12"/>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/injury_report"
+                        android:textSize="@dimen/text_size_label_medium"
+                        android:textColor="@color/text"
+                        android:fontFamily="@font/roboto_bold"/>
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/injured_yesterday"
-                        android:textSize="18sp"
+                        android:text="@string/any_new_injuries"
+                        android:textSize="@dimen/text_size_body"
                         android:textColor="@color/text"
-                        android:fontFamily="@font/roboto_bold" />
+                        android:fontFamily="@font/roboto_regular" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/checkin_SWITCH_injured"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
                         app:thumbTint="@drawable/switch_thumb_selector"
                         app:trackTint="@drawable/switch_track_selector"
                         app:trackDecorationTint="@null" />
@@ -311,17 +384,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/dailyCheckIn_BTN_submit"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="@dimen/button_height_medium"
             android:layout_gravity="center"
             android:text="@string/submit"
             android:textAllCaps="false"
             android:background="@drawable/btn_gradient"
             android:fontFamily="@font/roboto_bold"
             android:textColor="@color/white"
-            android:textSize="18sp"
+            android:textSize="@dimen/text_size_button_medium"
             app:backgroundTint="@null"
-            app:cornerRadius="16dp"
-            app:elevation="4dp"
+            app:cornerRadius="@dimen/radius_medium"
+            app:elevation="@dimen/elevation_small"
             />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
