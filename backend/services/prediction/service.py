@@ -9,6 +9,7 @@ from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
 from services.history.repository import fetch_daily_firestore_snapshot, save_daily_prediction_result
 from services.nutrition_defaults import resolve_request_nutrition
+from services.profile_defaults import resolve_request_age
 from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import (
     apply_history_confidence_fallback,
@@ -34,6 +35,7 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     Missing or zero measurements lower ``prediction_confidence`` only (never HTTP rejection).
     """
     payload = resolve_request_nutrition(payload)
+    payload = resolve_request_age(payload)
     frame = injury_request_to_model_dataframe(payload)
     frame, history_confidence = apply_history_confidence_fallback(frame, payload)
     quality = calculate_data_quality_score(payload)
@@ -59,12 +61,9 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     loaded_model = get_model()
     bundle = resolve_model_bundle(loaded_model)
     if bundle.estimator is None:
-        gate_reason = get_model_gate_reason()
-        blocked_reason = (
-            bundle.gate_status
-            if bundle.gate_status != ModelGateReason.MODEL_NOT_LOADED.value
-            else gate_reason
-        )
+        blocked_reason = bundle.gate_status
+        if blocked_reason == ModelGateReason.MODEL_NOT_LOADED.value:
+            blocked_reason = get_model_gate_reason()
         logger.warning(
             "predict_blocked userId=%s reason=%s prediction_confidence=%.2f",
             payload.userId,

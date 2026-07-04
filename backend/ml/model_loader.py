@@ -150,6 +150,28 @@ def _load_bundle_without_manifest(path: Path) -> Optional[Any]:
     return bundle
 
 
+def _set_model_blocked(
+    reason: ModelGateReason,
+    *,
+    manifest: dict[str, Any] | None = None,
+) -> None:
+    """Clear live model state and record why serving is blocked."""
+    global _estimator, _model_gate_reason, _model_live, _active_manifest
+    _estimator = None
+    _model_gate_reason = reason.value
+    _model_live = False
+    _active_manifest = manifest if manifest is not None else {}
+
+
+def _set_model_live(estimator: Any, manifest: dict[str, Any] | None = None) -> None:
+    """Mark the loaded bundle as live for inference."""
+    global _estimator, _model_gate_reason, _model_live, _active_manifest
+    _estimator = estimator
+    _model_gate_reason = ModelGateReason.NONE.value
+    _model_live = True
+    _active_manifest = manifest if manifest is not None else {}
+
+
 def load_model(
     model_path: PathLike | None = None,
     manifest_path: PathLike | None = None,
@@ -170,10 +192,7 @@ def load_model(
 
     if not path.is_file():
         logger.warning("Model file not found at %s. Run ML_model/train_model.py first.", path)
-        _estimator = None
-        _model_gate_reason = ModelGateReason.MODEL_FILE_NOT_FOUND.value
-        _model_live = False
-        _active_manifest = {}
+        _set_model_blocked(ModelGateReason.MODEL_FILE_NOT_FOUND)
         return None
 
     manifest_candidate = (
@@ -189,22 +208,13 @@ def load_model(
                     "Ungated fallback model blocked outside development (APP_ENV=%s).",
                     settings.APP_ENV,
                 )
-                _estimator = None
-                _model_gate_reason = ModelGateReason.UNGATED_FALLBACK_BLOCKED.value
-                _model_live = False
-                _active_manifest = {}
+                _set_model_blocked(ModelGateReason.UNGATED_FALLBACK_BLOCKED)
                 return None
             bundle = _load_bundle_without_manifest(path)
             if bundle is None:
-                _estimator = None
-                _model_gate_reason = ModelGateReason.FALLBACK_BUNDLE_INVALID.value
-                _model_live = False
-                _active_manifest = {}
+                _set_model_blocked(ModelGateReason.FALLBACK_BUNDLE_INVALID)
                 return None
-            _estimator = bundle
-            _model_gate_reason = ModelGateReason.NONE.value
-            _model_live = True
-            _active_manifest = {}
+            _set_model_live(bundle)
             logger.info(
                 "Fallback model loaded from %s (no manifest gate).",
                 path,
@@ -218,10 +228,7 @@ def load_model(
             return _estimator
 
         logger.warning("Manifest not found at %s; model will not be marked live.", manifest_candidate)
-        _estimator = None
-        _model_gate_reason = ModelGateReason.MANIFEST_NOT_FOUND.value
-        _model_live = False
-        _active_manifest = {}
+        _set_model_blocked(ModelGateReason.MANIFEST_NOT_FOUND)
         return None
 
     try:
@@ -229,25 +236,16 @@ def load_model(
             manifest = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Manifest read failed at %s: %s", manifest_candidate, exc)
-        _estimator = None
-        _model_gate_reason = ModelGateReason.MANIFEST_CORRUPTED.value
-        _model_live = False
-        _active_manifest = {}
+        _set_model_blocked(ModelGateReason.MANIFEST_CORRUPTED)
         return None
 
     valid, reason = _validate_manifest_for_live(manifest, path)
     if not valid:
         logger.warning("Model gate rejected load: %s", reason)
-        _estimator = None
-        _model_gate_reason = reason.value
-        _model_live = False
-        _active_manifest = manifest
+        _set_model_blocked(reason, manifest=manifest)
         return None
 
-    _estimator = joblib.load(path)
-    _model_gate_reason = ModelGateReason.NONE.value
-    _model_live = True
-    _active_manifest = manifest
+    _set_model_live(joblib.load(path), manifest=manifest)
     logger.info(
         "Model loaded successfully from %s (manifest=%s)",
         path,
@@ -274,42 +272,33 @@ def get_model_gate_reason() -> str:
     return _model_gate_reason
 
 
+def _parse_optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def get_model_status() -> dict[str, Any]:
     """Return operational model status for internal monitoring endpoints."""
-    policy = _active_manifest.get("policy") if isinstance(_active_manifest, dict) else {}
-    winner = _active_manifest.get("winner") if isinstance(_active_manifest, dict) else None
-    threshold = _active_manifest.get("threshold") if isinstance(_active_manifest, dict) else None
-    winner_metrics = (
-        _active_manifest.get("winner_metrics") if isinstance(_active_manifest, dict) else {}
-    )
-    if not isinstance(winner_metrics, dict):
-        winner_metrics = {}
-    auc_value = None
-    recall_value = None
-    if isinstance(_active_manifest, dict):
-        auc_raw = winner_metrics.get("ROC-AUC")
-        if auc_raw is not None:
-            try:
-                auc_value = float(auc_raw)
-            except (TypeError, ValueError):
-                auc_value = None
-        recall_raw = winner_metrics.get("Recall@Threshold")
-        if recall_raw is not None:
-            try:
-                recall_value = float(recall_raw)
-            except (TypeError, ValueError):
-                recall_value = None
+    manifest = _active_manifest if isinstance(_active_manifest, dict) else {}
+    policy = manifest.get("policy") if isinstance(manifest.get("policy"), dict) else {}
+    winner_metrics = manifest.get("winner_metrics") if isinstance(manifest.get("winner_metrics"), dict) else {}
+    auc_value = _parse_optional_float(winner_metrics.get("ROC-AUC"))
+    recall_value = _parse_optional_float(winner_metrics.get("Recall@Threshold"))
     degraded_auc_threshold = settings.ML_MIN_AUC_FOR_LIVE + settings.ML_DEGRADED_AUC_OFFSET
     degraded_rc = bool(_model_live and auc_value is not None and auc_value < degraded_auc_threshold)
-    run_id = _active_manifest.get("run_id") if isinstance(_active_manifest, dict) else None
+    run_id = manifest.get("run_id")
     if not run_id and isinstance(_active_promoted, dict):
         run_id = _active_promoted.get("run_id")
     return {
         "status": ModelLiveStatus.LIVE.value if _model_live else ModelLiveStatus.BLOCKED.value,
         "gate_reason": _model_gate_reason,
-        "winner": winner,
-        "threshold": threshold,
-        "policy": policy if isinstance(policy, dict) else {},
+        "winner": manifest.get("winner"),
+        "threshold": manifest.get("threshold"),
+        "policy": policy,
         "degraded_rc": degraded_rc,
         "run_id": run_id,
         "promoted_at_utc": _active_promoted.get("promoted_at_utc") if isinstance(_active_promoted, dict) else None,

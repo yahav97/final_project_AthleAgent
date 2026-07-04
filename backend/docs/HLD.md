@@ -224,7 +224,7 @@ erDiagram
     }
 ```
 
-> **גיל במודל:** Firestore שומר `birth_date` (מחרוזת `yyyy-MM-dd`). הבקאנד מחשב את פיצ'ר המודל `age` ב-`age_from_profile()` לפי תאריך החיזוי (`D`), עם חסימה לטווח 12–90. אם `birth_date` חסר או לא תקין — נכנס default 28.
+> **גיל במודל:** Firestore שומר `birth_date` (מחרוזת `yyyy-MM-dd`). הבקאנד מחשב את פיצ'ר המודל `age` ב-`age_from_profile()` לפי תאריך החיזוי (`D`). אם `birth_date` חסר — נכנס `settings.PROFILE_DEFAULT_AGE` (**22**) ו-`ageImputed=true` (עונש confidence).
 
 > חוזה מלא: [FEATURES.md](FEATURES.md)
 

@@ -21,7 +21,6 @@ from services.preprocessing.scales import (
     soreness_to_model_scale,
     stress_to_model_scale,
 )
-from utils.exceptions import ValidationError
 
 pytestmark = pytest.mark.unit
 
@@ -164,6 +163,34 @@ class TestDataQualityScore:
         assert with_imputed["score"] < without["score"]
         assert "nutrition_imputed" in with_imputed["weak_fields"]
 
+    def test_age_imputed_reduces_score(self):
+        base = InjuryPredictionRequest(
+            userId="u1",
+            date="2026-04-30",
+            sleepMinutes=420,
+            steps=8000,
+            distanceMeters=6000,
+            activeCalories=400,
+            heartRateAvg=58,
+            stressLevel=40,
+            muscleSoreness=3,
+            energyLevel=70,
+            hrvRmssd=65.0,
+            restingHeartRate=52,
+            totalCalories=2800,
+            bmrCalories=1650,
+            totalProtein=120,
+            totalCarbs=280,
+            nutritionTotalCalories=2400.0,
+        )
+        without = calculate_data_quality_score(base)
+        with_imputed = calculate_data_quality_score(
+            base.model_copy(update={"ageImputed": True})
+        )
+        assert without["score"] == pytest.approx(1.0)
+        assert with_imputed["score"] < without["score"]
+        assert "age_imputed" in with_imputed["weak_fields"]
+
     def test_weak_fields_reduce_score(self):
         req = InjuryPredictionRequest(
             userId="u1",
@@ -214,12 +241,6 @@ class TestValidateFeatureVector:
 
 
 class TestInjuryRequestToDataframe:
-    def test_missing_age_raises(self):
-        req = InjuryPredictionRequest(sleepMinutes=420, steps=10000)
-        with pytest.raises(ValidationError) as exc_info:
-            injury_request_to_model_dataframe(req)
-        assert exc_info.value.code == "missing_age"
-
     def test_distance_from_meters_over_steps(self):
         req = InjuryPredictionRequest(
             age=28,

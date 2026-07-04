@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-# Sleep is written to the wake-up calendar day; physical load to the prior day.
-SLEEP_MINUTES_FIELD_NAMES: tuple[str, ...] = ("sleepMinutes", "sleep_minutes")
-
 
 def merge_wake_up_day_row(
     wake_up_key: str,
@@ -28,9 +25,8 @@ def merge_wake_up_day_row(
         return None
 
     row = dict(physical)
-    for key in SLEEP_MINUTES_FIELD_NAMES:
-        if key in wake:
-            row[key] = wake[key]
+    if "sleepMinutes" in wake:
+        row["sleepMinutes"] = wake["sleepMinutes"]
     row.update(checkin)
     row["date_key"] = wake_up_key
     return row

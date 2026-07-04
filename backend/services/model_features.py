@@ -4,6 +4,7 @@ Sklearn feature contract loaded from ``backend/data/model_feature_contract.json`
 The JSON is the single source of truth for:
 - ``MODEL_FEATURE_COLUMNS`` — column order passed to ``predict_proba``
 - ``DEFAULT_FEATURE_VALUES`` — population defaults when history is thin
+  (``age`` overridden at load time from ``settings.PROFILE_DEFAULT_AGE``)
 - ``TRAINING_CSV_EXCLUDE_COLUMNS`` — columns derived only at serve time
 - ``INTEGER_FEATURE_COLUMNS`` — features stored as whole numbers (train + serve)
 """
@@ -14,6 +15,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from config import settings
 
 MODEL_FEATURE_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "data" / "model_feature_contract.json"
 
@@ -27,32 +30,39 @@ def load_model_feature_contract() -> dict[str, Any]:
     return data
 
 
+def _require_list(contract: dict[str, Any], key: str) -> list[Any]:
+    value = contract[key]
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"model_feature_contract.json: {key} must be a non-empty list")
+    return value
+
+
+def _optional_list(contract: dict[str, Any], key: str) -> list[Any]:
+    value = contract.get(key, ())
+    if not isinstance(value, list):
+        raise ValueError(f"model_feature_contract.json: {key} must be a list")
+    return value
+
+
 def feature_column_names_from_contract() -> tuple[str, ...]:
-    columns = load_model_feature_contract()["feature_columns"]
-    if not isinstance(columns, list) or not columns:
-        raise ValueError("model_feature_contract.json: feature_columns must be a non-empty list")
-    return tuple(str(column) for column in columns)
+    return tuple(str(column) for column in _require_list(load_model_feature_contract(), "feature_columns"))
 
 
 def default_feature_values_from_contract() -> dict[str, float]:
     defaults = load_model_feature_contract()["default_values"]
     if not isinstance(defaults, dict) or not defaults:
         raise ValueError("model_feature_contract.json: default_values must be a non-empty object")
-    return {str(key): float(value) for key, value in defaults.items()}
+    resolved = {str(key): float(value) for key, value in defaults.items()}
+    resolved["age"] = float(settings.PROFILE_DEFAULT_AGE)
+    return resolved
 
 
 def training_csv_exclude_columns_from_contract() -> tuple[str, ...]:
-    excluded = load_model_feature_contract().get("training_csv_exclude_columns", ())
-    if not isinstance(excluded, list):
-        raise ValueError("model_feature_contract.json: training_csv_exclude_columns must be a list")
-    return tuple(str(column) for column in excluded)
+    return tuple(str(column) for column in _optional_list(load_model_feature_contract(), "training_csv_exclude_columns"))
 
 
 def integer_feature_columns_from_contract() -> tuple[str, ...]:
-    columns = load_model_feature_contract().get("integer_feature_columns", ())
-    if not isinstance(columns, list):
-        raise ValueError("model_feature_contract.json: integer_feature_columns must be a list")
-    return tuple(str(column) for column in columns)
+    return tuple(str(column) for column in _optional_list(load_model_feature_contract(), "integer_feature_columns"))
 
 
 def coerce_whole_number_features(features: dict[str, float]) -> dict[str, float]:

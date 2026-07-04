@@ -92,10 +92,6 @@ def compute_prediction_confidence_percent(
     return round(min(100.0, max(0.0, combined * 100.0)), 2)
 
 
-# Backward-compatible alias.
-prediction_confidence_0_100 = compute_prediction_confidence_percent
-
-
 def count_defaulted_critical_features(feature_frame: pd.DataFrame) -> int:
     """How many rolling features still match population defaults (thin history signal)."""
     count = 0

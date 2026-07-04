@@ -20,7 +20,6 @@ from services.history.repository import (
 )
 from services.history.rolling_features import (
     compute_historical_derived_features,
-    sleep_hours,
     sleep_hours_from_doc,
 )
 from services.preprocessing.request_features import add_same_day_composite_features
@@ -63,12 +62,12 @@ class TestStableAthleteId:
 
 class TestSleepHours:
     def test_default_when_missing(self):
-        assert sleep_hours({}) == pytest.approx(7.0)
+        assert sleep_hours_from_doc({}) == pytest.approx(7.0)
 
     def test_converts_minutes_and_clamps(self):
-        assert sleep_hours({"sleepMinutes": 540}) == pytest.approx(9.0)
-        assert sleep_hours({"sleepMinutes": 120}) == pytest.approx(3.0)
-        assert sleep_hours({"sleepMinutes": 900}) == pytest.approx(12.0)
+        assert sleep_hours_from_doc({"sleepMinutes": 540}) == pytest.approx(9.0)
+        assert sleep_hours_from_doc({"sleepMinutes": 120}) == pytest.approx(3.0)
+        assert sleep_hours_from_doc({"sleepMinutes": 900}) == pytest.approx(12.0)
 
 
 class TestHistoryDayQuality:
@@ -139,7 +138,7 @@ class TestHistoricalDerivedFeatures:
         assert 0.35 <= out["acwr_ratio"] <= 2.8
         assert out["acute_load_7d"] >= 0
         assert out["acwr_ratio_ma7"] == pytest.approx(out["acwr_ratio"])
-        assert out["sleep_hours_ma7"] == pytest.approx(sleep_hours(rows[0]))
+        assert out["sleep_hours_ma7"] == pytest.approx(sleep_hours_from_doc(rows[0]))
 
     def test_seven_day_window_high_confidence_context(self, monkeypatch):
         rows = [

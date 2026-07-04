@@ -12,14 +12,6 @@ _lock = Lock()
 _last_seen: dict[str, float] = {}
 
 
-def _max_tracked_keys() -> int:
-    return settings.CLIENT_EVENT_MAX_TRACKED_KEYS
-
-
-def _stale_entry_seconds() -> int:
-    return settings.CLIENT_EVENT_STALE_ENTRY_SECONDS
-
-
 def _rate_limit_seconds(event_type: ClientEventType) -> int:
     if event_type == "error":
         return 0
@@ -35,11 +27,11 @@ def _rate_limit_seconds(event_type: ClientEventType) -> int:
 
 
 def _evict_stale_entries(now: float) -> None:
-    stale_before = now - _stale_entry_seconds()
+    stale_before = now - settings.CLIENT_EVENT_STALE_ENTRY_SECONDS
     stale_keys = [key for key, seen_at in _last_seen.items() if seen_at < stale_before]
     for key in stale_keys:
         _last_seen.pop(key, None)
-    max_keys = _max_tracked_keys()
+    max_keys = settings.CLIENT_EVENT_MAX_TRACKED_KEYS
     if len(_last_seen) <= max_keys:
         return
     overflow = len(_last_seen) - max_keys

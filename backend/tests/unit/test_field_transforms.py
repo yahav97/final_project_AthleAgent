@@ -15,7 +15,7 @@ from services.field_transforms import (
     resting_hr,
     resting_hr_from_doc,
 )
-from services.history.rolling_features import compute_historical_derived_features, hrv_score
+from services.history.rolling_features import compute_historical_derived_features, hrv_score_from_doc
 from utils.exceptions import ValidationError
 
 pytestmark = pytest.mark.unit
@@ -30,10 +30,6 @@ class TestAgeFromProfile:
 
     def test_age_from_profile_uses_birth_date(self):
         profile = {"birth_date": "1995-01-01"}
-        assert age_from_profile(profile, as_of_date="2026-06-16") == 31.48
-
-    def test_age_from_profile_accepts_birth_date_camel_case(self):
-        profile = {"birthDate": "1995-01-01"}
         assert age_from_profile(profile, as_of_date="2026-06-16") == 31.48
 
     def test_computed_age_not_clamped(self):
@@ -55,10 +51,10 @@ class TestResolveModelAge:
     def test_rounds_to_two_decimal_places(self):
         assert resolve_model_age(31.456789) == 31.46
 
-    def test_missing_age_raises(self):
-        with pytest.raises(ValidationError) as exc_info:
-            resolve_model_age(None)
-        assert exc_info.value.code == "missing_age"
+    def test_missing_age_uses_profile_default(self):
+        from config import settings
+
+        assert resolve_model_age(None) == float(settings.PROFILE_DEFAULT_AGE)
 
     def test_invalid_age_raises(self):
         with pytest.raises(ValidationError) as exc_info:
@@ -110,11 +106,11 @@ class TestInjuredYesterday:
 class TestHrvScore:
     def test_uses_rmssd_when_present(self):
         doc = {"hrvRmssd": 72.0, "heartRateAvg": 60}
-        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(72.0)
+        assert hrv_score_from_doc(doc, resting_hr=54.0) == pytest.approx(72.0)
 
     def test_falls_back_to_proxy(self):
         doc = {"heartRateAvg": 60}
-        assert hrv_score(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
+        assert hrv_score_from_doc(doc, resting_hr=54.0) == pytest.approx(74.9, rel=0.01)
 
     def test_historical_hrv_drop_uses_real_hrv_series(self):
         rows = [

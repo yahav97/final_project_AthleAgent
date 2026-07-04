@@ -340,7 +340,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | `bmi` | 23.5 | — |
 | `body_fat_pct` | 16.0 | — |
 | `vo2_max` | 48.0 | — |
-| `age` | 28.0 | — |
+| `age` | 22.0 | מקור: `settings.PROFILE_DEFAULT_AGE` |
 | `load_recovery_imbalance` | 1.0 | — |
 | `speed_intensity_ratio` | 1.3 | — |
 | `nutrition_intake_calories` | 2500 | — |
@@ -358,7 +358,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 | Firestore source | Field | Model feature |
 |---|---|---|
-| `users/{uid}` | `birth_date` | `age` (נגזר; `age_from_profile`) |
+| `users/{uid}` | `birth_date` | `age` (נגזר; `age_from_profile`; חסר → `PROFILE_DEFAULT_AGE` = 22) |
 | `users/{uid}` | `historyInjuryCount` | `history_injury_count` |
 | `daily_health` | `sleepMinutes` | `sleep_hours` |
 | `daily_health` | `steps` | `daily_distance_km` fallback, `avg_cadence` |
@@ -380,15 +380,13 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 
 ## 6. Data Quality & Confidence
 
-### שדות קריטיים (חוסר בהם עשוי לחסום חיזוי)
-
-שדות מדידה חסרים / אפס / NaN → `weak_fields` → `quality_score` יורד (לא חוסם HTTP).
-
 ### שדות מדידה (הורדת ציון איכות)
 
 `SAME_DAY_MEASUREMENT_FIELDS`: `sleepMinutes`, `steps`, `distanceMeters`, `activeCalories`, `heartRateAvg`, `hrvRmssd`, `restingHeartRate`, `totalCalories`, `bmrCalories`, `nutritionTotalCalories`, `totalProtein`, `totalCarbs`
 
 בנוסף: `nutrition_imputed` (כשתזונת אתמול הושלמה ממוצעים) — **−0.12** (`NUTRITION_IMPUTED_PENALTY`).
+
+בנוסף: `age_imputed` (כש-`birth_date` חסר בפרופיל) — **−0.12** (`AGE_IMPUTED_PENALTY`); גיל במודל = **`settings.PROFILE_DEFAULT_AGE` (22)**.
 
 כל שדה מדידה חסר / אפס / NaN מוריד **−0.08** (`ZERO_OR_MISSING_PENALTY`). ציון נמוך מוריד `prediction_confidence` — **לא חוסם** את החיזוי ב-HTTP.
 

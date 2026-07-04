@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any, NamedTuple
 
+import numpy as np
 import pandas as pd
 
 from utils.exceptions import ValidationError
@@ -56,9 +56,9 @@ def align_dataframe_to_columns(frame: pd.DataFrame, column_names: list[str]) -> 
 def coerce_finite_float_row(frame: pd.DataFrame) -> pd.DataFrame:
     """Cast to float64 and replace NaN / non-finite values with 0.0."""
     aligned = frame.astype("float64").fillna(0.0)
-    values = aligned.to_numpy().ravel()
-    sanitized = [0.0 if not math.isfinite(float(value)) else float(value) for value in values]
-    return pd.DataFrame([sanitized], columns=aligned.columns, dtype="float64")
+    values = aligned.to_numpy(dtype="float64", copy=True)
+    values[~np.isfinite(values)] = 0.0
+    return pd.DataFrame(values, columns=aligned.columns, index=aligned.index, dtype="float64")
 
 
 def validate_feature_vector_for_model(

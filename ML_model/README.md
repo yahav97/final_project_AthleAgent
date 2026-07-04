@@ -6,10 +6,12 @@
 | [`notebooks/model_improvement_journey.ipynb`](notebooks/model_improvement_journey.ipynb) | **Live demo** — same functions as `train_model.py` on a CSV subset |
 | [`artifacts/promoted.json`](artifacts/promoted.json) | Production model pointer (updated by `run_pipeline.py`) |
 | `fixtures/athlete_injury_demo.csv` | **In git** — lean demo CSV for the notebook |
-| `data_generator.py` | Builds full `athlete_injury_data.csv` (gitignored, 1,000×340 = 340k rows) |
+| `data_generator.py` | CLI → builds full `athlete_injury_data.csv` (gitignored, 1,000×340 = 340k rows) |
+| `generation/` | Synthetic simulator and post-processing |
 | `feature_contract.py` | Shared JSON loader — `integer_feature_columns`, `workout_intensity_minutes()`, `assert_whole_number_columns()` |
 | `policy_config.py` | Selection gates (Recall, FPR, F1, …) — notebook can override live |
-| `train_model.py` | Full pipeline → `artifacts/<run_id>/` |
+| `train_model.py` | CLI → full pipeline → `artifacts/<run_id>/` |
+| `training/` | Model catalog, metrics, CV, selection, artifacts |
 | `validate_metrics.py` | Promotion policy gates |
 | `run_pipeline.py` | End-to-end train + validate + promote |
 
@@ -29,7 +31,25 @@ Details: [`docs/MODEL_SELECTION.md`](docs/MODEL_SELECTION.md)
 
 ## Model candidates
 
-See `MODEL_CANDIDATE_NAMES` in `train_model.py`. Edit the tuple to change candidates project-wide.
+See `MODEL_CANDIDATE_NAMES` in `training/models.py` (re-exported by `train_model.py`). Edit the tuple to change candidates project-wide.
+
+## Package layout
+
+```
+ML_model/
+├── generation/
+│   ├── config.py        # scale defaults (athletes, days, seed)
+│   ├── simulator.py     # day-by-day simulation + reference features
+│   └── postprocess.py   # derived features and row-count validation
+├── training/
+│   ├── constants.py     # shared constants + dataclasses
+│   ├── models.py        # 5 candidate estimators
+│   ├── policy.py        # threshold metrics + winner selection
+│   └── pipeline.py      # splits, CV, training, artifacts
+├── data_generator.py    # CLI (backward-compatible imports)
+├── train_model.py       # CLI (backward-compatible imports)
+└── run_pipeline.py
+```
 
 ## Per-run artifacts
 

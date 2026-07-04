@@ -25,8 +25,10 @@ def classify_risk_level(
     high_cutoff = settings.RISK_HIGH_CUTOFF if high is None else high
     medium_cutoff = settings.RISK_MEDIUM_CUTOFF if medium is None else medium
     pct = int(probability * 100)
-    if pct > round(high_cutoff * 100):
+    high_percent = round(high_cutoff * 100)
+    medium_percent = round(medium_cutoff * 100)
+    if pct > high_percent:
         return "High"
-    if pct > round(medium_cutoff * 100):
+    if pct > medium_percent:
         return "Medium"
     return "Low"

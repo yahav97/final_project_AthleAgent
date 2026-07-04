@@ -96,8 +96,8 @@ flowchart TB
     end
 
     subgraph MLOps["ML Pipeline (offline)"]
-        Gen[data_generator.py]
-        Train[train_model.py]
+        Gen[generation/simulator]
+        Train[training/pipeline]
         Promote[run_pipeline.py]
         Artifacts[(artifacts/injury_model.pkl)]
     end
@@ -289,8 +289,8 @@ erDiagram
 
 | שלב | כלי | פלט |
 |-----|-----|-----|
-| Synthetic data | `ML_model/data_generator.py` | `athlete_injury_data.csv` |
-| Training | `ML_model/train_model.py` | `injury_model.pkl` + manifest |
+| Synthetic data | `ML_model/generation/simulator.py` (CLI: `data_generator.py`) | `athlete_injury_data.csv` |
+| Training | `ML_model/training/pipeline.py` (CLI: `train_model.py`) | `injury_model.pkl` + manifest |
 | Quality gates | `validate_metrics.py`, `model_loader.py` | Recall ≥ 0.80, AUC ≥ 0.68 |
 | Promotion | `run_pipeline.py` | `artifacts/promoted.json` |
 | Serving | `POST /predict/daily` | probability → risk bands |

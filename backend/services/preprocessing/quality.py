@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from schemas.inference import InjuryPredictionRequest
 from services.preprocessing.constants import (
+    AGE_IMPUTED_FLAG,
+    AGE_IMPUTED_PENALTY,
     NUTRITION_IMPUTED_FLAG,
     NUTRITION_IMPUTED_PENALTY,
     OPTIONAL_PROFILE_FIELDS,
@@ -23,6 +25,7 @@ def calculate_data_quality_score(
     - Required measurements must be present and non-zero; missing/null/0/NaN reduce confidence.
     - Optional profile metrics are penalized only when sent as 0 or NaN.
     - Imputed nutrition history is flagged separately.
+    - Imputed profile age (missing birth_date) is flagged separately.
     - Historical gaps are handled in ``confidence`` (not here).
     """
     payload_dict = payload.model_dump()
@@ -40,11 +43,17 @@ def calculate_data_quality_score(
     if payload_dict.get("nutritionImputed"):
         weak_fields.append(NUTRITION_IMPUTED_FLAG)
 
+    if payload_dict.get("ageImputed"):
+        weak_fields.append(AGE_IMPUTED_FLAG)
+
+    imputed_flags = {NUTRITION_IMPUTED_FLAG, AGE_IMPUTED_FLAG}
     penalty = ZERO_OR_MISSING_PENALTY * sum(
-        1 for field in weak_fields if field != NUTRITION_IMPUTED_FLAG
+        1 for field in weak_fields if field not in imputed_flags
     )
     if NUTRITION_IMPUTED_FLAG in weak_fields:
         penalty += NUTRITION_IMPUTED_PENALTY
+    if AGE_IMPUTED_FLAG in weak_fields:
+        penalty += AGE_IMPUTED_PENALTY
 
     score = max(0.0, min(1.0, 1.0 - penalty))
 
