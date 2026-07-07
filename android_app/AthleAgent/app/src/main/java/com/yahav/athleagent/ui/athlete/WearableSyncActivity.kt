@@ -92,6 +92,7 @@ class WearableSyncActivity : AppCompatActivity() {
         }
     }
 
+
     private fun injectSevenDaysOfWearableDemoData() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
@@ -100,13 +101,20 @@ class WearableSyncActivity : AppCompatActivity() {
                 val db = FirebaseFirestore.getInstance()
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
+                // השארנו את הזרקת הגובה כדי למנוע שגיאת heightCm במודל
+                db.collection("users").document(userId).set(
+                    mapOf("heightCm" to 180.0),
+                    SetOptions.merge()
+                )
+
                 for (i in 0..6) {
                     val cal = Calendar.getInstance()
                     cal.add(Calendar.DATE, -i)
                     val dateKey = dateFormat.format(cal.time)
-                    
-                    // Randomized realistic wearable data (NO survey data)
+
+                    // Randomized realistic wearable data
                     val steps = (4000..16000).random().toLong()
+                    val distance = (steps * 0.76).toInt()
                     val sleepMinutes = (340..560).random().toLong()
                     val heartRateAvg = (62..82).random()
                     val hrvRmssd = (35..75).random().toDouble()
@@ -115,10 +123,11 @@ class WearableSyncActivity : AppCompatActivity() {
                     val bodyFatPct = (12..22).random().toDouble()
                     val respiratoryRate = (14..20).random().toDouble()
                     val restingHeartRate = (55..70).random()
-                    
+
                     // Health Data payload matching backend requirements
                     val healthData = mapOf(
                         "steps" to steps,
+                        "distanceMeters" to distance,
                         "sleepMinutes" to sleepMinutes,
                         "activeCalories" to (steps * 0.045).toInt(),
                         "totalCalories" to (2000..2800).random(),
@@ -139,16 +148,13 @@ class WearableSyncActivity : AppCompatActivity() {
                         "bodyFatPct" to bodyFatPct,
                         "respiratoryRate" to respiratoryRate,
                         "lastSync" to FieldValue.serverTimestamp(),
-                        
-                        // Fake risk metrics for visualization purposes
+
                         "finalRiskScore" to (15..55).random(),
                         "riskLevel" to "Low",
                         "predictionConfidence" to (88..98).random().toDouble()
                     )
 
-                    // Note: We DO NOT inject daily_checkins here as per requirements.
-
-                    // Save to Firestore
+                    // Save Health Data to Firestore
                     db.collection("users").document(userId)
                         .collection("daily_health").document(dateKey)
                         .set(healthData, SetOptions.merge())
