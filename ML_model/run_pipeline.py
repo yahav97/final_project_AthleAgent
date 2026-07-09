@@ -8,6 +8,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+_ml_dir = str(Path(__file__).resolve().parent)
+if _ml_dir not in sys.path:
+    sys.path.insert(0, _ml_dir)
+
+from training.constants import latest_artifacts_dir  # noqa: E402
+
 
 def _run(command: list[str], cwd: Path) -> None:
     proc = subprocess.run(command, cwd=str(cwd), check=False, capture_output=True, text=True)
@@ -19,12 +25,11 @@ def _run(command: list[str], cwd: Path) -> None:
         raise RuntimeError(f"Command failed ({proc.returncode}): {' '.join(command)}")
 
 
-def _latest_artifacts_dir(ml_dir: Path) -> Path:
-    artifacts_root = ml_dir / "artifacts"
-    dirs = sorted([p for p in artifacts_root.iterdir() if p.is_dir()], key=lambda p: p.name, reverse=True)
-    if not dirs:
+def _require_latest_artifacts_dir(ml_dir: Path) -> Path:
+    artifacts_dir = latest_artifacts_dir(ml_dir)
+    if artifacts_dir is None:
         raise RuntimeError("No artifacts directories produced by training.")
-    return dirs[0]
+    return artifacts_dir
 
 
 def _promote(ml_dir: Path, artifacts_dir: Path) -> None:
@@ -52,7 +57,7 @@ def main() -> int:
     _run([python, "train_model.py"], ml_dir)
     _run([python, "validate_metrics.py"], ml_dir)
 
-    _promote(ml_dir, _latest_artifacts_dir(ml_dir))
+    _promote(ml_dir, _require_latest_artifacts_dir(ml_dir))
     return 0
 
 

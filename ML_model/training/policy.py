@@ -93,29 +93,15 @@ def _rank_balanced_operating_points(model_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def select_operating_threshold_for_model(
+def winner_operating_threshold(
     threshold_rows: list[dict[str, float | str]],
     model_name: str,
 ) -> float:
-    """Pick one threshold for a model using progressively relaxed recall/FPR gates."""
-    df = pd.DataFrame(threshold_rows)
-    policy = get_policy()
-    model_df = df[df["Model"] == model_name].copy()
-    if model_df.empty:
-        return policy.THRESHOLD
-
-    feasible = model_df[
-        (model_df["Recall"] >= policy.MIN_RECALL_HARD)
-        & (model_df["FPR"] <= policy.MAX_FPR_OPERATING)
-    ]
-    if not feasible.empty:
-        return float(_rank_balanced_operating_points(feasible).iloc[0]["Threshold"])
-
-    recall_ok = model_df[model_df["Recall"] >= policy.MIN_RECALL_HARD]
-    if not recall_ok.empty:
-        return float(_rank_balanced_operating_points(recall_ok).iloc[0]["Threshold"])
-
-    return float(_rank_balanced_operating_points(model_df).iloc[0]["Threshold"])
+    """Operating threshold for one model from the tiered policy search."""
+    picked = _best_operating_row_for_model(threshold_rows, model_name)
+    if picked is None:
+        return get_policy().THRESHOLD
+    return float(picked[0]["Threshold"])
 
 
 def _best_operating_row_for_model(

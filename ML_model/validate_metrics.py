@@ -3,27 +3,22 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-from policy_config import get_policy
+_ml_dir = str(Path(__file__).resolve().parent)
+if _ml_dir not in sys.path:
+    sys.path.insert(0, _ml_dir)
 
-
-def _latest_artifacts_dir(ml_dir: Path) -> Path | None:
-    root = ml_dir / "artifacts"
-    if not root.exists():
-        return None
-    candidates = [p for p in root.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    candidates.sort(key=lambda p: p.name, reverse=True)
-    return candidates[0]
+from policy_config import get_policy  # noqa: E402
+from training.constants import latest_artifacts_dir  # noqa: E402
 
 
 def main() -> int:
     ml_dir = Path(__file__).resolve().parent
-    artifacts_dir = _latest_artifacts_dir(ml_dir)
+    artifacts_dir = latest_artifacts_dir(ml_dir)
     if artifacts_dir is None:
         print("No artifacts directory found. Run train_model.py first.")
         return 1

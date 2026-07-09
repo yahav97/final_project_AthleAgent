@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +21,6 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
-from csv_io import save_csv
 from policy_config import get_policy, policy_as_dict
 from training.constants import (
     ATHLETE_CV_SPLITS,
@@ -41,8 +39,8 @@ from training.policy import (
     pick_best_model,
     print_split_diagnostics,
     select_best_operating_points,
-    select_operating_threshold_for_model,
     threshold_sweep,
+    winner_operating_threshold,
 )
 from training.serve_parity import apply_train_serve_parity_augmentation
 
@@ -352,7 +350,11 @@ def train_and_compare(
             )
     best_model_name = str(best_row["Model"])
     best_model = trained_models[best_model_name]
-    best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
+    best_operating_threshold = (
+        float(best_row["OperatingThreshold"])
+        if "OperatingThreshold" in best_row.index
+        else winner_operating_threshold(threshold_rows, best_model_name)
+    )
     winner_proba = best_model.predict_proba(split.X_test)[:, 1]
     winner_operating_metrics = evaluate_with_threshold(
         split.y_test, winner_proba, best_operating_threshold
@@ -364,7 +366,6 @@ def train_and_compare(
     return TrainResult(
         results_df=results_df,
         threshold_rows=threshold_rows,
-        trained_models=trained_models,
         calibration_bins=calibration_bins,
         best_row=best_row,
         best_model_name=best_model_name,
@@ -381,8 +382,8 @@ def train_and_compare(
 # --- artifacts ---
 
 
-def _project_relative_path(path: str, project_root: str) -> str:
-    return os.path.relpath(path, project_root).replace("\\", "/")
+def _project_relative_path(path: Path, project_root: Path) -> str:
+    return path.resolve().relative_to(project_root.resolve()).as_posix()
 
 
 def save_training_artifacts(
@@ -418,26 +419,23 @@ def save_training_artifacts(
     }
     joblib.dump(model_bundle, output_model_path)
 
-    save_csv(result.results_df, artifacts_dir / "model_comparison.csv")
-    save_csv(
-        pd.concat(
-            [frame.assign(model=name) for name, frame in result.calibration_bins.items()],
-            ignore_index=True,
-        ),
-        artifacts_dir / "calibration_curve_data.csv",
-    )
-    save_csv(pd.DataFrame(result.threshold_rows), artifacts_dir / "threshold_sweep.csv")
-    save_csv(result.best_points, artifacts_dir / "best_operating_points.csv")
-    save_csv(result.risk_bins_df, artifacts_dir / "risk_bins_summary.csv")
+    result.results_df.to_csv(artifacts_dir / "model_comparison.csv", index=False)
+    pd.concat(
+        [frame.assign(model=name) for name, frame in result.calibration_bins.items()],
+        ignore_index=True,
+    ).to_csv(artifacts_dir / "calibration_curve_data.csv", index=False)
+    pd.DataFrame(result.threshold_rows).to_csv(artifacts_dir / "threshold_sweep.csv", index=False)
+    result.best_points.to_csv(artifacts_dir / "best_operating_points.csv", index=False)
+    result.risk_bins_df.to_csv(artifacts_dir / "risk_bins_summary.csv", index=False)
 
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "run_id": run_id,
-        "artifacts_dir": _project_relative_path(str(artifacts_dir), str(project_root)),
-        "dataset_path": _project_relative_path(str(dataset_path), str(project_root)),
+        "artifacts_dir": _project_relative_path(artifacts_dir, project_root),
+        "dataset_path": _project_relative_path(Path(dataset_path), project_root),
         "dataset_rows": int(dataset_rows if dataset_rows is not None else len(split.y_all)),
         "benchmark_path": (
-            _project_relative_path(str(benchmark_path), str(project_root))
+            _project_relative_path(Path(benchmark_path), project_root)
             if benchmark_path and Path(benchmark_path).is_file()
             else None
         ),
@@ -475,12 +473,12 @@ def save_training_artifacts(
         json.dump(manifest, f, indent=2)
 
     if result.importance_df is not None:
-        save_csv(result.importance_df, artifacts_dir / "feature_importance.csv")
+        result.importance_df.to_csv(artifacts_dir / "feature_importance.csv", index=False)
     if serving_importance_df is not None:
-        save_csv(serving_importance_df, artifacts_dir / "feature_importance_serving.csv")
+        serving_importance_df.to_csv(artifacts_dir / "feature_importance_serving.csv", index=False)
     if cv_result is not None:
-        save_csv(cv_result.fold_details, artifacts_dir / "athlete_cv_folds.csv")
-        save_csv(cv_result.summary, artifacts_dir / "athlete_cv_summary.csv")
+        cv_result.fold_details.to_csv(artifacts_dir / "athlete_cv_folds.csv", index=False)
+        cv_result.summary.to_csv(artifacts_dir / "athlete_cv_summary.csv", index=False)
 
     return artifacts_dir
 

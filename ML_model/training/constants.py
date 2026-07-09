@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 # Model-selection gates: ML_model/policy_config.py (notebook can override live).
@@ -20,6 +20,17 @@ THRESHOLDS_TO_EVAL = sorted(
     + [round(value / 100, 2) for value in range(22, 62, 2)]
 )
 LABEL_COLUMN = "injury_today"
+
+
+def latest_artifacts_dir(ml_dir: Path) -> Path | None:
+    """Return the newest run folder under ML_model/artifacts/, if any."""
+    root = Path(ml_dir) / "artifacts"
+    if not root.is_dir():
+        return None
+    candidates = [p for p in root.iterdir() if p.is_dir()]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda p: p.name, reverse=True)[0]
 
 
 @dataclass
@@ -44,7 +55,6 @@ class AthleteCvResult:
 class TrainResult:
     results_df: pd.DataFrame
     threshold_rows: list[dict[str, float | str]]
-    trained_models: dict[str, object]
     calibration_bins: dict[str, pd.DataFrame]
     best_row: pd.Series
     best_model_name: str

@@ -31,7 +31,7 @@ Details: [`docs/MODEL_SELECTION.md`](docs/MODEL_SELECTION.md)
 
 ## Model candidates
 
-See `MODEL_CANDIDATE_NAMES` in `training/models.py` (re-exported by `train_model.py`). Edit the tuple to change candidates project-wide.
+See `MODEL_CANDIDATE_NAMES` in `training/models.py`. Edit the tuple to change candidates project-wide.
 
 ## Package layout
 

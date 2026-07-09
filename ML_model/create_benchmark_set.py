@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-from csv_io import save_csv
+_ml_dir = str(Path(__file__).resolve().parent)
+if _ml_dir not in sys.path:
+    sys.path.insert(0, _ml_dir)
+
+from training.constants import (  # noqa: E402
+    BENCHMARK_FILENAME,
+    DATASET_FILENAME,
+    RANDOM_STATE,
+)
 
 HOLDOUT_RATIO = 0.2
-SEED = 42
-DATASET_FILENAME = "athlete_injury_data.csv"
-BENCHMARK_FILENAME = "benchmark_holdout.csv"
 
 
 def main() -> int:
@@ -31,10 +37,10 @@ def main() -> int:
 
     athletes = pd.Series(df["athlete_id"].dropna().unique()).sort_values().reset_index(drop=True)
     sample_n = max(1, int(len(athletes) * HOLDOUT_RATIO))
-    holdout_ids = athletes.sample(n=sample_n, random_state=SEED)
+    holdout_ids = athletes.sample(n=sample_n, random_state=RANDOM_STATE)
     holdout = df[df["athlete_id"].isin(set(holdout_ids.tolist()))].copy()
     holdout = holdout.sort_values(["athlete_id", "date"]).reset_index(drop=True)
-    save_csv(holdout, benchmark_path)
+    holdout.to_csv(benchmark_path, index=False)
     print(f"Benchmark holdout created: {benchmark_path} (rows={len(holdout)}, athletes={sample_n})")
     return 0
 
