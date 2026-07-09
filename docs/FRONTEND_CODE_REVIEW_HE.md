@@ -3,7 +3,7 @@
 
 | שדה               | ערך                                                                 |
 | ----------------- | ------------------------------------------------------------------- |
-| **גרסה**          | 1.1                                                                 |
+| **גרסה**          | 1.3                                                                 |
 | **תאריך**         | 2026-07-09                                                          |
 | **קהל יעד**       | מפתחי Android, בוחני פרויקט גמר, reviewers                          |
 | **היקף**          | `android_app/AthleAgent` בלבד — ללא Backend / ML                    |
@@ -18,13 +18,13 @@
 
 **חוזקות:** UI מלוטש עם `SignalManager`, זרימות athlete/coach ברורות, שילוב Health Connect ו-Gemini Vision, שכבת observability בסיסית (correlation ID, client events).
 
-**חולשות עיקריות:** מפתחות API בצד הלקוח, fallbacks ל-UID מזויף, memory leaks ב-`onResume`, כפילויות לוגיקה, כיסוי בדיקות דל, **קבצים ארוכים עם יותר מדי אחריות**, ו**חוסר שכבת domain**.
+**חולשות עיקריות:** מפתחות API בצד הלקוח, fallbacks ל-UID מזויף, memory leaks ב-`onResume`, כפילויות לוגיקה, כיסוי בדיקות דל, **קבצים ארוכים עם יותר מדי אחריות**, **חוסר שכבת domain**, **קוד מת + משאבים לא מקושרים** (פרק 15), ו**הערות בקוד לא עקביות — חלק בעברית, חסרות בקבצים מורכבים** (פרק 9.5).
 
 | הערכה              | ציון | הערה                                      |
 | ------------------ | ---- | ----------------------------------------- |
 | פרויקט גמר / דמו   | 7/10 | זרימות שלמות, אינטגרציות מרשימות          |
 | מוכנות לפרודקשן    | 4/10 | P0 באבטחה ו-stability, בדיקות לא מספיקות |
-| מבנה קוד וארגון    | 5/10 | God Activities, כפילויות, חוסר שכבות    |
+| מבנה קוד וארגון    | 5/10 | God Activities, כפילויות, חוסר שכבות, הערות לא עקביות |
 
 ---
 
@@ -183,6 +183,9 @@
 | 13 | אין ולידציה לחוזק סיסמה / פורמט אימייל | `RegisterActivity.kt`, `LoginManager.kt` | — |
 | 14 | `isMinifyEnabled = false` ב-release | `app/build.gradle.kts` | 37–38 |
 | 15 | `SignalManager.contextRef` נשמר אך לא בשימוש | `utilities/SignalManager.kt` | 16 |
+| 16 | **הערות בעברית בקוד** — 5 הערות ב-2 קבצים, סותרות מדיניות אנגלית בלבד | `MealAnalysisActivity.kt`, `WearableSyncActivity.kt` | 68, 77, 84, 89 / 104 |
+| 17 | **קבצים מורכבים ללא הערות** — `LoginActivity` (237 שורות, 0 הערות) | `LoginActivity.kt` | — |
+| 18 | הערות לא פורמליות / אישיות באנגלית | `ApiClient.kt`, `CorrelationIdInterceptor.kt`, `HomeCoachActivity.kt` | 28 / 11 / 63 |
 
 ### 4.4 P3 — נמוך
 
@@ -196,9 +199,12 @@
 | 6 | אנימציית הקלדה (`delay(30)` לתו) על טקסט AI ארוך | `AthleteDashboardActivity.kt`, `CoachDashboardActivity.kt` | 226–234, 260–268 |
 | 7 | `AlertItem` מכיל `onClick` lambda — מונע equality יציבה | `model/AlertItem.kt` | 10 |
 | 8 | `enableEdgeToEdge()` לא אחיד בכל המסכים | מספר Activities | — |
-| 9 | הערות מעורבות עברית/אנגלית | `MealAnalysisActivity.kt`, `WearableSyncActivity.kt` | — |
-| 10 | כרטיס התראות תמיד גלוי גם כש-"No pending requests" | `HomeCoachActivity.kt` | 125–126 |
-| 11 | PII (אימייל, מדדי בריאות) נשלח ל-Gemini מה-client ללא consent מפורש | Dashboard + meal activities | — |
+| 9 | כרטיס התראות תמיד גלוי גם כש-"No pending requests" | `HomeCoachActivity.kt` | 125–126 |
+| 10 | PII (אימייל, מדדי בריאות) נשלח ל-Gemini מה-client ללא consent מפורש | Dashboard + meal activities | — |
+| 11 | **9 קבצי Kotlin ללא אף הערה** | ראו פרק 9.5 | — |
+| 12 | **KDoc רק ב-2 קבצים** (`CalculationUtils`, `SignalManager`) — שאר ה-API ללא תיעוד | `network/`, `observability/`, `model/` | — |
+| 13 | הערות XML דלות — רוב ה-layouts ללא section comments | `res/layout/` | — |
+| 14 | הערת XML לא ברורה | `dimens.xml` | 4 |
 
 ---
 
@@ -276,13 +282,17 @@ onResume()
 
 ### 6.3 קוד מת (Dead code)
 
-| פריט | קובץ |
-| ---- | ---- |
-| `MainActivity` (לא launcher) | `ui/auth/MainActivity.kt` |
-| `PredictionModels.kt` | `model/PredictionModels.kt` |
-| `updateUIWithMissingDataState()` | `AthleteDashboardActivity.kt` |
-| `SignalManager.contextRef` | `utilities/SignalManager.kt` |
-| `RequestIdHolder.generateNewId()` — לא נקרא | `RequestIdHolder.kt` |
+סקירה מלאה — **פרק 15**. תמצית:
+
+| חומרה | פריט | קובץ |
+| ----- | ---- | ---- |
+| High | `MainActivity` + layout — לא נגיש מ-Intent | `ui/auth/MainActivity.kt`, `activity_main.xml` |
+| High | `CalculationUtils` — לא נקרא מ-`main` | `util/CalculationUtils.kt` |
+| Medium | `PredictionModels.kt` — כפילות מודל | `model/PredictionModels.kt` |
+| Medium | `updateUIWithMissingDataState()` — לא נקרא | `AthleteDashboardActivity.kt` |
+| Low | `SignalManager.contextRef` — נשמר, לא בשימוש | `utilities/SignalManager.kt` |
+| Low | `RequestIdHolder.generateNewId()` — רק ב-tests | `RequestIdHolder.kt` |
+| Medium | ~15+ drawables, launcher ישן, פונט, colors/dimens | `res/**` |
 
 ---
 
@@ -353,6 +363,108 @@ onResume()
 // CalculationUtils.kt — קיים אך לא בשימוש ב-production:
 fun getRiskLevel(score: Int): String
 fun isTeamCodeValid(code: String): Boolean
+```
+
+### 9.5 הערות בקוד (Code Comments)
+
+**מדיניות מומלצת:** כל ההערות בקוד — **אנגלית בלבד**, טון מקצועי, מסבירות *למה* (לא *מה*) בלוגיקה לא-ברורה. KDoc על public APIs, network contracts, ו-utility classes.
+
+#### 9.5.1 סיכום
+
+| מדד | ערך | הערכה |
+| --- | --- | ----- |
+| קבצי Kotlin ב-`main` | 32 | — |
+| קבצים עם לפחות הערה אחת | 23 (72%) | בינוני |
+| קבצים **ללא אף הערה** | **9 (28%)** | חלש |
+| הערות בעברית | **5** ב-2 קבצים | **P2 — חייב תיקון** |
+| KDoc מלא | 2 קבצים (`CalculationUtils`, `SignalManager`) | חלש |
+| הערות לא פורמליות | 4+ | P3 |
+
+#### 9.5.2 הערות בעברית — חייב להמיר לאנגלית
+
+| קובץ | שורה | הערה נוכחית | תרגום מוצע |
+| ---- | ---- | ----------- | ----------- |
+| `WearableSyncActivity.kt` | 104 | `// השארנו את הזרקת הגובה כדי למנוע שגיאת heightCm במודל` | `// Keep height injection to avoid missing heightCm in the ML model` |
+| `MealAnalysisActivity.kt` | 68 | `// שומרים להיום בשביל ה-UI!` | `// Use today's date key for UI and Firestore document path` |
+| `MealAnalysisActivity.kt` | 77 | `// שומרים את הארוחה במסמך של היום` | `// Persist meal under today's daily_nutrition document` |
+| `MealAnalysisActivity.kt` | 84 | `// שדות מקוריים בשביל ה-UI שלך` | `// UI-facing totals (incremented on each meal)` |
+| `MealAnalysisActivity.kt` | 89 | `// שדות למודל` | `// Fields consumed by the ML backend / prediction pipeline` |
+
+#### 9.5.3 הערות לא פורמליות / אישיות (אנגלית — לשכתב)
+
+| קובץ | שורה | הערה נוכחית | בעיה |
+| ---- | ---- | ----------- | ---- |
+| `ApiClient.kt` | 28 | `// We added the new API exposure here!` | סגנון commit message, לא תיעוד |
+| `CorrelationIdInterceptor.kt` | 11 | `// ...header requested by Tzuf` | שם אישי, לא רלוונטי לקורא עתידי |
+| `HomeCoachActivity.kt` | 63 | `// Transition to the new team creation screen!` | סימן קריאה מיותר, לא מוסיף הקשר |
+| `dimens.xml` | 4 | `<!-- new x4 -->` | לא ברור מה נוסף או למה |
+
+#### 9.5.4 קבצים ללא הערות (9)
+
+| קובץ | שורות | חומרה | למה צריך הערות |
+| ---- | ----- | ----- | -------------- |
+| `LoginActivity.kt` | **237** | **P2** | Google Sign-In, role dialog, Firestore routing — לוגיקה מורכבת ללא הסבר |
+| `App.kt` | 16 | P3 | נקודת כניסה — Timber/SignalManager init |
+| `PrivacyPolicyActivity.kt` | 21 | P3 | Health Connect rationale — ריק, צריך TODO comment |
+| `ApiService.kt` | 22 | P3 | חוזה Retrofit — שדות `PredictionResponse` ללא תיעוד |
+| `ObservabilityApi.kt` | 19 | P3 | payload fields + endpoint |
+| `AlertsAdapter.kt` | 39 | P3 | — |
+| `model/AthleteItem.kt` | 3 | P3 | data class פשוט |
+| `model/AlertItem.kt` | 11 | P3 | — |
+| `model/AthleteRequest.kt` | 7 | P3 | — |
+
+#### 9.5.5 קבצים עם כיסוי דל (מורכבים, מעט הערות)
+
+| קובץ | שורות | הערות | מה חסר |
+| ---- | ----- | ----- | ------ |
+| `HomeAthleteActivity.kt` | 255 | 3 | `checkDailyDataStatus`, alerts carousel, `TabLayoutMediator` — ללא הסבר |
+| `CoachDashboardActivity.kt` | 253 | 2 | N+1 Firestore, Gemini flow, chart setup |
+| `DailyCheckInActivity.kt` | 145 | 3 | ML trigger preconditions, survey → Firestore mapping |
+| `WearableSyncActivity.kt` | 366 | 13 | Health Connect permissions, split save (today/yesterday), demo block |
+| `RegisterActivity.kt` | 121 | 1 | ולידציה, birth date picker |
+
+#### 9.5.6 קבצים עם כיסוי טוב (דוגמה לעקוב)
+
+| קובץ | הערות | הערה |
+| ---- | ----- | ---- |
+| `AnalyzingMealActivity.kt` | ~15 | Gemini flow מתועד היטב |
+| `AthleteAdapter.kt` | 9 | selection state מוסבר |
+| `requestsAdapter.kt` | 7 | adapter lifecycle ברור |
+| `MainActivity.kt` | 8 | routing מתועד (קובץ מת — אך ההערות טובות) |
+| `CalculationUtils.kt` | KDoc | **הסטנדרט המומלץ** לשאר ה-utils |
+
+#### 9.5.7 הערות ב-XML
+
+| מצב | פירוט |
+| --- | ----- |
+| Layouts עם section comments | 4 מתוך 20 (`activity_daily_check_in`, `activity_home_coach`, `activity_coach_dashboard`, `styles.xml`) |
+| Layouts ללא הערות | 16 — כולל `activity_home_athlete` (304 שורות), `activity_login` (198 שורות) |
+| themes.xml | הערות template מ-Android Studio (commented `colorPrimary`) — לא מזיק, לא מועיל |
+
+#### 9.5.8 מה להוסיף — עדיפות
+
+| עדיפות | פעולה | קבצים |
+| ------ | ----- | ----- |
+| 1 | **המר כל הערה עברית לאנגלית** | `MealAnalysisActivity.kt`, `WearableSyncActivity.kt` |
+| 2 | הוסף הערות על flows מורכבים | `LoginActivity.kt`, `HomeAthleteActivity.kt`, `CoachDashboardActivity.kt` |
+| 3 | KDoc על network + observability APIs | `ApiService.kt`, `ObservabilityApi.kt`, `ApiClient.kt` |
+| 4 | שכתב הערות לא פורמליות | `ApiClient.kt`, `CorrelationIdInterceptor.kt`, `dimens.xml` |
+| 5 | Section comments ב-layouts ארוכים | `activity_home_athlete.xml`, `activity_daily_check_in.xml` (הרחבה) |
+| 6 | **אל** להוסיף הערות על קוד שקוף (`setText`, `findViewById`) — רק על business logic |
+
+#### 9.5.9 דוגמאות להערות נדרשות
+
+```kotlin
+// LoginActivity.kt — חסר לחלוטין, לדוגמה:
+// After Google sign-in, new users must pick role and birth date before Firestore write.
+// Returning users skip the dialog and route by stored role field.
+
+// HomeAthleteActivity.kt — checkDailyDataStatus():
+// Queries today's daily_health, daily_survey, and daily_nutrition in parallel.
+// Drives the alert carousel when sync, check-in, or meal logging is incomplete.
+
+// ApiService.kt — KDoc:
+/** Response from POST /predict/daily. risk_score is 0–100; risk_level is Low/Medium/High/Critical. */
 ```
 
 ---
@@ -542,6 +654,7 @@ com.yahav.athleagent/
 | Magic numbers | risk thresholds `35, 55, 75` — קיימים ב-`CalculationUtils` אך לא בשימוש |
 | Hardcoded colors ב-Kotlin | `"#E65100"`, `"#00F59B"` — גם ב-adapters וגם ב-activities |
 | `@SuppressLint` רב | `SetTextI18n`, `NotifyDataSetChanged` — סימן ללוגיקה שצריכה ViewModel |
+| הערות חסרות / בעברית | `LoginActivity` ללא הערות; 5 הערות עברית — ראו פרק 9.5 |
 
 ### 10.9 מבנה מומלץ (לעתיד)
 
@@ -702,7 +815,7 @@ CalculationUtils.getRiskLevel(35)
 | ------ | ----- | ------ |
 | 12 | חילוץ `checkAndTriggerPredictionInBackground` ל-shared class | P2 #1 |
 | 13 | שימוש ב-`CalculationUtils` בכל ה-UI | P2 thresholds |
-| 14 | מחיקת dead code (`MainActivity`, `PredictionModels`) | P2 |
+| 14 | מחיקת dead code ומשאבים מיותרים (פרק 15) | P2 |
 | 15 | תיקון `CalculationUtilsTest` או הקוד | P1 #16 |
 
 ### שלב 5 — בדיקות
@@ -723,6 +836,15 @@ CalculationUtils.getRiskLevel(35)
 | 22 | איחוד `util/` + `utilities/` |
 | 23 | פיצול layouts ארוכים עם `<include>` |
 
+### שלב 7 — הערות ותיעוד
+
+| עדיפות | פעולה | ממצאים |
+| ------ | ----- | ------ |
+| 24 | המר 5 הערות עברית לאנגלית | P2 #16, פרק 9.5.2 |
+| 25 | הוסף הערות ל-`LoginActivity`, dashboards, home | P2 #17, פרק 9.5.5 |
+| 26 | KDoc על `ApiService`, `ObservabilityApi` | P3 #12 |
+| 27 | שכתב הערות לא פורמליות | P2 #18, פרק 9.5.3 |
+
 ---
 
 ## 14. נספח — רשימת קבצים לפי חומרה מקסימלית
@@ -733,12 +855,212 @@ CalculationUtils.getRiskLevel(35)
 | **P1** | `ApiClient.kt`, `CorrelationIdInterceptor.kt`, `network_security_config.xml`, `AndroidManifest.xml`, `HomeCoachActivity.kt`, `MainActivity.kt`, `CoachDashboardActivity.kt`, `CalculationUtilsTest.kt` |
 | **P2** | `DailyCheckInActivity.kt`, `CreateTeamActivity.kt`, `JoinTeamActivity.kt`, `ClientEventReporter.kt`, `RequestIdHolder.kt`, `SignalManager.kt`, `ApiService.kt`, `PredictionModels.kt`, `LoginManager.kt` |
 | **P3** | `App.kt`, `AthleteAdapter.kt`, `AlertItem.kt`, `requestsAdapter.kt` |
+| **Dead code** | `MainActivity.kt`, `activity_main.xml`, `PredictionModels.kt`, `CalculationUtils.kt`, `ic_launcher*`, `page_gradient`, `open_sans_regular.ttf` — ראו פרק 15 |
 
 ---
 
-## 15. שינויי מסמך
+## 15. קוד מת, משאבים מיותרים ופריטים למחיקה
+
+פרק זה מרכז את כל מה שניתן (או צריך) למחוק, לאחד, או להגן — מעבר לממצאים המפוזרים בפרקים 3–6.
+
+### 15.1 סיכום
+
+| חומרה | כמות משוערת | עיקר הבעיות |
+| ----- | ----------- | ----------- |
+| **High** | 3 | Activity + layout לא נגישים; `CalculationUtils` לא מחובר ל-app |
+| **Medium** | 15+ | launcher ישן, drawables/colors לא מקושרים, כפילות מודל, demo injection |
+| **Low** | 20+ | strings/dimens עודפים, imports מתים, artifacts, naming |
+
+**הערה:** פריטים שמסומנים "לא dead — להחליט" דורשים בחירה: למחוק, לחבר לקוד, או לעטוף ב-`BuildConfig.DEBUG`.
+
+### 15.2 Kotlin — קוד מת או לא בשימוש
+
+#### High — למחיקה או חיבור מחדש
+
+| פריט | קובץ | למה מת / מיותר | המלצה |
+| ---- | ---- | -------------- | ----- |
+| `MainActivity` | `ui/auth/MainActivity.kt` | רשום ב-Manifest אך **אין אף `Intent` שמפנה אליו**. `LoginActivity` הוא LAUNCHER ומבצע routing זהה (`checkUserRoleAndNavigate`) | **מחק** את הקלאס + הסרה מ-Manifest, **או** הפוך ל-LAUNCHER והסר routing מ-`LoginActivity` |
+| `activity_main.xml` | `res/layout/activity_main.xml` | Layout יחיד של `MainActivity` | מחק יחד עם `MainActivity` |
+| `CalculationUtils` (כולו) | `util/CalculationUtils.kt` | **אף קריאה מ-`main`** — רק `CalculationUtilsTest.kt`. Dashboards משתמשים ב-thresholds hardcoded | **או** חבר ל-UI (`getRiskLevel`, `formatDateToKey`, `isTeamCodeValid`) **או** מחק util + tests |
+
+#### Medium — כפילות / פונקציות מתות
+
+| פריט | קובץ | למה מת / מיותר | המלצה |
+| ---- | ---- | -------------- | ----- |
+| `PredictionResponse` (מודל נפרד) | `model/PredictionModels.kt` | **לא מיובא בשום מקום**. הקוד משתמש ב-`ApiService.PredictionResponse` (שדות שונים: `risk_score` vs `risk_percentage`) | מחק `PredictionModels.kt` |
+| `updateUIWithMissingDataState()` | `AthleteDashboardActivity.kt` (206–216) | מוגדר, **לא נקרא** | מחק או חבר ל-flow חסר נתונים |
+| `CalculationUtilsTest` | `app/src/test/.../CalculationUtilsTest.kt` | תלוי ב-util שלא מחובר ל-production | מחק אם מוחקים את `CalculationUtils`; אחרת תקן לפני חיבור |
+| `injectSevenDaysOfWearableDemoData()` | `WearableSyncActivity.kt` (89–177) | **לא dead** — פעיל (long-press). מזריק נתונים אקראיים ל-Firestore | **הסר** מ-production או עטוף ב-`BuildConfig.DEBUG` |
+
+#### Low — שדות / פונקציות מתות
+
+| פריט | קובץ | הערה |
+| ---- | ---- | ---- |
+| `SignalManager.contextRef` | `utilities/SignalManager.kt` (16) | `WeakReference` נשמר, לא נקרא |
+| `RequestIdHolder.generateNewId()` | `observability/RequestIdHolder.kt` (13–16) | נקרא רק ב-`RequestIdHolderTest`, לא בתחילת session |
+| `isTeamCodeValid()` | `CalculationUtils.kt` | קיים אך `CreateTeamActivity` / `JoinTeamActivity` לא משתמשים |
+
+#### Naming — לא למחוק, לתקן
+
+| קובץ | class | הערה |
+| ---- | ----- | ---- |
+| `ui/athlete/AlertAdapter.kt` | `AlertsAdapter` | בשימוש — שנה שם קובץ ל-`AlertsAdapter.kt` |
+| `ui/coach/requestsAdapter.kt` | `RequestsAdapter` | בשימוש — שנה ל-`RequestsAdapter.kt` |
+
+#### מה **לא** dead (חשוב)
+
+כל שאר 31 קבצי Kotlin ב-`main` מקושרים: 16 Activities (חוץ מ-`MainActivity`), adapters, `LoginManager`, `SignalManager`, observability stack, `ApiClient`, מודלים (`AthleteItem`, `AlertItem`, `AthleteRequest`).
+
+### 15.3 Drawable, Font ו-Launcher — לא מקושרים
+
+האפליקציה משתמשת ב-`@mipmap/main_logo` (Manifest). משפחת `ic_launcher` הישנה **מתה**:
+
+| קובץ | חומרה | הערה |
+| ---- | ----- | ---- |
+| `mipmap-anydpi/ic_launcher.xml` | Medium | launcher default — לא ב-Manifest |
+| `mipmap-anydpi/ic_launcher_round.xml` | Medium | אותו דבר |
+| `drawable/ic_launcher_background.xml` | Medium | רק עבור ic_launcher |
+| `drawable/ic_launcher_foreground.xml` | Medium | אותו דבר |
+| `mipmap-{hdpi…xxxhdpi}/ic_launcher.webp` (×5) | Medium | binaries ישנים |
+| `mipmap-{hdpi…xxxhdpi}/ic_launcher_round.webp` (×5) | Medium | binaries ישנים |
+
+Drawables נוספים **ללא** `@drawable/...` בפרויקט:
+
+| קובץ | חומרה |
+| ---- | ----- |
+| `drawable/page_gradient.xml` | Medium |
+| `drawable-night/page_gradient.xml` | Medium |
+| `drawable/bg_input_refined.xml` | Medium |
+| `drawable/rounded_add_reaction_24.xml` | Medium |
+| `color/box_stroke_selector.xml` | Medium |
+
+Font לא מקושר:
+
+| קובץ | חומרה | הערה |
+| ---- | ----- | ---- |
+| `font/open_sans_regular.ttf` | Medium | הפרויקט משתמש רק ב-`roboto_bold` / `roboto_regular` |
+
+### 15.4 Strings, Colors, Dimens — עודפים
+
+#### Strings לא מקושרים (דוגמאות)
+
+מחרוזות ב-`strings.xml` **ללא** `@string/...` ב-layouts או בקוד:
+
+| שם | הערה | חומרה |
+| -- | ---- | ----- |
+| `user_name_or_email_address`, `password`, `Remember_me_text` | יש חלופות בשימוש (`Password_text` וכו') | Low |
+| `pers`, `pers1` | layouts משתמשים ב-hardcoded `"--%"` | Low |
+| `risk_long_text`, `score_based1` | לא מקושרים | Low |
+| `reject_request`, `approve_request` | `item_athlete_request.xml` — hardcoded `"Reject"` / `"Approve"` | Low |
+| `how_is_your_energy_level_today` | כפילות של `how_is_your_energy` | Low |
+| `daily_check_in_muscle` | כפילות של `muscle_soreness_level` | Low |
+| `emoji_very_sad` … `emoji_very_happy` | 5 אמוג'ים — לא בשימוש | Low |
+| `stress_level_question` | כפילות של `stress_level_label` | Low |
+| `checking_your_daily_data`, `set_your_account`, `email_address_hint`, `injured_yesterday`, `age` | לא מקושרים | Low |
+
+**כפילויות פעילות (לא למחוק בלי refactor):** `daily_risk_score` / `daily_risk_score1`, `risk_logo` / `risk_logo1`, `risk_score_last_7_days` / `...1`.
+
+#### Colors — palette גדול לא בשימוש
+
+עשרות צבעים ב-`colors.xml` / `values-night/colors.xml` **ללא** `@color/...` ב-layouts, drawables או styles. קבוצות עיקריות:
+
+- `aa_brand_*`, `aa_text_*`, `aa_button_*`, `aa_input_*`, `aa_success/warning/error/info`
+- `lm_*` (login module palette)
+- `cs_*` (coach/secondary palette)
+- `text_color_primary/secondary`, `stroke_color_primary` (רק ב-`box_stroke_selector` המת)
+- `yellow_vibrant`, `orange_vibrant`, `red_vibrant` — הקוד משתמש ב-hex hardcoded במקום
+
+**חומרה:** Medium — ניקוי מוריד רעש; חלק עשוי להיות "עתידי" לעיצוב.
+
+#### Dimens לא מקושרים
+
+**spacing:** `spacing_10`, `36`, `44`, `52`, `56`, `76`, `80`, `84`, `88`, `92`, `96`, `104`, `108`, `112`, `120`, `132`, `144`, `152`, `160`, `176`, `212`, `220`, `600`
+
+**אחרים:** `special_width`, `new_button_*`, `text_risk`, `stickers_size`, `empty_space`, `button_stroke_unpressed`, `text_max_width`, `text_input_*`, `text_height`, `text_medium`, `text_small`, `forgot_password_text_size`, `team_text`, `headline_text_survey`, `logo_*`, `input_padding_vertical`
+
+**חומרה:** Low
+
+### 15.5 Layouts — הערות
+
+| קובץ | הערה | למחוק? |
+| ---- | ---- | ------ |
+| `activity_main.xml` | תלוי ב-`MainActivity` המת | **כן** |
+| `activity_privacy_policy_activity.xml` | **ריק** — נדרש ל-Health Connect rationale | **לא** — למלא תוכן |
+| `activity_coach_dashboard.xml` + `activity_athlete_dashboard.xml` | מבנה כמעט זהה | **לא** — מועמד ל-`<include>` משותף |
+
+כל 18 ה-layouts הנותרים מקושרים ל-Activity או Adapter.
+
+### 15.6 Imports מתים (Kotlin)
+
+| קובץ | Imports לא בשימוש |
+| ---- | ----------------- |
+| `DailyCheckInActivity.kt` | `Color`, `GradientDrawable`, `ContextCompat`, `toColorInt` |
+| `WearableSyncActivity.kt` | `Color`, `toColorInt` |
+| `HomeCoachActivity.kt` | `Log` (מוזכר גם בפרק 4.4) |
+
+### 15.7 קבצים מחוץ ל-app — למחיקה
+
+| נתיב | מה זה | חומרה |
+| ---- | ----- | ----- |
+| `android_app/AthleAgent/.artifacts/` | 3 קבצי markdown מסשן AI | Low — לא חלק מה-build |
+| `app/src/androidTest/.../ExampleInstrumentedTest.kt` | boilerplate — בודק רק `packageName` | Low — ערך מינימלי |
+
+### 15.8 Dependencies — האם למחוק?
+
+| Dependency | בשימוש? | הערה |
+| ---------- | ------- | ---- |
+| `retrofit`, `okhttp`, `gson` | ✓ | `ApiClient` |
+| `firebase-*`, `firebase-ui-auth` | ✓ | auth + Firestore |
+| `generativeai` | ✓ | Gemini |
+| `mpandroidchart` | ✓ | dashboards |
+| `health.connect.client` | ✓ | `WearableSyncActivity` |
+| `timber` | חלקי | רק `App.kt` + `ClientEventReporter` — רוב הקוד ב-`Log.d/e` |
+| `play-services-auth` | כנראה ✓ | נדרש ל-Google Sign-In (Firebase UI) |
+| `espresso`, `androidx.junit` | מינימלי | רק `ExampleInstrumentedTest` |
+
+**אין dependency ברור למחיקה בביטחון** ללא בדיקת Google Sign-In.
+
+### 15.9 תוכנית מחיקה מומלצת (עדיפות)
+
+#### שלב A — מיידי (High)
+
+1. **מחק** `MainActivity.kt` + `activity_main.xml` + רישום ב-Manifest — **או** הפוך ל-LAUNCHER מרכזי.
+2. **מחק** `model/PredictionModels.kt` (כפילות מ-`ApiService.PredictionResponse`).
+3. **החלטה על `CalculationUtils`:** חבר ל-dashboards + team flows **או** מחק util + `CalculationUtilsTest`.
+
+#### שלב B — ניקוי משאבים (Medium)
+
+4. מחק משפחת `ic_launcher` (10 mipmaps + 2 xml + 2 drawables).
+5. מחק drawables מתים: `page_gradient` (×2), `bg_input_refined`, `rounded_add_reaction_24`, `box_stroke_selector`.
+6. מחק `font/open_sans_regular.ttf`.
+7. נקה colors לא מקושרים (או אחד palette אחד לעיצוב).
+8. הסר / הגן `injectSevenDaysOfWearableDemoData` ב-`WearableSyncActivity`.
+
+#### שלב C — ליטוש (Low)
+
+9. מחק פונקציות מתות: `updateUIWithMissingDataState`, `SignalManager.contextRef`.
+10. נקה strings/dimens לא מקושרים.
+11. תקן unused imports.
+12. תקן שמות קבצים: `AlertAdapter.kt` → `AlertsAdapter.kt`, `requestsAdapter.kt` → `RequestsAdapter.kt`.
+13. מחק `.artifacts/`.
+14. אחד לוגים: `Log` ↔ `Timber`.
+
+### 15.10 הערכת חיסכון
+
+| קטגוריה | הערכה |
+| ------- | ----- |
+| שורות Kotlin למחיקה | ~150–200 (כולל `MainActivity`, demo injection, `CalculationUtils` אם נמחק) |
+| קבצי resource למחיקה | ~25+ (launcher, drawables, font) |
+| הפחתת APK | קטנה–בינונית (בעיקר mipmaps + font) |
+| הפחתת רעש תחזוקה | **גבוהה** — פחות בלבול בין מודלים, palettes, ו-Activities |
+
+---
+
+## 16. שינויי מסמך
 
 | גרסה | תאריך | שינוי |
 | ---- | ----- | ----- |
 | 1.0 | 2026-07-09 | סקירה ראשונית מלאה של פרונטאנד Android |
 | 1.1 | 2026-07-09 | הוספת פרק 10: מבנה קוד, אורך קבצים, חלוקה לקלאסים, כפילויות, packages |
+| 1.2 | 2026-07-09 | הוספת פרק 15: קוד מת, משאבים מיותרים, פריטים למחיקה, תוכנית ניקוי |
+| 1.3 | 2026-07-09 | הוספת פרק 9.5: סקירת הערות בקוד — עברית, כיסוי, KDoc, תוכנית תיקון |
