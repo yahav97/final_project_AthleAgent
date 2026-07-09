@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from io import StringIO
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from utils.logging import setup_logging
-from utils.request_context import get_or_create_request_id, request_id_var, user_id_var
+from utils.request_context import get_or_create_request_id, request_id_var
 
 pytestmark = pytest.mark.unit
 
@@ -120,34 +117,3 @@ class TestClientEventsRoute:
         assert first.json()["accepted"] is True
         assert second.json()["accepted"] is False
         assert second.json()["reason"] == "rate_limited"
-
-
-class TestJsonLogging:
-    def test_json_formatter_emits_parseable_line(self, tmp_path):
-        from utils.logging import ContextFilter
-
-        stream = StringIO()
-        root = setup_logging(log_dir=tmp_path, level="INFO", log_format="json")
-        handler = logging.StreamHandler(stream)
-        from pythonjsonlogger.json import JsonFormatter
-
-        handler.setFormatter(
-            JsonFormatter(
-                "%(asctime)s %(levelname)s %(name)s %(message)s",
-                rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
-            )
-        )
-        handler.addFilter(ContextFilter())
-        root.handlers.clear()
-        root.addHandler(handler)
-
-        request_id_var.set("json-test-id")
-        user_id_var.set("user-1")
-        root.info("structured_event", extra={"event": "structured_event"})
-
-        payload = json.loads(stream.getvalue().strip())
-        assert payload["message"] == "structured_event"
-        assert payload["event"] == "structured_event"
-        assert payload["request_id"] == "json-test-id"
-        assert payload["user_id"] == "user-1"
-        assert payload["source"] == "backend"

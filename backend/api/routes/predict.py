@@ -29,10 +29,7 @@ def test_predict_injury(data: SimpleData):
         dict: Stable mock inference payload.
     """
     if not settings.ENABLE_TEST_PREDICT_ENDPOINT:
-        raise HTTPException(
-            status_code=404,
-            detail="Test endpoint disabled. Set ENABLE_TEST_PREDICT_ENDPOINT=true.",
-        )
+        raise HTTPException(status_code=404, detail="Test endpoint disabled.")
     return {
         "user_id": data.user_id,
         "risk_percentage": settings.TEST_PREDICT_MOCK_RISK_PERCENTAGE,

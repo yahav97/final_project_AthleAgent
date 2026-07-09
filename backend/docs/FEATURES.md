@@ -9,7 +9,7 @@
 
 | פרט | ערך |
 |---|---|
-| **מודל** | **XGBoostCalibratedTuned** (run `20260629_184034`) |
+| **מודל** | **XGBoostCalibratedTuned** (run `20260709_104916`) |
 | **מספר פיצ'רים** | 35 (`model_features.py`) |
 | **שדות שלמים (train + serve)** | 15 (`integer_feature_columns` ב-`model_feature_contract.json`) |
 | **סף אימון (manifest)** | **0.10** |

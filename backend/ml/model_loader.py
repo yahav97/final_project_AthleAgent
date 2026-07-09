@@ -288,8 +288,6 @@ def get_model_status() -> dict[str, Any]:
     winner_metrics = manifest.get("winner_metrics") if isinstance(manifest.get("winner_metrics"), dict) else {}
     auc_value = _parse_optional_float(winner_metrics.get("ROC-AUC"))
     recall_value = _parse_optional_float(winner_metrics.get("Recall@Threshold"))
-    degraded_auc_threshold = settings.ML_MIN_AUC_FOR_LIVE + settings.ML_DEGRADED_AUC_OFFSET
-    degraded_rc = bool(_model_live and auc_value is not None and auc_value < degraded_auc_threshold)
     run_id = manifest.get("run_id")
     if not run_id and isinstance(_active_promoted, dict):
         run_id = _active_promoted.get("run_id")
@@ -299,7 +297,6 @@ def get_model_status() -> dict[str, Any]:
         "winner": manifest.get("winner"),
         "threshold": manifest.get("threshold"),
         "policy": policy,
-        "degraded_rc": degraded_rc,
         "run_id": run_id,
         "promoted_at_utc": _active_promoted.get("promoted_at_utc") if isinstance(_active_promoted, dict) else None,
         "manifest_path": _active_promoted.get("manifest_path") if isinstance(_active_promoted, dict) else None,

@@ -2,7 +2,7 @@
 
 > **מסמך זה:** הסבר מלא בעברית על איך נבנה ציון הסיכון, מאיזה ימים, אילו פרמטרים, מה חוזר לפרונט, ואילו ספים חלים.  
 > **קוד אמת:** `services/prediction/` · `services/preprocessing/` · `services/history/` · `data/model_feature_contract.json`  
-> **מודל פרודקשן:** **XGBoostCalibratedTuned** — `ML_model/artifacts/promoted.json` (run `20260629_184034`)  
+> **מודל פרודקשן:** **XGBoostCalibratedTuned** — `ML_model/artifacts/promoted.json` (run `20260709_104916`)  
 > **חוזה שדות Firestore:** [`FEATURES.md`](FEATURES.md)  
 > **קונפיג ML:** [`MODEL.md`](MODEL.md)
 

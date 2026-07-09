@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down server", extra={"event": "server_shutdown"})
 
 
-_openapi_enabled = settings.APP_ENV == "development"
+_openapi_enabled = settings.openapi_enabled
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

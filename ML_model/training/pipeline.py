@@ -22,6 +22,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
+from csv_io import save_csv
 from policy_config import get_policy, policy_as_dict
 from training.constants import (
     ATHLETE_CV_SPLITS,
@@ -417,14 +418,17 @@ def save_training_artifacts(
     }
     joblib.dump(model_bundle, output_model_path)
 
-    result.results_df.to_csv(artifacts_dir / "model_comparison.csv", index=False)
-    pd.concat(
-        [frame.assign(model=name) for name, frame in result.calibration_bins.items()],
-        ignore_index=True,
-    ).to_csv(artifacts_dir / "calibration_curve_data.csv", index=False)
-    pd.DataFrame(result.threshold_rows).to_csv(artifacts_dir / "threshold_sweep.csv", index=False)
-    result.best_points.to_csv(artifacts_dir / "best_operating_points.csv", index=False)
-    result.risk_bins_df.to_csv(artifacts_dir / "risk_bins_summary.csv", index=False)
+    save_csv(result.results_df, artifacts_dir / "model_comparison.csv")
+    save_csv(
+        pd.concat(
+            [frame.assign(model=name) for name, frame in result.calibration_bins.items()],
+            ignore_index=True,
+        ),
+        artifacts_dir / "calibration_curve_data.csv",
+    )
+    save_csv(pd.DataFrame(result.threshold_rows), artifacts_dir / "threshold_sweep.csv")
+    save_csv(result.best_points, artifacts_dir / "best_operating_points.csv")
+    save_csv(result.risk_bins_df, artifacts_dir / "risk_bins_summary.csv")
 
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -471,12 +475,12 @@ def save_training_artifacts(
         json.dump(manifest, f, indent=2)
 
     if result.importance_df is not None:
-        result.importance_df.to_csv(artifacts_dir / "feature_importance.csv", index=False)
+        save_csv(result.importance_df, artifacts_dir / "feature_importance.csv")
     if serving_importance_df is not None:
-        serving_importance_df.to_csv(artifacts_dir / "feature_importance_serving.csv", index=False)
+        save_csv(serving_importance_df, artifacts_dir / "feature_importance_serving.csv")
     if cv_result is not None:
-        cv_result.fold_details.to_csv(artifacts_dir / "athlete_cv_folds.csv", index=False)
-        cv_result.summary.to_csv(artifacts_dir / "athlete_cv_summary.csv", index=False)
+        save_csv(cv_result.fold_details, artifacts_dir / "athlete_cv_folds.csv")
+        save_csv(cv_result.summary, artifacts_dir / "athlete_cv_summary.csv")
 
     return artifacts_dir
 

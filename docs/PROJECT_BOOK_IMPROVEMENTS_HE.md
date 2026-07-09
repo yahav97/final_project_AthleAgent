@@ -221,7 +221,7 @@
 
 | # | גרף | קובץ מקור |
 |---|-----|-----------|
-| 1 | Feature Importance (Top 10) | `ML_model/artifacts/20260629_184034/feature_importance.csv` |
+| 1 | Feature Importance (Top 10) | `ML_model/artifacts/20260709_104916/feature_importance.csv` |
 | 2 | Risk Bins (green/yellow/red) | `run_manifest.json` → `risk_bins` |
 | 3 | (אופציונלי) ROC Curve | מתוך artifacts של הריצה |
 | 4 | (אופציונלי) Confusion Matrix | מתוך artifacts של הריצה |
@@ -312,7 +312,7 @@
 **פרמטרים:**
 - סף החלטה (Threshold): **0.10**
 - מספר פיצ'רים: **35**
-- Run ID: `20260629_184034`
+- Run ID: `20260709_104916`
 
 **מדדי איכות על Holdout:**
 
@@ -473,7 +473,7 @@
 | [`docs/LLD_PROJECT.md`](LLD_PROJECT.md) | סכמות Firestore, API, Activities |
 | [`docs/NFR.md`](NFR.md) | הרחבת דרישות לא-פונקציונליות |
 | [`docs/LOGGING_HE.md`](LOGGING_HE.md) | פירוט איסוף לוגים |
-| [`ML_model/artifacts/20260629_184034/run_manifest.json`](../ML_model/artifacts/20260629_184034/run_manifest.json) | מדדי מודל מדויקים |
+| [`ML_model/artifacts/20260709_104916/run_manifest.json`](../ML_model/artifacts/20260709_104916/run_manifest.json) | מדדי מודל מדויקים |
 | [`README.md`](../README.md) | תקציר, screenshots, tech stack |
 
 ---

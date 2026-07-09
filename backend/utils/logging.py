@@ -1,13 +1,10 @@
 """
-Logging configuration for AthleAgent backend.
-
-Supports plain text (legacy) and JSON Lines (production default).
+Logging for AthleAgent backend.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -15,24 +12,9 @@ from pathlib import Path
 from config import settings
 from utils.request_context import request_id_var, user_id_var
 
-LOG_DIR = settings.LOG_DIR
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-_DISABLE_FILE_LOGGING_ENV = "ATHLEAGENT_DISABLE_FILE_LOGGING"
-
-
-def _file_logging_enabled(log_to_file: bool | None) -> bool:
-    if log_to_file is not None:
-        return log_to_file
-    return os.environ.get(_DISABLE_FILE_LOGGING_ENV, "").lower() not in (
-        "1",
-        "true",
-        "yes",
-    )
-
 
 class ContextFilter(logging.Filter):
-    """Inject request-scoped fields and service metadata into every log record."""
+    """Add request id and user id to log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
@@ -40,52 +22,30 @@ class ContextFilter(logging.Filter):
         record.service = settings.PROJECT_NAME
         record.version = settings.VERSION
         if getattr(record, "source", None) is None:
-            setattr(record, "source", "backend")
+            record.source = "backend"
         return True
-
-
-def _build_text_formatter() -> logging.Formatter:
-    return logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - "
-        "[request_id=%(request_id)s user_id=%(user_id)s] - %(message)s"
-    )
-
-
-def _build_json_formatter() -> logging.Formatter:
-    from pythonjsonlogger.json import JsonFormatter
-
-    return JsonFormatter(
-        "%(asctime)s %(levelname)s %(name)s %(message)s",
-        rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
-    )
 
 
 def setup_logging(
     log_dir: Path | None = None,
     level: str | None = None,
-    log_format: str | None = None,
     log_to_file: bool | None = None,
 ) -> logging.Logger:
-    """Configure the athleagent logger with optional file rotation and stdout output."""
+    """Configure the athleagent logger."""
     resolved_dir = log_dir or settings.LOG_DIR
     resolved_level = (level or settings.LOG_LEVEL).upper()
-    resolved_format = (log_format or settings.LOG_FORMAT).lower()
-    write_to_file = _file_logging_enabled(log_to_file)
+    write_to_file = settings.LOG_TO_FILE if log_to_file is None else log_to_file
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - "
+        "[request_id=%(request_id)s user_id=%(user_id)s] - %(message)s"
+    )
+    context_filter = ContextFilter()
 
     root = logging.getLogger("athleagent")
     root.setLevel(resolved_level)
     root.handlers.clear()
     root.propagate = False
-
-    file_formatter: logging.Formatter
-    if resolved_format == "json":
-        file_formatter = _build_json_formatter()
-    else:
-        file_formatter = _build_text_formatter()
-    # Human-readable lines on stdout (docker compose logs); structured JSON in the file.
-    console_formatter = _build_text_formatter()
-
-    context_filter = ContextFilter()
 
     if write_to_file:
         resolved_dir.mkdir(parents=True, exist_ok=True)
@@ -95,14 +55,13 @@ def setup_logging(
             backupCount=settings.LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
-        file_handler.setFormatter(file_formatter)
+        file_handler.setFormatter(formatter)
         file_handler.addFilter(context_filter)
         root.addHandler(file_handler)
 
     stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(console_formatter)
+    stream_handler.setFormatter(formatter)
     stream_handler.addFilter(context_filter)
-
     root.addHandler(stream_handler)
 
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

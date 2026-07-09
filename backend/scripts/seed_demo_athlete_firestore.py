@@ -1,33 +1,18 @@
 """
-Write realistic demo field values to Firestore for one athlete (merge writes).
+Write demo field values to Firestore for one athlete (merge writes).
 
-Intended for the new/updated contract fields:
-  - users/{uid}: birth_date, historyInjuryCount
-  - daily_health/{date}: sleepMinutes, injuredYesterday, … (today)
-  - daily_health/{date-1}: steps, distanceMeters, HR, weight, … (yesterday / physical)
-  - daily_checkins/{date}: stress, soreness, energy
-  - daily_nutrition/{date}: protein, carbs, mealsLoggedCount
-  - daily_health/{date} (optional fake backend outputs): finalRiskScore, riskLevel,
-    predictionConfidence, predictionUpdatedAt
-
-Requires the same credentials as the API (config / FIREBASE_SERVICE_ACCOUNT_KEY / backend/firebase-key.json).
-
+Usage:
   cd backend
-  python scripts/seed_demo_athlete_firestore.py --user-id YOUR_FIREBASE_UID
-
-Optional:
-  --date YYYY-MM-dd   (default: today in Asia/Jerusalem)
-  --dry-run           (print only, no writes)
+  python scripts/seed_demo_athlete_firestore.py YOUR_FIREBASE_UID
+  python scripts/seed_demo_athlete_firestore.py YOUR_FIREBASE_UID 2026-07-09
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-
 from zoneinfo import ZoneInfo
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -51,23 +36,12 @@ def _get_db():
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Seed demo athlete docs in Firestore (merge).")
-    parser.add_argument("--user-id", required=True, help="Firebase Auth uid (users/{uid})")
-    parser.add_argument(
-        "--date",
-        type=str,
-        default=None,
-        help="Calendar day for prediction (yyyy-MM-dd). Default: today (Israel).",
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Print payloads only; do not write.")
-    parser.add_argument(
-        "--no-fake-prediction",
-        action="store_true",
-        help="Do not write simulated prediction fields (finalRiskScore, riskLevel, …).",
-    )
-    args = parser.parse_args()
+    if len(sys.argv) < 2:
+        print("Usage: python scripts/seed_demo_athlete_firestore.py USER_ID [YYYY-MM-DD]", file=sys.stderr)
+        return 1
 
-    date_key = args.date or _today_israel()
+    user_id = sys.argv[1].strip()
+    date_key = sys.argv[2].strip() if len(sys.argv) > 2 else _today_israel()
     yesterday_key = _prev_day(date_key)
     now_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -79,17 +53,11 @@ def main() -> int:
     health_today: dict[str, Any] = {
         "sleepMinutes": 450,
         "lastSync": datetime.now(ZoneInfo("Asia/Jerusalem")).isoformat(),
+        "finalRiskScore": 38.75,
+        "riskLevel": "Medium",
+        "predictionConfidence": 71.2,
+        "predictionUpdatedAt": now_utc,
     }
-    if not args.no_fake_prediction:
-        # Simulated POST /predict/daily persist (merge) — for UI demos only.
-        health_today.update(
-            {
-                "finalRiskScore": 38.75,
-                "riskLevel": "Medium",
-                "predictionConfidence": 71.2,
-                "predictionUpdatedAt": now_utc,
-            }
-        )
 
     health_yesterday: dict[str, Any] = {
         "steps": 9800,
@@ -117,33 +85,27 @@ def main() -> int:
     }
 
     paths = {
-        f"users/{args.user_id}": profile,
-        f"users/{args.user_id}/daily_health/{date_key}": health_today,
-        f"users/{args.user_id}/daily_health/{yesterday_key}": health_yesterday,
-        f"users/{args.user_id}/daily_checkins/{date_key}": checkins,
-        f"users/{args.user_id}/daily_nutrition/{date_key}": nutrition,
+        f"users/{user_id}": profile,
+        f"users/{user_id}/daily_health/{date_key}": health_today,
+        f"users/{user_id}/daily_health/{yesterday_key}": health_yesterday,
+        f"users/{user_id}/daily_checkins/{date_key}": checkins,
+        f"users/{user_id}/daily_nutrition/{date_key}": nutrition,
     }
 
     print("Seed demo athlete")
-    print(f"  userId={args.user_id}")
+    print(f"  userId={user_id}")
     print(f"  date (D)={date_key}  |  yesterday (D-1)={yesterday_key}")
     print()
 
-    if args.dry_run:
-        for path, doc in paths.items():
-            print(path)
-            for k, v in sorted(doc.items()):
-                print(f"    {k}: {v}")
-            print()
-        print("DRY_RUN: no writes performed.")
-        return 0
-
     db = _get_db()
     if db is None:
-        print("ERROR: Firestore client not available (check FIREBASE_SERVICE_ACCOUNT_KEY / firebase-key.json).", file=sys.stderr)
+        print(
+            "ERROR: Firestore client not available (place firebase-key.json in backend/).",
+            file=sys.stderr,
+        )
         return 1
 
-    user_ref = db.collection("users").document(args.user_id)
+    user_ref = db.collection("users").document(user_id)
     user_ref.set(profile, merge=True)
     user_ref.collection("daily_health").document(date_key).set(health_today, merge=True)
     user_ref.collection("daily_health").document(yesterday_key).set(health_yesterday, merge=True)
@@ -155,7 +117,7 @@ def main() -> int:
         print(f"  {path}")
     print()
     print("You can call POST /predict/daily with:")
-    print(f'  {{"userId": "{args.user_id}", "date": "{date_key}"}}')
+    print(f'  {{"userId": "{user_id}", "date": "{date_key}"}}')
     return 0
 
 

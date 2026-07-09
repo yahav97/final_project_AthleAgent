@@ -10,7 +10,6 @@ ML_STATUS_KEYS = {
     "winner",
     "threshold",
     "policy",
-    "degraded_rc",
     "run_id",
     "promoted_at_utc",
     "manifest_path",
@@ -28,7 +27,6 @@ class TestMlStatusRoute:
         assert data["status"] in ("Live", "Blocked")
         assert isinstance(data["gate_reason"], str)
         assert isinstance(data["policy"], dict)
-        assert isinstance(data["degraded_rc"], bool)
         assert "winner_metrics" in data
         assert isinstance(data["winner_metrics"], dict)
 

@@ -15,79 +15,12 @@ if str(ML_ROOT) not in sys.path:
 from training.pipeline import add_sequential_features  # noqa: E402
 from training.serve_parity import (  # noqa: E402
     HISTORY_ROLLING_FEATURES,
-    apply_low_confidence_defaults,
-    apply_nutrition_population_defaults,
     apply_train_serve_parity_augmentation,
     build_cold_start_mask,
-    compute_serve_derived_features,
     load_contract_defaults,
-    nutrition_defaults_from_contract,
 )
 
 pytestmark = pytest.mark.unit
-
-
-def _sample_row() -> pd.Series:
-    defaults = load_contract_defaults()
-    row = pd.Series(defaults)
-    row["athlete_id"] = 1
-    row["date"] = pd.Timestamp("2025-01-15")
-    row["injury_today"] = 0
-    row["acute_load_7d"] = 8.5
-    row["acwr_ratio"] = 1.9
-    row["acwr_ratio_ma7"] = 1.7
-    row["sleep_hours_ma7"] = 6.2
-    row["sleep_debt_3d"] = 4.5
-    row["hrv_drop"] = 6.0
-    row["load_recovery_imbalance"] = 8.55
-    row["nutrition_intake_calories"] = 1800.0
-    row["daily_calories"] = 1750.0
-    row["total_calories_burned"] = 2100.0
-    row["calorie_balance"] = -350.0
-    return row
-
-
-class TestServeDerivedFeatures:
-    def test_compute_serve_derived_features_matches_backend_formula(self):
-        row = {
-            "daily_distance_km": 5.0,
-            "active_calories_burned": 360.0,
-            "sleep_hours": 6.0,
-            "hrv_score": 58.0,
-            "resting_hr": 56.0,
-            "total_calories_burned": 0.0,
-            "bmr_calories": 1600.0,
-        }
-        derived = compute_serve_derived_features(row)
-        assert derived["acute_load_7d"] == pytest.approx(5.55)
-        assert 0.35 <= derived["acwr_ratio"] <= 2.8
-        assert derived["sleep_debt_3d"] == pytest.approx(2.5)  # (8 - 6) * 1.25
-        assert derived["total_calories_burned"] == 1960.0
-
-
-class TestLowConfidenceDefaults:
-    def test_apply_low_confidence_defaults_replaces_rolling_features(self):
-        defaults = load_contract_defaults()
-        row = _sample_row()
-        out = apply_low_confidence_defaults(row, defaults)
-
-        for column in HISTORY_ROLLING_FEATURES:
-            assert out[column] == defaults[column]
-
-        expected_imbalance = defaults["acwr_ratio"] * defaults["sleep_debt_3d"]
-        assert out["load_recovery_imbalance"] == pytest.approx(expected_imbalance)
-
-
-class TestNutritionDefaults:
-    def test_apply_nutrition_population_defaults(self):
-        defaults = load_contract_defaults()
-        nutrition = nutrition_defaults_from_contract(defaults)
-        row = _sample_row()
-        out = apply_nutrition_population_defaults(row, nutrition)
-
-        assert out["nutrition_intake_calories"] == 2600.0
-        assert out["daily_calories"] == 2600.0
-        assert out["calorie_balance"] == pytest.approx(2600.0 - 2100.0)
 
 
 class TestColdStartMask:

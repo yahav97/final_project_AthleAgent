@@ -9,6 +9,7 @@ _ml_dir = str(Path(__file__).resolve().parent)
 if _ml_dir not in sys.path:
     sys.path.insert(0, _ml_dir)
 
+from csv_io import save_csv  # noqa: E402
 from generation.config import DAYS_PER_ATHLETE, DEFAULT_SEED, NUM_ATHLETES  # noqa: E402
 from generation.simulator import generate_synthetic_data  # noqa: E402
 
@@ -22,7 +23,7 @@ def main() -> None:
         seed=DEFAULT_SEED,
     )
     output_path = Path(__file__).resolve().parent / OUTPUT_FILENAME
-    df.to_csv(output_path, index=False)
+    save_csv(df, output_path)
     print(f"SUCCESS: Created {output_path}")
 
 

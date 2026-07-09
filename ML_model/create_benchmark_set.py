@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from csv_io import save_csv
+
 HOLDOUT_RATIO = 0.2
 SEED = 42
 DATASET_FILENAME = "athlete_injury_data.csv"
@@ -32,7 +34,7 @@ def main() -> int:
     holdout_ids = athletes.sample(n=sample_n, random_state=SEED)
     holdout = df[df["athlete_id"].isin(set(holdout_ids.tolist()))].copy()
     holdout = holdout.sort_values(["athlete_id", "date"]).reset_index(drop=True)
-    holdout.to_csv(benchmark_path, index=False)
+    save_csv(holdout, benchmark_path)
     print(f"Benchmark holdout created: {benchmark_path} (rows={len(holdout)}, athletes={sample_n})")
     return 0
 

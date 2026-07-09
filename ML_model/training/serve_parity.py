@@ -1,17 +1,8 @@
-"""Train-serve parity augmentation — mirror backend cold-start and nutrition defaults.
-
-Production path (thin history / missing meals):
-- ``prediction/confidence.py`` replaces rolling features with contract defaults.
-- ``nutrition_defaults.py`` fills weak nutrition with population averages.
-
-During training, synthetic rows always have full athlete history. This module
-randomly masks a fraction of days so the model sees serve-time feature values.
-"""
+"""Train-serve parity augmentation — mirror backend cold-start and nutrition defaults."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +13,6 @@ from policy_config import (
     DEFAULT_COLD_START_AUGMENT_FRACTION,
     DEFAULT_COLD_START_FIRST_N_DAYS,
     DEFAULT_NUTRITION_MASK_FRACTION,
-    DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
-    DEFAULT_SLEEP_TARGET_HOURS,
 )
 
 # Matches backend/services/prediction/confidence.py HISTORY_ROLLING_FEATURES.
@@ -55,86 +44,12 @@ def load_contract_defaults() -> dict[str, float]:
 
 
 def nutrition_defaults_from_contract(contract_defaults: dict[str, float]) -> dict[str, float]:
-    """Nutrition imputation values aligned with backend NUTRITION_DEFAULT_CALORIES (2600)."""
     calories = float(contract_defaults["nutrition_intake_calories"])
     return {
         "nutrition_intake_calories": calories,
         "daily_calories": float(contract_defaults["daily_calories"]),
         "calorie_balance": float(contract_defaults["calorie_balance"]),
     }
-
-
-def acwr_baseline_from_acute_proxy(acute_load_7d: float) -> float:
-    """Mirror backend/services/feature_engineering.acwr_baseline_from_acute_proxy."""
-    return float(max(0.55, acute_load_7d * 0.78 + 1.35))
-
-
-def acwr_ratio_bounded(acute_load_7d: float, baseline: float) -> float:
-    """Mirror backend/services/feature_engineering.acwr_ratio_bounded."""
-    if baseline <= 0:
-        return 1.0
-    return float(min(2.8, max(0.35, acute_load_7d / baseline)))
-
-
-def compute_serve_derived_features(row: Mapping[str, Any]) -> dict[str, float]:
-    """Mirror backend/services/feature_engineering.compute_derived_features."""
-    daily_distance_km = float(row.get("daily_distance_km") or 0.0)
-    active_calories = float(row.get("active_calories_burned") or 0.0)
-    sleep_hours = float(row.get("sleep_hours") or 7.0)
-    hrv_score = float(row.get("hrv_score") or 62.0)
-    resting_hr = float(row.get("resting_hr") or 54.0)
-    bmr_calories = float(row.get("bmr_calories") or 0.0)
-
-    acute_load_7d = max(0.05, daily_distance_km * 0.95 + active_calories / 450.0)
-    baseline = acwr_baseline_from_acute_proxy(acute_load_7d)
-    acwr_ratio = acwr_ratio_bounded(acute_load_7d, baseline)
-
-    sleep_target = float(DEFAULT_SLEEP_TARGET_HOURS)
-    sleep_debt_scale = float(DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE)
-    sleep_debt_3d = float(max(0.0, (sleep_target - sleep_hours) * sleep_debt_scale))
-
-    baseline_hrv = 62.0
-    hrv_drop = float(
-        max(-15.0, min(15.0, baseline_hrv - hrv_score + (resting_hr - 54.0) * 0.15))
-    )
-
-    total_calories_burned = float(row.get("total_calories_burned") or 0.0)
-    if total_calories_burned <= 0 and (active_calories > 0 or bmr_calories > 0):
-        total_calories_burned = active_calories + bmr_calories
-
-    return {
-        "acute_load_7d": acute_load_7d,
-        "acwr_ratio": acwr_ratio,
-        "sleep_debt_3d": sleep_debt_3d,
-        "hrv_drop": hrv_drop,
-        "total_calories_burned": total_calories_burned,
-    }
-
-
-def apply_low_confidence_defaults(row: pd.Series, defaults: dict[str, float]) -> pd.Series:
-    """Simulate backend LOW history confidence — all rolling features → population defaults."""
-    out = row.copy()
-    for column in HISTORY_ROLLING_FEATURES:
-        if column in out.index:
-            out[column] = defaults[column]
-    acwr = float(out["acwr_ratio"])
-    sleep_debt = float(out["sleep_debt_3d"])
-    out["load_recovery_imbalance"] = acwr * sleep_debt
-    return out
-
-
-def apply_nutrition_population_defaults(
-    row: pd.Series,
-    nutrition_defaults: dict[str, float],
-) -> pd.Series:
-    """Simulate backend nutrition_defaults.apply_nutrition_population_defaults."""
-    out = row.copy()
-    for column in NUTRITION_FEATURE_COLUMNS:
-        if column in out.index:
-            out[column] = nutrition_defaults[column]
-    total_burned = float(out.get("total_calories_burned") or 0.0)
-    out["calorie_balance"] = float(out["daily_calories"]) - total_burned
-    return out
 
 
 def build_cold_start_mask(
@@ -144,12 +59,7 @@ def build_cold_start_mask(
     target_fraction: float,
     seed: int,
 ) -> pd.Series:
-    """
-    Mark rows that simulate cold-start / thin-history serving.
-
-    Always includes the first ``first_n_days`` per athlete, then randomly samples
-  additional days until ~``target_fraction`` of each athlete's rows are covered.
-    """
+    """Mark rows that simulate cold-start / thin-history serving."""
     cold_start = pd.Series(False, index=df.index)
     rng = np.random.default_rng(seed)
 
@@ -191,11 +101,7 @@ def apply_train_serve_parity_augmentation(
     seed: int = 42,
     enabled: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """
-    Apply serve-time feature masking on a post-``add_sequential_features`` frame.
-
-    Returns ``(augmented_df, stats)`` for manifest logging.
-    """
+    """Apply serve-time feature masking on a post-``add_sequential_features`` frame."""
     if not enabled or df.empty:
         return df, {"enabled": False, "rows": len(df)}
 

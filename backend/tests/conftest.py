@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
-# Keep pytest output on stdout only — do not append to logs/athleagent.log.
-os.environ["ATHLEAGENT_DISABLE_FILE_LOGGING"] = "1"
-
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -14,6 +9,14 @@ import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+
+from config import settings
+
+# Keep pytest output on stdout only — do not append to logs/athleagent.log.
+settings.LOG_TO_FILE = False
+from utils.logging import setup_logging
+
+setup_logging()
 
 from api.routes import predict as predict_routes
 from main import app
@@ -167,7 +170,6 @@ def mock_model_bundle() -> dict[str, Any]:
         feature_names_in_ = np.array(MODEL_FEATURE_COLUMNS, dtype=object)
 
         def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-            # Return fixed probability for deterministic assertions.
             return np.array([[0.65, 0.42]])
 
     return {
@@ -183,10 +185,3 @@ def mock_model_bundle() -> dict[str, Any]:
 def model_feature_row() -> pd.DataFrame:
     """Single valid model row with population-default values."""
     return pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
-
-
-def pytest_configure(config) -> None:
-    """Re-apply logging without file handler if modules imported before conftest."""
-    from utils.logging import setup_logging
-
-    setup_logging()

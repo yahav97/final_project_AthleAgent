@@ -1,4 +1,4 @@
-"""Unit tests for Settings env parsing."""
+"""Unit tests for backend Settings defaults."""
 
 from __future__ import annotations
 
@@ -9,47 +9,21 @@ from config import Settings, settings
 pytestmark = pytest.mark.unit
 
 
-class TestCorsOriginsParsing:
-    def test_default_origins(self):
+class TestDomainDefaults:
+    def test_ml_gate_defaults(self):
+        s = Settings()
+        assert s.ML_MIN_RECALL_HARD == 0.80
+        assert s.ML_MIN_AUC_FOR_LIVE == 0.68
+
+    def test_cors_origins(self):
         s = Settings()
         assert "http://localhost:3000" in s.CORS_ORIGINS
-
-    def test_comma_separated_env_override(self, monkeypatch):
-        monkeypatch.setenv("CORS_ORIGINS", "http://a.com, http://b.com")
-        s = Settings()
-        assert s.CORS_ORIGINS == ["http://a.com", "http://b.com"]
-
-    def test_json_array_env_override(self, monkeypatch):
-        monkeypatch.setenv("CORS_ORIGINS", '["http://x.com","http://y.com"]')
-        s = Settings()
-        assert s.CORS_ORIGINS == ["http://x.com", "http://y.com"]
-
-
-class TestDomainDefaults:
-    def test_ml_gate_defaults_match_training_policy(self):
-        import sys
-        from pathlib import Path
-
-        ml_root = str(Path(__file__).resolve().parents[2] / "ML_model")
-        if ml_root not in sys.path:
-            sys.path.insert(0, ml_root)
-        from policy_config import DEFAULT_MIN_AUC_FOR_LIVE, DEFAULT_MIN_RECALL_HARD
-
-        s = Settings()
-        assert s.ML_MIN_RECALL_HARD == DEFAULT_MIN_RECALL_HARD
-        assert s.ML_MIN_AUC_FOR_LIVE == DEFAULT_MIN_AUC_FOR_LIVE
 
     def test_profile_default_age(self):
         assert settings.PROFILE_DEFAULT_AGE == 22
         assert settings.PROFILE_DEFAULT_AGE == int(
             __import__("services.model_features", fromlist=["DEFAULT_FEATURE_VALUES"]).DEFAULT_FEATURE_VALUES["age"]
         )
-
-    def test_ml_gate_defaults(self):
-        s = Settings()
-        assert s.ML_MIN_RECALL_HARD == 0.80
-        assert s.ML_MIN_AUC_FOR_LIVE == 0.68
-        assert s.ML_DEGRADED_AUC_OFFSET == 0.02
 
     def test_risk_band_defaults(self):
         s = Settings()
@@ -63,26 +37,10 @@ class TestDomainDefaults:
         assert s.HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS == 4
         assert s.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS == 3
 
-    def test_sleep_feature_defaults_match_training_constants(self):
-        import sys
-        from pathlib import Path
-
-        ml_root = str(Path(__file__).resolve().parents[2] / "ML_model")
-        if ml_root not in sys.path:
-            sys.path.insert(0, ml_root)
-        from policy_config import (
-            DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE,
-            DEFAULT_SLEEP_TARGET_HOURS,
-        )
-
+    def test_sleep_feature_defaults(self):
         s = Settings()
-        assert s.SLEEP_TARGET_HOURS == DEFAULT_SLEEP_TARGET_HOURS
-        assert s.SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE == DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE
-
-    def test_sleep_target_hours_env_override(self, monkeypatch):
-        monkeypatch.setenv("SLEEP_TARGET_HOURS", "7.5")
-        s = Settings()
-        assert s.SLEEP_TARGET_HOURS == pytest.approx(7.5)
+        assert s.SLEEP_TARGET_HOURS == 8.0
+        assert s.SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE == 1.25
 
     def test_feature_flags_default_off(self):
         s = Settings()
@@ -98,3 +56,6 @@ class TestDomainDefaults:
         assert fresh.ML_MIN_RECALL_HARD == settings.ML_MIN_RECALL_HARD
         assert fresh.RISK_HIGH_CUTOFF == settings.RISK_HIGH_CUTOFF
 
+    def test_openapi_enabled_in_development(self):
+        s = Settings()
+        assert s.openapi_enabled is True
