@@ -7,7 +7,10 @@ from typing import Any
 from ml.model_loader import get_model, get_model_gate_reason
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
-from services.history.repository import fetch_daily_firestore_snapshot, save_daily_prediction_result
+from services.history.repository import (
+    fetch_inference_firestore_bundle,
+    save_daily_prediction_result,
+)
 from services.nutrition_defaults import resolve_request_nutrition
 from services.profile_defaults import resolve_request_age
 from services.prediction.bundle import resolve_model_bundle
@@ -27,7 +30,11 @@ from utils.exceptions import DatabaseError, MLModelError
 from utils.logging import logger
 
 
-def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
+def predict_injury_risk(
+    payload: InjuryPredictionRequest,
+    *,
+    history_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Run preprocessing → feature row → sklearn ``predict_proba`` (injury positive class).
 
@@ -37,7 +44,11 @@ def predict_injury_risk(payload: InjuryPredictionRequest) -> dict[str, Any]:
     payload = resolve_request_nutrition(payload)
     payload = resolve_request_age(payload)
     frame = injury_request_to_model_dataframe(payload)
-    frame, history_confidence = apply_history_confidence_fallback(frame, payload)
+    frame, history_confidence = apply_history_confidence_fallback(
+        frame,
+        payload,
+        history_context=history_context,
+    )
     quality = calculate_data_quality_score(payload)
     quality_score = float(quality["score"])
     logger.info(
@@ -97,12 +108,16 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     - Survey: ``daily_checkins/{D}``.
     - Nutrition: ``daily_nutrition/{D-1}`` + population defaults via ``resolve_request_nutrition``.
     """
-    snapshot = fetch_daily_firestore_snapshot(user_id, date_key)
+    bundle = fetch_inference_firestore_bundle(user_id, date_key)
+    snapshot = bundle.get("snapshot") or {}
     if not snapshot:
         raise DatabaseError("Firestore snapshot unavailable", code="firestore_snapshot_unavailable")
 
     payload = injury_prediction_request_from_firestore_snapshot(user_id, date_key, snapshot)
-    return predict_injury_risk(payload)
+    return predict_injury_risk(
+        payload,
+        history_context=bundle.get("history_context"),
+    )
 
 
 def persist_prediction_result_or_raise(

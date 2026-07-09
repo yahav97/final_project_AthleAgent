@@ -301,8 +301,8 @@ class TestPredictInjuryRisk:
 
     def test_from_firestore_raises_when_snapshot_empty(self, monkeypatch):
         monkeypatch.setattr(
-            "services.prediction.service.fetch_daily_firestore_snapshot",
-            lambda uid, d: {},
+            "services.prediction.service.fetch_inference_firestore_bundle",
+            lambda uid, d, **kwargs: {},
         )
         with pytest.raises(DatabaseError, match="Firestore snapshot unavailable"):
             predict_injury_risk_from_firestore("u1", "2026-05-09")

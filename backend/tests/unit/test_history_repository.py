@@ -13,6 +13,7 @@ from services.history.day_quality import (
 )
 from services.history.history_merge import merge_wake_up_day_row
 from services.history.repository import (
+    fetch_inference_firestore_bundle,
     fetch_user_history,
     get_history_window_context,
     history_confidence_from_quality_days,
@@ -191,7 +192,7 @@ class TestHistoricalDerivedFeatures:
 
 class TestReadFirestoreDocuments:
     def test_get_all_used_when_client_supports_batch(self):
-        calls: list[list[object]] = []
+        calls: list[tuple[list[object], tuple[str, ...] | None]] = []
 
         class _Snapshot:
             def __init__(self, label: str) -> None:
@@ -206,18 +207,20 @@ class TestReadFirestoreDocuments:
                 self.label = label
 
         class _Db:
-            def get_all(self, refs: list[object]) -> list[_Snapshot]:
-                calls.append(list(refs))
+            def get_all(self, refs: list[object], field_paths=None) -> list[_Snapshot]:
+                calls.append((list(refs), tuple(field_paths) if field_paths else None))
                 return [_Snapshot(ref.label) for ref in refs]
 
         refs = [_Ref("a"), _Ref("b")]
-        snapshots = read_firestore_documents(_Db(), refs)
+        field_paths = ("steps", "sleepMinutes")
+        snapshots = read_firestore_documents(_Db(), refs, field_paths=field_paths)
         assert len(calls) == 1
-        assert calls[0] == refs
+        assert calls[0][0] == refs
+        assert calls[0][1] == field_paths
         assert [snap.to_dict()["label"] for snap in snapshots] == ["a", "b"]
 
     def test_falls_back_to_sequential_get_without_get_all(self):
-        get_calls: list[str] = []
+        get_calls: list[tuple[str, tuple[str, ...] | None]] = []
 
         class _Snapshot:
             def __init__(self, label: str) -> None:
@@ -231,13 +234,14 @@ class TestReadFirestoreDocuments:
             def __init__(self, label: str) -> None:
                 self.label = label
 
-            def get(self) -> _Snapshot:
-                get_calls.append(self.label)
+            def get(self, field_paths=None) -> _Snapshot:
+                get_calls.append((self.label, tuple(field_paths) if field_paths else None))
                 return _Snapshot(self.label)
 
         refs = [_Ref("x"), _Ref("y")]
-        snapshots = read_firestore_documents(object(), refs)
-        assert get_calls == ["x", "y"]
+        field_paths = ("steps",)
+        snapshots = read_firestore_documents(object(), refs, field_paths=field_paths)
+        assert get_calls == [("x", field_paths), ("y", field_paths)]
         assert [snap.to_dict()["label"] for snap in snapshots] == ["x", "y"]
 
 
@@ -258,7 +262,7 @@ class TestFetchUserHistory:
                 self.collection = collection
                 self.key = key
 
-            def get(self) -> _Snapshot:
+            def get(self, field_paths=None) -> _Snapshot:
                 get_calls.append((self.collection, self.key))
                 if self.collection == "daily_health" and self.key == "2026-05-02":
                     return _Snapshot(
@@ -343,7 +347,7 @@ class TestFetchUserHistory:
 
                 return _Users()
 
-            def get_all(self, refs: list[_DocRef]) -> list[_Snapshot]:
+            def get_all(self, refs: list[_DocRef], field_paths=None) -> list[_Snapshot]:
                 batch_get_all_calls.append(len(refs))
                 return [ref.get() for ref in refs]
 
@@ -357,6 +361,68 @@ class TestFetchUserHistory:
         assert "2026-04-30" in requested_health_keys
         # 7 wake + 7 physical + 7 checkin refs, with 6 overlapping health docs → 15 unique reads.
         assert batch_get_all_calls == [15]
+
+
+class TestFetchInferenceFirestoreBundle:
+    def test_single_batch_read_for_snapshot_and_history(self, monkeypatch):
+        batch_sizes: list[int] = []
+        field_paths_used: list[tuple[str, ...] | None] = []
+
+        class _Snapshot:
+            def __init__(self, exists: bool, data: dict | None = None) -> None:
+                self.exists = exists
+                self._data = data or {}
+
+            def to_dict(self) -> dict:
+                return self._data
+
+        class _DocRef:
+            def __init__(self, collection: str, key: str) -> None:
+                self.collection = collection
+                self.key = key
+
+        class _Collection:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def document(self, key: str) -> _DocRef:
+                return _DocRef(self.name, key)
+
+        class _UserDoc:
+            path = "users/u1"
+
+            def collection(self, name: str) -> _Collection:
+                return _Collection(name)
+
+        class _Db:
+            def collection(self, name: str):
+                class _Users:
+                    def document(self, uid: str) -> _UserDoc:
+                        return _UserDoc()
+
+                return _Users()
+
+            def get_all(self, refs: list[_DocRef], field_paths=None) -> list[_Snapshot]:
+                batch_sizes.append(len(refs))
+                field_paths_used.append(tuple(field_paths) if field_paths else None)
+                return [_Snapshot(False) for _ in refs]
+
+        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        bundle = fetch_inference_firestore_bundle("u1", "2026-05-07")
+
+        # Snapshot (profile + D + D-1 + checkin + nutrition) + history window, deduped.
+        assert batch_sizes == [20]
+        assert field_paths_used[0] is not None
+        assert "finalRiskScore" not in field_paths_used[0]
+        assert "steps" in field_paths_used[0]
+        assert bundle["snapshot"] == {
+            "profile": {},
+            "daily_health": {},
+            "daily_health_yesterday": {},
+            "daily_checkins": {},
+            "daily_nutrition_yesterday": {},
+        }
+        assert bundle["history_context"]["confidence"] == "low"
 
 
 def _training_style_ma7(acwr_values: list[float], sleep_values: list[float]) -> tuple[float, float]:

@@ -152,12 +152,11 @@ class TestPredictDailyErrors:
             "daily_nutrition_yesterday": {"totalCalories": 2400},
         }
         monkeypatch.setattr(
-            "services.prediction.service.fetch_daily_firestore_snapshot",
-            lambda uid, d: dict(snapshot_without_age),
-        )
-        monkeypatch.setattr(
-            "services.prediction.confidence.get_history_window_context",
-            lambda *a, **k: {"confidence": "low", "features": {}},
+            "services.prediction.service.fetch_inference_firestore_bundle",
+            lambda uid, d, **kwargs: {
+                "snapshot": dict(snapshot_without_age),
+                "history_context": {"confidence": "low", "features": {}},
+            },
         )
 
         class _Estimator:

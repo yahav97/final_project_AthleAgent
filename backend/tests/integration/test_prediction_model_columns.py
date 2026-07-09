@@ -19,13 +19,16 @@ def test_predict_daily_with_loaded_model_no_500(monkeypatch):
     from main import app
 
     monkeypatch.setattr(
-        "services.prediction.service.fetch_daily_firestore_snapshot",
-        lambda uid, d: {
-            "profile": {"birth_date": "1995-01-01"},
-            "daily_health": {"sleepMinutes": 480},
-            "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
-            "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2, "energyLevel": 65},
-            "daily_nutrition_yesterday": {},
+        "services.prediction.service.fetch_inference_firestore_bundle",
+        lambda uid, d, **kwargs: {
+            "snapshot": {
+                "profile": {"birth_date": "1995-01-01"},
+                "daily_health": {"sleepMinutes": 480},
+                "daily_health_yesterday": {"steps": 8000, "distanceMeters": 5000},
+                "daily_checkins": {"stressLevel": 35, "muscleSoreness": 2, "energyLevel": 65},
+                "daily_nutrition_yesterday": {},
+            },
+            "history_context": {"confidence": "low", "features": {}},
         },
     )
 

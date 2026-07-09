@@ -36,6 +36,8 @@ def parse_history_confidence(confidence: HistoryConfidence | str) -> HistoryConf
 def apply_history_confidence_fallback(
     feature_frame: pd.DataFrame,
     payload: InjuryPredictionRequest,
+    *,
+    history_context: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, HistoryConfidence]:
     """
     Enrich row with historical rolling features and return confidence label.
@@ -45,18 +47,21 @@ def apply_history_confidence_fallback(
       fields to avoid noisy short-window artifacts.
     """
     confidence = HistoryConfidence.LOW
-    if not (payload.userId and payload.date):
+    if history_context is None:
+        if not (payload.userId and payload.date):
+            return feature_frame, confidence
+        history_context = get_history_window_context(
+            payload.userId,
+            payload.date,
+            lookback_days=settings.HISTORY_LOOKBACK_DAYS,
+            include_target_day=False,
+        )
+    elif not (payload.userId and payload.date):
         return feature_frame, confidence
 
-    context = get_history_window_context(
-        payload.userId,
-        payload.date,
-        lookback_days=settings.HISTORY_LOOKBACK_DAYS,
-        include_target_day=False,
-    )
-    confidence_raw = context.get("confidence") or HistoryConfidence.LOW.value
+    confidence_raw = history_context.get("confidence") or HistoryConfidence.LOW.value
     confidence = parse_history_confidence(confidence_raw)
-    features = context.get("features") or {}
+    features = history_context.get("features") or {}
 
     if confidence in (HistoryConfidence.HIGH, HistoryConfidence.MEDIUM) and features:
         for column, value in features.items():

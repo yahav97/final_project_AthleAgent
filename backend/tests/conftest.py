@@ -75,8 +75,11 @@ def mock_firestore_snapshot(monkeypatch, firestore_snapshot: dict[str, Any]) -> 
     def apply(snapshot: dict[str, Any] | None = None) -> None:
         data = snapshot if snapshot is not None else firestore_snapshot
         monkeypatch.setattr(
-            "services.prediction.service.fetch_daily_firestore_snapshot",
-            lambda uid, d: dict(data),
+            "services.prediction.service.fetch_inference_firestore_bundle",
+            lambda uid, d, **kwargs: {
+                "snapshot": dict(data),
+                "history_context": {"confidence": "low", "features": {}},
+            },
         )
 
     return apply
