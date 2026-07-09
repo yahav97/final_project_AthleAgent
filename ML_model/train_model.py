@@ -1,20 +1,13 @@
-"""Train injury model with balanced precision–recall policy for production UX.
-
-Backward-compatible entry point — implementation lives in ``training/``.
-"""
+"""Train injury model — entry point for the full training pipeline."""
 
 from __future__ import annotations
 
-import io
 import sys
 from pathlib import Path
 
 _ml_dir = str(Path(__file__).resolve().parent)
 if _ml_dir not in sys.path:
     sys.path.insert(0, _ml_dir)
-
-if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from training.constants import (  # noqa: E402
     ATHLETE_CV_SPLITS,
@@ -43,17 +36,6 @@ from training.policy import (  # noqa: E402
     build_operating_points_table,
     evaluate_with_threshold,
     pick_best_model,
-    select_winner_with_cv_stability,
-)
-
-# Policy helpers used by notebook cells that import from train_model.
-from policy_config import (  # noqa: E402
-    apply_policy_overrides,
-    evaluate_policy_gates,
-    get_policy,
-    policy_as_dict,
-    policy_thresholds,
-    reset_policy,
 )
 
 

@@ -1,28 +1,31 @@
-"""Single source of truth for ML policy gates and feature-engineering defaults.
+"""ML selection gates and feature-engineering defaults.
 
-Used by training (`train_model.py`, `data_generator.py`), validation
-(`validate_metrics.py`), the presentation notebook, and as defaults for
-backend serving gates (`backend/config.py`).
-
-Runtime overrides (notebook demo): call ``apply_policy_overrides(...)`` then
-re-run training — a different candidate may win.
+Used by training, validation, the demo notebook, and backend/config.py defaults.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from types import SimpleNamespace
 from typing import Any
 
-# Canonical defaults — backend/config.py imports these for ML_MIN_* defaults.
+# Selection gates — backend/config.py imports DEFAULT_MIN_* for Settings defaults.
+DEFAULT_THRESHOLD: float = 0.18
 DEFAULT_MIN_RECALL_HARD: float = 0.80
 DEFAULT_MIN_AUC_FOR_LIVE: float = 0.68
 DEFAULT_MAX_FPR_OPERATING: float = 0.55
 DEFAULT_TARGET_RECALL: float = 0.80
 DEFAULT_TARGET_PRECISION: float = 0.13
 DEFAULT_TARGET_F1: float = 0.22
-DEFAULT_THRESHOLD: float = 0.18
 
-# Feature-engineering defaults — backend/config.py imports these for serve-time settings.
+THRESHOLD = DEFAULT_THRESHOLD
+MIN_RECALL_HARD = DEFAULT_MIN_RECALL_HARD
+MIN_AUC_FOR_LIVE = DEFAULT_MIN_AUC_FOR_LIVE
+MAX_FPR_OPERATING = DEFAULT_MAX_FPR_OPERATING
+TARGET_RECALL = DEFAULT_TARGET_RECALL
+TARGET_PRECISION = DEFAULT_TARGET_PRECISION
+TARGET_F1 = DEFAULT_TARGET_F1
+
+# Feature-engineering defaults — backend/config.py imports these.
 DEFAULT_SLEEP_TARGET_HOURS: float = 8.0
 DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = 1.25
 
@@ -31,99 +34,49 @@ DEFAULT_COLD_START_AUGMENT_FRACTION: float = 0.25
 DEFAULT_COLD_START_FIRST_N_DAYS: int = 7
 DEFAULT_NUTRITION_MASK_FRACTION: float = 0.25
 
-POLICY_FIELD_NAMES: tuple[str, ...] = (
-    "THRESHOLD",
-    "MIN_RECALL_HARD",
-    "TARGET_RECALL",
-    "TARGET_PRECISION",
-    "TARGET_F1",
-    "MAX_FPR_OPERATING",
-    "MIN_AUC_FOR_LIVE",
-)
 
-
-@dataclass
-class PolicyConfig:
-    """Mutable policy gates for model selection and promotion checks."""
-
-    THRESHOLD: float = DEFAULT_THRESHOLD
-    MIN_RECALL_HARD: float = DEFAULT_MIN_RECALL_HARD
-    TARGET_RECALL: float = DEFAULT_TARGET_RECALL
-    TARGET_PRECISION: float = DEFAULT_TARGET_PRECISION
-    TARGET_F1: float = DEFAULT_TARGET_F1
-    MAX_FPR_OPERATING: float = DEFAULT_MAX_FPR_OPERATING
-    MIN_AUC_FOR_LIVE: float = DEFAULT_MIN_AUC_FOR_LIVE
-
-
-_active: PolicyConfig = PolicyConfig()
-
-
-def get_default_policy() -> PolicyConfig:
-    """Fresh copy of repository defaults (not the live mutable singleton)."""
-    return PolicyConfig()
-
-
-def get_policy() -> PolicyConfig:
-    """Live policy used by training and validation."""
-    return _active
-
-
-def reset_policy() -> PolicyConfig:
-    """Restore live policy to repository defaults."""
-    global _active
-    _active = PolicyConfig()
-    return _active
-
-
-def apply_policy_overrides(**overrides: float | None) -> PolicyConfig:
-    """Override live policy values (pass ``None`` to skip a key)."""
-    valid = {f.name for f in fields(PolicyConfig)}
-    for key, value in overrides.items():
-        if value is None:
-            continue
-        if key not in valid:
-            raise ValueError(f"Unknown policy key {key!r}. Valid: {sorted(valid)}")
-        setattr(_active, key, float(value))
-    return _active
+def get_policy() -> SimpleNamespace:
+    """Current gate values (notebook may edit module constants before training)."""
+    return SimpleNamespace(
+        THRESHOLD=THRESHOLD,
+        MIN_RECALL_HARD=MIN_RECALL_HARD,
+        TARGET_RECALL=TARGET_RECALL,
+        TARGET_PRECISION=TARGET_PRECISION,
+        TARGET_F1=TARGET_F1,
+        MAX_FPR_OPERATING=MAX_FPR_OPERATING,
+        MIN_AUC_FOR_LIVE=MIN_AUC_FOR_LIVE,
+    )
 
 
 def policy_thresholds() -> dict[str, float]:
-    p = _active
     return {
-        "recall_hard_min": p.MIN_RECALL_HARD,
-        "recall_target": p.TARGET_RECALL,
-        "precision_min": p.TARGET_PRECISION,
-        "f1_min": p.TARGET_F1,
-        "fpr_max_operating": p.MAX_FPR_OPERATING,
-        "fixed_comparison_threshold": p.THRESHOLD,
-        "auc_min_for_live": p.MIN_AUC_FOR_LIVE,
+        "recall_hard_min": MIN_RECALL_HARD,
+        "recall_target": TARGET_RECALL,
+        "precision_min": TARGET_PRECISION,
+        "f1_min": TARGET_F1,
+        "fpr_max_operating": MAX_FPR_OPERATING,
+        "fixed_comparison_threshold": THRESHOLD,
+        "auc_min_for_live": MIN_AUC_FOR_LIVE,
     }
 
 
 def evaluate_policy_gates(recall: float, precision: float, f1: float, fpr: float) -> dict[str, bool]:
-    p = _active
     return {
-        "recall_hard": recall >= p.MIN_RECALL_HARD,
-        "fpr": fpr <= p.MAX_FPR_OPERATING,
-        "precision": precision >= p.TARGET_PRECISION,
-        "f1": f1 >= p.TARGET_F1,
+        "recall_hard": recall >= MIN_RECALL_HARD,
+        "fpr": fpr <= MAX_FPR_OPERATING,
+        "precision": precision >= TARGET_PRECISION,
+        "f1": f1 >= TARGET_F1,
     }
 
 
 def policy_as_dict() -> dict[str, Any]:
-    """Serialize live policy (for manifests and debugging)."""
-    p = _active
+    """Serialize policy for run manifests."""
     return {
-        "recall_hard_min": p.MIN_RECALL_HARD,
-        "recall_min": p.TARGET_RECALL,
-        "fpr_max_operating": p.MAX_FPR_OPERATING,
-        "precision_min": p.TARGET_PRECISION,
-        "f1_min": p.TARGET_F1,
-        "auc_min_for_live": p.MIN_AUC_FOR_LIVE,
-        "fixed_comparison_threshold": p.THRESHOLD,
+        "recall_hard_min": MIN_RECALL_HARD,
+        "recall_min": TARGET_RECALL,
+        "fpr_max_operating": MAX_FPR_OPERATING,
+        "precision_min": TARGET_PRECISION,
+        "f1_min": TARGET_F1,
+        "auc_min_for_live": MIN_AUC_FOR_LIVE,
+        "fixed_comparison_threshold": THRESHOLD,
     }
-
-
-def format_policy_knobs_template() -> dict[str, float | None]:
-    """Notebook helper: ``None`` = keep default; set a float to experiment live."""
-    return {name: None for name in POLICY_FIELD_NAMES}

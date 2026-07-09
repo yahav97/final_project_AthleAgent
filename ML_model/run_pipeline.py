@@ -1,26 +1,22 @@
-"""Run full ML pipeline and promote latest successful artifact set."""
+"""Run full ML pipeline: generate data → train → validate → promote."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from data_generator import DAYS_PER_ATHLETE, NUM_ATHLETES
 
-
-def _run(command: list[str], cwd: Path, allowed_exit_codes: tuple[int, ...] = (0,)) -> int:
+def _run(command: list[str], cwd: Path) -> None:
     proc = subprocess.run(command, cwd=str(cwd), check=False, capture_output=True, text=True)
     if proc.stdout:
         print(proc.stdout, end="")
     if proc.stderr:
         print(proc.stderr, end="", file=sys.stderr)
-    if proc.returncode not in allowed_exit_codes:
+    if proc.returncode != 0:
         raise RuntimeError(f"Command failed ({proc.returncode}): {' '.join(command)}")
-    return proc.returncode
 
 
 def _latest_artifacts_dir(ml_dir: Path) -> Path:
@@ -31,72 +27,32 @@ def _latest_artifacts_dir(ml_dir: Path) -> Path:
     return dirs[0]
 
 
-def _promote(ml_dir: Path, artifacts_dir: Path, degraded_rc: bool) -> None:
+def _promote(ml_dir: Path, artifacts_dir: Path) -> None:
     promoted_path = ml_dir / "artifacts" / "promoted.json"
     run_id = artifacts_dir.name
     model_rel = (artifacts_dir / "injury_model.pkl").relative_to(ml_dir.parent).as_posix()
-    manifest_rel = f"ML_model/artifacts/{run_id}/run_manifest.json"
     payload = {
         "model_path": model_rel,
         "run_id": run_id,
         "promoted_at_utc": datetime.now(timezone.utc).isoformat(),
         "promoted_by": "run_pipeline.py",
-        "manifest_path": manifest_rel,
+        "manifest_path": f"ML_model/artifacts/{run_id}/run_manifest.json",
     }
     with open(promoted_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
-    if degraded_rc:
-        print("Warning: promoted with degraded validation (exit code 2).")
     print(f"Promoted artifact set: {artifacts_dir}")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run AthleAgent ML pipeline.")
-    parser.add_argument("--num-athletes", type=int, default=NUM_ATHLETES)
-    parser.add_argument("--days", type=int, default=DAYS_PER_ATHLETE)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--force-benchmark", action="store_true")
-    parser.add_argument(
-        "--allow-degraded",
-        action="store_true",
-        help="Promote when validate_metrics exits 2 (passes hard gate only, not all targets).",
-    )
-    parser.add_argument(
-        "--allow-cv-disagreement",
-        action="store_true",
-        help="Promote when CV top model differs from selected holdout winner.",
-    )
-    args = parser.parse_args()
-
     ml_dir = Path(__file__).resolve().parent
-    _run(
-        [
-            sys.executable,
-            "data_generator.py",
-            "--num-athletes",
-            str(args.num_athletes),
-            "--days",
-            str(args.days),
-            "--seed",
-            str(args.seed),
-        ],
-        ml_dir,
-    )
-    benchmark_cmd = [sys.executable, "create_benchmark_set.py", "--seed", str(args.seed)]
-    if args.force_benchmark:
-        benchmark_cmd.append("--force")
-    _run(benchmark_cmd, ml_dir)
-    _run([sys.executable, "train_model.py"], ml_dir)
-    validate_cmd = [sys.executable, "validate_metrics.py"]
-    if args.allow_cv_disagreement:
-        validate_cmd.append("--allow-cv-disagreement")
-    validate_exit = _run(
-        validate_cmd,
-        ml_dir,
-        allowed_exit_codes=(0, 2) if args.allow_degraded else (0,),
-    )
-    artifacts_dir = _latest_artifacts_dir(ml_dir)
-    _promote(ml_dir, artifacts_dir, degraded_rc=(validate_exit == 2))
+    python = sys.executable
+
+    _run([python, "data_generator.py"], ml_dir)
+    _run([python, "create_benchmark_set.py"], ml_dir)
+    _run([python, "train_model.py"], ml_dir)
+    _run([python, "validate_metrics.py"], ml_dir)
+
+    _promote(ml_dir, _latest_artifacts_dir(ml_dir))
     return 0
 
 

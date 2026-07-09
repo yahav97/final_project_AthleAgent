@@ -41,7 +41,6 @@ from training.policy import (
     print_split_diagnostics,
     select_best_operating_points,
     select_operating_threshold_for_model,
-    select_winner_with_cv_stability,
     threshold_sweep,
 )
 from training.serve_parity import apply_train_serve_parity_augmentation
@@ -258,23 +257,14 @@ def cross_validate_by_athlete(
 def assess_cv_holdout_agreement(
     cv_result: AthleteCvResult,
     holdout_winner: str,
-    *,
-    holdout_pure_winner: str | None = None,
-    selection_reason: str | None = None,
-) -> dict[str, str | bool | int]:
-    """Compare CV stability leader with the selected holdout winner."""
+) -> dict[str, str | bool]:
+    """Compare CV stability leader with the holdout winner (informational)."""
     cv_top = str(cv_result.summary.iloc[0]["Model"])
-    pure = holdout_pure_winner or holdout_winner
-    payload: dict[str, str | bool | int] = {
+    return {
         "cv_top_model": cv_top,
-        "holdout_pure_winner": pure,
         "holdout_winner": holdout_winner,
-        "selected_model": holdout_winner,
         "agreement": cv_top == holdout_winner,
     }
-    if selection_reason:
-        payload["selection_reason"] = selection_reason
-    return payload
 
 
 # --- training ---
@@ -346,18 +336,19 @@ def train_and_compare(
         by=["F1@Threshold", "Precision@Threshold", "Recall@Threshold", "FPR@Threshold"],
         ascending=[False, False, False, True],
     )
+    best_row = pick_best_model(results_df, threshold_rows)
     cv_agreement: dict[str, str | bool | int] | None = None
     if cv_result is not None:
-        best_row, cv_agreement = select_winner_with_cv_stability(cv_result, results_df, threshold_rows)
+        cv_agreement = assess_cv_holdout_agreement(
+            cv_result,
+            str(best_row["Model"]),
+        )
         if verbose and not cv_agreement.get("agreement"):
             print(
-                "\nCV/holdout stability: combined-rank selection "
-                f"chose {cv_agreement.get('selected_model')} "
-                f"(CV top={cv_agreement.get('cv_top_model')}, "
-                f"holdout-only winner={cv_agreement.get('holdout_pure_winner')})."
+                "\nCV note: top CV model "
+                f"({cv_agreement.get('cv_top_model')}) differs from holdout winner "
+                f"({cv_agreement.get('holdout_winner')}). Holdout policy stands."
             )
-    else:
-        best_row = pick_best_model(results_df, threshold_rows)
     best_model_name = str(best_row["Model"])
     best_model = trained_models[best_model_name]
     best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
@@ -542,9 +533,8 @@ def run_training_pipeline(
             )
         else:
             print(
-                f"\nCV stability WARNING: top CV model ({cv_agreement['cv_top_model']}) "
-                f"≠ selected winner ({cv_agreement.get('selected_model', cv_agreement['holdout_winner'])}). "
-                "Promotion is blocked unless validate_metrics is run with --allow-cv-disagreement."
+                f"\nCV note: top CV model ({cv_agreement['cv_top_model']}) "
+                f"differs from holdout winner ({cv_agreement['holdout_winner']})."
             )
         print(f"\nRefitting {result.best_model_name} on full dataset for serving...")
     serving_model, serving_importance = refit_winner_for_serving(df, result.best_model_name)
