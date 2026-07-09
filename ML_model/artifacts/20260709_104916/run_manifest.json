@@ -1,0 +1,74 @@
+{
+  "created_at_utc": "2026-07-09T10:49:16.700747+00:00",
+  "run_id": "20260709_104916",
+  "artifacts_dir": "ML_model/artifacts/20260709_104916",
+  "dataset_path": "ML_model/athlete_injury_data.csv",
+  "dataset_rows": 340000,
+  "benchmark_path": "ML_model/benchmark_holdout.csv",
+  "threshold": 0.1,
+  "policy": {
+    "recall_hard_min": 0.8,
+    "recall_min": 0.8,
+    "fpr_max_operating": 0.55,
+    "precision_min": 0.13,
+    "f1_min": 0.22,
+    "auc_min_for_live": 0.68,
+    "fixed_comparison_threshold": 0.18
+  },
+  "winner": "XGBoostCalibratedTuned",
+  "athlete_cv_splits": 2,
+  "selection_protocol": {
+    "athlete_cv_splits": 2,
+    "metrics_source": "fixed_holdout_evaluation",
+    "serving_model_fit": "full_dataset_refit",
+    "cv_holdout_agreement": {
+      "cv_top_model": "XGBoostCalibratedTuned",
+      "holdout_winner": "XGBoostCalibratedTuned",
+      "agreement": true
+    },
+    "train_serve_parity_augmentation": {
+      "enabled": true,
+      "rows": 340000,
+      "cold_start_fraction_target": 0.25,
+      "cold_start_first_n_days": 7,
+      "cold_start_rows": 85000,
+      "cold_start_fraction_actual": 0.25,
+      "nutrition_mask_fraction_target": 0.25,
+      "nutrition_mask_rows": 85103,
+      "nutrition_mask_fraction_actual": 0.25030294117647056,
+      "overlap_rows": 21269,
+      "contract_path": "backend/data/model_feature_contract.json",
+      "nutrition_defaults": {
+        "nutrition_intake_calories": 2600.0,
+        "daily_calories": 2600.0,
+        "calorie_balance": 610.0
+      }
+    }
+  },
+  "winner_metrics": {
+    "Recall@Threshold": 0.8078307830783078,
+    "Precision@Threshold": 0.27077173716285524,
+    "F1@Threshold": 0.40559472161966736,
+    "FPR@Threshold": 0.42487256108279137,
+    "BrierScore": 0.11139500382384482,
+    "ROC-AUC": 0.7827366754956389,
+    "LogLoss": 0.36619189731175883
+  },
+  "risk_bins": [
+    {
+      "bin": "green_0_20",
+      "samples": 52281,
+      "injury_rate": 0.0923279967865955
+    },
+    {
+      "bin": "yellow_20_50",
+      "samples": 11217,
+      "injury_rate": 0.30881697423553534
+    },
+    {
+      "bin": "red_50_100",
+      "samples": 4502,
+      "injury_rate": 0.6261661483784985
+    }
+  ]
+}

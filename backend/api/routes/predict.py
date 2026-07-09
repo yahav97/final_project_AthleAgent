@@ -1,6 +1,6 @@
 """Injury risk prediction HTTP routes."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from config import settings
 from ml.model_loader import get_model_status
@@ -13,7 +13,6 @@ from services.prediction.service import (
     persist_prediction_result_or_raise,
     predict_injury_risk_from_firestore,
 )
-from utils.exceptions import AuthorizationError
 from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
@@ -43,22 +42,14 @@ def test_predict_injury(data: SimpleData):
 
 
 @router.post("/predict/daily", response_model=InjuryPredictionResponse)
-def predict_injury_daily(
-    trigger: DailyPredictionTriggerRequest,
-    request: Request,
-) -> InjuryPredictionResponse:
+def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredictionResponse:
     """
     Minimal trigger endpoint: frontend sends only userId/date; backend loads all
     relevant daily data directly from Firestore and runs production inference.
-    """
-    if settings.REQUIRE_FIREBASE_AUTH:
-        authenticated_uid = str(getattr(request.state, "firebase_uid", "") or "")
-        if authenticated_uid != trigger.userId:
-            raise AuthorizationError(
-                "userId does not match authenticated Firebase uid",
-                code="auth_user_mismatch",
-            )
 
+    API auth is not enforced here — Android clients do not send Bearer tokens.
+    Demo deployments should bind to localhost only (see docker-compose.yml).
+    """
     user_id_var.set(trigger.userId)
     result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
     persist_prediction_result_or_raise(

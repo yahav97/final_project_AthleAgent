@@ -43,6 +43,7 @@ from training.policy import (  # noqa: E402
     build_operating_points_table,
     evaluate_with_threshold,
     pick_best_model,
+    select_winner_with_cv_stability,
 )
 
 # Policy helpers used by notebook cells that import from train_model.

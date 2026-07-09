@@ -41,8 +41,10 @@ from training.policy import (
     print_split_diagnostics,
     select_best_operating_points,
     select_operating_threshold_for_model,
+    select_winner_with_cv_stability,
     threshold_sweep,
 )
+from training.serve_parity import apply_train_serve_parity_augmentation
 
 
 # Medium risk band uses 60% of the injury threshold (floor 0.15) — matches backend bundle defaults.
@@ -117,14 +119,24 @@ def subset_dataset(
     return out.sort_values(["athlete_id", "date"]).reset_index(drop=True)
 
 
-def prepare_model_frames(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, list[str]]:
+def prepare_model_frames(
+    df: pd.DataFrame,
+    *,
+    apply_serve_parity: bool = True,
+    serve_parity_seed: int = RANDOM_STATE,
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, list[str], dict[str, object]]:
     if LABEL_COLUMN not in df.columns:
         raise ValueError(f"Dataset must include '{LABEL_COLUMN}' column.")
     df = add_sequential_features(df)
+    df, parity_stats = apply_train_serve_parity_augmentation(
+        df,
+        seed=serve_parity_seed,
+        enabled=apply_serve_parity,
+    )
     y = df[LABEL_COLUMN].astype(int)
     model_df = df.drop(columns=[LABEL_COLUMN, "athlete_id", "date"])
     feature_columns = list(model_df.columns)
-    return df, y, model_df, feature_columns
+    return df, y, model_df, feature_columns, parity_stats
 
 
 def make_train_split(
@@ -133,8 +145,14 @@ def make_train_split(
     holdout_ratio: float = 0.2,
     seed: int = RANDOM_STATE,
     benchmark_path: str | Path | None = None,
+    apply_serve_parity: bool = True,
+    serve_parity_seed: int = RANDOM_STATE,
 ) -> TrainSplit:
-    df, y, model_df, feature_columns = prepare_model_frames(df)
+    df, y, model_df, feature_columns, parity_stats = prepare_model_frames(
+        df,
+        apply_serve_parity=apply_serve_parity,
+        serve_parity_seed=serve_parity_seed,
+    )
     benchmark_file = Path(benchmark_path) if benchmark_path else None
     if benchmark_file is not None and benchmark_file.is_file():
         benchmark_df = pd.read_csv(benchmark_file, parse_dates=["date"])
@@ -158,6 +176,7 @@ def make_train_split(
         y_all=y,
         feature_columns=feature_columns,
         holdout_athlete_ids=holdout_ids,
+        serve_parity_stats=parity_stats,
     )
 
 
@@ -236,14 +255,26 @@ def cross_validate_by_athlete(
     return AthleteCvResult(fold_details=fold_details, summary=summary)
 
 
-def assess_cv_holdout_agreement(cv_result: AthleteCvResult, holdout_winner: str) -> dict[str, str | bool]:
-    """Compare CV stability leader with the fixed-holdout policy winner."""
+def assess_cv_holdout_agreement(
+    cv_result: AthleteCvResult,
+    holdout_winner: str,
+    *,
+    holdout_pure_winner: str | None = None,
+    selection_reason: str | None = None,
+) -> dict[str, str | bool | int]:
+    """Compare CV stability leader with the selected holdout winner."""
     cv_top = str(cv_result.summary.iloc[0]["Model"])
-    return {
+    pure = holdout_pure_winner or holdout_winner
+    payload: dict[str, str | bool | int] = {
         "cv_top_model": cv_top,
+        "holdout_pure_winner": pure,
         "holdout_winner": holdout_winner,
+        "selected_model": holdout_winner,
         "agreement": cv_top == holdout_winner,
     }
+    if selection_reason:
+        payload["selection_reason"] = selection_reason
+    return payload
 
 
 # --- training ---
@@ -253,7 +284,7 @@ def refit_winner_for_serving(df: pd.DataFrame, model_name: str) -> tuple[object,
     """Refit the policy winner on the full dataset for production serving."""
     if model_name not in model_catalog():
         raise ValueError(f"Unknown model: {model_name}")
-    _, y, model_df, feature_columns = prepare_model_frames(df)
+    _, y, model_df, feature_columns, _parity_stats = prepare_model_frames(df)
     model = clone(model_catalog()[model_name])
     model.fit(model_df, y)
     return model, extract_feature_importance(model, feature_columns)
@@ -263,6 +294,7 @@ def train_and_compare(
     split: TrainSplit,
     *,
     model_names: list[str] | None = None,
+    cv_result: AthleteCvResult | None = None,
     verbose: bool = True,
 ) -> TrainResult:
     catalog = model_catalog()
@@ -314,7 +346,18 @@ def train_and_compare(
         by=["F1@Threshold", "Precision@Threshold", "Recall@Threshold", "FPR@Threshold"],
         ascending=[False, False, False, True],
     )
-    best_row = pick_best_model(results_df, threshold_rows)
+    cv_agreement: dict[str, str | bool | int] | None = None
+    if cv_result is not None:
+        best_row, cv_agreement = select_winner_with_cv_stability(cv_result, results_df, threshold_rows)
+        if verbose and not cv_agreement.get("agreement"):
+            print(
+                "\nCV/holdout stability: combined-rank selection "
+                f"chose {cv_agreement.get('selected_model')} "
+                f"(CV top={cv_agreement.get('cv_top_model')}, "
+                f"holdout-only winner={cv_agreement.get('holdout_pure_winner')})."
+            )
+    else:
+        best_row = pick_best_model(results_df, threshold_rows)
     best_model_name = str(best_row["Model"])
     best_model = trained_models[best_model_name]
     best_operating_threshold = select_operating_threshold_for_model(threshold_rows, best_model_name)
@@ -339,6 +382,7 @@ def train_and_compare(
         risk_bins_df=risk_bins_df,
         importance_df=importance_df,
         best_points=best_points,
+        cv_holdout_agreement=cv_agreement,
     )
 
 
@@ -362,6 +406,7 @@ def save_training_artifacts(
     serving_estimator: object | None = None,
     serving_importance_df: pd.DataFrame | None = None,
     cv_agreement: dict[str, str | bool] | None = None,
+    serve_parity_stats: dict[str, object] | None = None,
 ) -> Path:
     artifacts_dir = Path(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -410,6 +455,7 @@ def save_training_artifacts(
             "metrics_source": "fixed_holdout_evaluation",
             "serving_model_fit": "full_dataset_refit" if serving_estimator is not None else "holdout_train_only",
             "cv_holdout_agreement": cv_agreement,
+            "train_serve_parity_augmentation": serve_parity_stats,
         },
         "winner_metrics": {
             "Recall@Threshold": float(result.winner_operating_metrics["Recall@Threshold"]),
@@ -471,11 +517,23 @@ def run_training_pipeline(
         print(cv_result.summary.to_string(index=False))
 
     split = make_train_split(df, benchmark_path=benchmark_file, seed=RANDOM_STATE)
+    serve_parity_stats = split.serve_parity_stats or {}
+    if verbose and serve_parity_stats.get("enabled"):
+        print(
+            "\nTrain-serve parity augmentation: "
+            f"cold_start={serve_parity_stats.get('cold_start_rows'):,} rows "
+            f"({serve_parity_stats.get('cold_start_fraction_actual', 0):.1%}), "
+            f"nutrition_masked={serve_parity_stats.get('nutrition_mask_rows'):,} rows "
+            f"({serve_parity_stats.get('nutrition_mask_fraction_actual', 0):.1%})"
+        )
     if verbose:
         print("\nFinal model selection on fixed benchmark holdout...")
-    result = train_and_compare(split, verbose=verbose)
+    result = train_and_compare(split, cv_result=cv_result, verbose=verbose)
 
-    cv_agreement = assess_cv_holdout_agreement(cv_result, result.best_model_name)
+    cv_agreement = result.cv_holdout_agreement or assess_cv_holdout_agreement(
+        cv_result,
+        result.best_model_name,
+    )
     if verbose:
         if cv_agreement["agreement"]:
             print(
@@ -485,8 +543,8 @@ def run_training_pipeline(
         else:
             print(
                 f"\nCV stability WARNING: top CV model ({cv_agreement['cv_top_model']}) "
-                f"≠ holdout winner ({cv_agreement['holdout_winner']}). "
-                "Holdout policy selection stands; review athlete_cv_summary.csv."
+                f"≠ selected winner ({cv_agreement.get('selected_model', cv_agreement['holdout_winner'])}). "
+                "Promotion is blocked unless validate_metrics is run with --allow-cv-disagreement."
             )
         print(f"\nRefitting {result.best_model_name} on full dataset for serving...")
     serving_model, serving_importance = refit_winner_for_serving(df, result.best_model_name)
@@ -520,6 +578,7 @@ def run_training_pipeline(
         serving_estimator=serving_model,
         serving_importance_df=serving_importance,
         cv_agreement=cv_agreement,
+        serve_parity_stats=split.serve_parity_stats,
     )
 
     if verbose:

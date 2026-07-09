@@ -16,6 +16,7 @@ from services.history.repository import (
     fetch_user_history,
     get_history_window_context,
     history_confidence_from_quality_days,
+    read_firestore_documents,
     stable_athlete_numeric_id,
 )
 from services.history.rolling_features import (
@@ -188,6 +189,58 @@ class TestHistoricalDerivedFeatures:
         assert ctx["confidence"] == expected_confidence
 
 
+class TestReadFirestoreDocuments:
+    def test_get_all_used_when_client_supports_batch(self):
+        calls: list[list[object]] = []
+
+        class _Snapshot:
+            def __init__(self, label: str) -> None:
+                self.label = label
+                self.exists = True
+
+            def to_dict(self) -> dict:
+                return {"label": self.label}
+
+        class _Ref:
+            def __init__(self, label: str) -> None:
+                self.label = label
+
+        class _Db:
+            def get_all(self, refs: list[object]) -> list[_Snapshot]:
+                calls.append(list(refs))
+                return [_Snapshot(ref.label) for ref in refs]
+
+        refs = [_Ref("a"), _Ref("b")]
+        snapshots = read_firestore_documents(_Db(), refs)
+        assert len(calls) == 1
+        assert calls[0] == refs
+        assert [snap.to_dict()["label"] for snap in snapshots] == ["a", "b"]
+
+    def test_falls_back_to_sequential_get_without_get_all(self):
+        get_calls: list[str] = []
+
+        class _Snapshot:
+            def __init__(self, label: str) -> None:
+                self.label = label
+                self.exists = True
+
+            def to_dict(self) -> dict:
+                return {"label": self.label}
+
+        class _Ref:
+            def __init__(self, label: str) -> None:
+                self.label = label
+
+            def get(self) -> _Snapshot:
+                get_calls.append(self.label)
+                return _Snapshot(self.label)
+
+        refs = [_Ref("x"), _Ref("y")]
+        snapshots = read_firestore_documents(object(), refs)
+        assert get_calls == ["x", "y"]
+        assert [snap.to_dict()["label"] for snap in snapshots] == ["x", "y"]
+
+
 class TestFetchUserHistory:
     def test_merges_physical_yesterday_with_sleep_and_checkin_today(self, monkeypatch):
         get_calls: list[tuple[str, str]] = []
@@ -251,6 +304,7 @@ class TestFetchUserHistory:
 
     def test_prediction_window_uses_wake_days_through_yesterday(self, monkeypatch):
         requested_health_keys: list[str] = []
+        batch_get_all_calls: list[int] = []
 
         class _Snapshot:
             def __init__(self, exists: bool, data: dict | None = None) -> None:
@@ -289,6 +343,10 @@ class TestFetchUserHistory:
 
                 return _Users()
 
+            def get_all(self, refs: list[_DocRef]) -> list[_Snapshot]:
+                batch_get_all_calls.append(len(refs))
+                return [ref.get() for ref in refs]
+
         monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
         fetch_user_history("u1", "2026-05-07", lookback_days=7, include_target_day=False)
 
@@ -297,6 +355,8 @@ class TestFetchUserHistory:
         assert "2026-05-06" in requested_health_keys
         assert "2026-05-07" not in requested_health_keys
         assert "2026-04-30" in requested_health_keys
+        # 7 wake + 7 physical + 7 checkin refs, with 6 overlapping health docs → 15 unique reads.
+        assert batch_get_all_calls == [15]
 
 
 def _training_style_ma7(acwr_values: list[float], sleep_values: list[float]) -> tuple[float, float]:

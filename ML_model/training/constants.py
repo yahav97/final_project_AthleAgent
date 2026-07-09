@@ -31,6 +31,7 @@ class TrainSplit:
     y_all: pd.Series
     feature_columns: list[str]
     holdout_athlete_ids: set[int]
+    serve_parity_stats: dict[str, object] | None = None
 
 
 @dataclass
@@ -53,3 +54,4 @@ class TrainResult:
     risk_bins_df: pd.DataFrame
     importance_df: pd.DataFrame | None
     best_points: pd.DataFrame
+    cv_holdout_agreement: dict[str, str | bool | int] | None = None

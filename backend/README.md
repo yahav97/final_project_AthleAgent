@@ -11,9 +11,9 @@ FastAPI backend for injury-risk inference. This service is treated as mission-cr
 
 All tunable backend behaviour is centralized in [`config.py`](config.py). Copy [`backend/.env.example`](.env.example) to `backend/.env` to override defaults without editing code.
 
-Key groups: ML gates, risk bands (must match Android), history window, prediction confidence weights, logging, and feature flags (`ENABLE_TEST_PREDICT_ENDPOINT`, `REQUIRE_FIREBASE_AUTH`, `APP_ENV`).
+Key groups: ML gates, risk bands (must match Android), history window, prediction confidence weights, logging, and feature flags (`ENABLE_TEST_PREDICT_ENDPOINT`, `APP_ENV`).
 
-`REQUIRE_FIREBASE_AUTH` defaults to **false** (current Android clients send no Bearer token). Set to **true** in production only after clients send `Authorization: Bearer <Firebase ID token>` and `userId` matches the token uid.
+The prediction API does **not** validate Firebase Bearer tokens — Android sends only `userId` + `date` (see `ApiClient.kt`). For demos, bind the server to **localhost** (`docker-compose.yml` uses `127.0.0.1:8000`). Firebase Authentication protects Firestore access on the client; the backend uses a service account for server-side reads/writes.
 
 ## API Structure
 

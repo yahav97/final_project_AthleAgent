@@ -1,11 +1,8 @@
 """Integration tests for POST /predict/daily — production inference contract."""
 
 import pytest
-from fastapi import Request
 
-from api.routes.predict import predict_injury_daily
-from schemas.inference import DailyPredictionTriggerRequest
-from utils.exceptions import AuthorizationError, DatabaseError
+from utils.exceptions import DatabaseError
 
 pytestmark = pytest.mark.integration
 
@@ -186,36 +183,3 @@ class TestPredictDailyErrors:
         data = response.json()
         assert data["risk_level"] in ("Low", "Medium", "High")
         assert float(data["prediction_confidence"]) < 100.0
-
-
-class TestPredictDailyAuth:
-    def test_auth_disabled_allows_request_without_bearer(
-        self,
-        api_client,
-        mock_daily_prediction_pipeline,
-        monkeypatch,
-    ):
-        monkeypatch.setattr("middleware.request_logging.settings.REQUIRE_FIREBASE_AUTH", False)
-        mock_daily_prediction_pipeline()
-        response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
-        assert response.status_code == 200
-
-    def test_user_mismatch_returns_403_when_auth_enabled(self, monkeypatch):
-        monkeypatch.setattr("api.routes.predict.settings.REQUIRE_FIREBASE_AUTH", True)
-        request = Request(
-            {
-                "type": "http",
-                "headers": [],
-                "method": "POST",
-                "path": "/predict/daily",
-            }
-        )
-        request.state.firebase_uid = "firebase-user-a"
-
-        with pytest.raises(AuthorizationError) as exc_info:
-            predict_injury_daily(
-                DailyPredictionTriggerRequest(userId="different-user", date="2026-05-09"),
-                request,
-            )
-
-        assert exc_info.value.code == "auth_user_mismatch"

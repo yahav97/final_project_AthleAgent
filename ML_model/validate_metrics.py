@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -22,7 +23,25 @@ def _latest_artifacts_dir(script_dir: str) -> str | None:
     return str(candidates[0])
 
 
+def _load_manifest(manifest_path: str) -> dict | None:
+    if not os.path.exists(manifest_path):
+        return None
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate promoted model metrics.")
+    parser.add_argument(
+        "--allow-cv-disagreement",
+        action="store_true",
+        help="Allow promotion when CV top model differs from selected holdout winner.",
+    )
+    args = parser.parse_args()
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     artifacts_dir = _latest_artifacts_dir(script_dir) or script_dir
     comparison_path = os.path.join(artifacts_dir, "model_comparison.csv")
@@ -47,30 +66,45 @@ def main() -> int:
         print(f"model_comparison.csv missing columns: {sorted(missing)}")
         return 1
 
+    manifest = _load_manifest(manifest_path)
     top = None
-    if os.path.exists(manifest_path):
-        try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                manifest = json.load(f)
-            winner = str(manifest.get("winner") or "").strip()
-            wm = manifest.get("winner_metrics") or {}
-            if winner and wm:
-                top = {
-                    "Model": winner,
-                    "Recall@Threshold": float(wm.get("Recall@Threshold")),
-                    "Precision@Threshold": float(wm.get("Precision@Threshold")),
-                    "F1@Threshold": float(wm.get("F1@Threshold")),
-                    "FPR@Threshold": float(wm.get("FPR@Threshold")),
-                    "ROC-AUC": float(wm.get("ROC-AUC")),
-                    "BrierScore": float(wm.get("BrierScore")),
-                    "LogLoss": float(wm.get("LogLoss")),
-                }
+    if manifest:
+        winner = str(manifest.get("winner") or "").strip()
+        wm = manifest.get("winner_metrics") or {}
+        if winner and wm:
+            top = {
+                "Model": winner,
+                "Recall@Threshold": float(wm.get("Recall@Threshold")),
+                "Precision@Threshold": float(wm.get("Precision@Threshold")),
+                "F1@Threshold": float(wm.get("F1@Threshold")),
+                "FPR@Threshold": float(wm.get("FPR@Threshold")),
+                "ROC-AUC": float(wm.get("ROC-AUC")),
+                "BrierScore": float(wm.get("BrierScore")),
+                "LogLoss": float(wm.get("LogLoss")),
+            }
+            print(
+                "Policy source: run_manifest winner metrics "
+                f"(operating threshold={manifest.get('threshold')})"
+            )
+
+    if manifest:
+        protocol = manifest.get("selection_protocol") or {}
+        cv_agreement = protocol.get("cv_holdout_agreement")
+        if cv_agreement and cv_agreement.get("agreement") is False:
+            print(
+                "\nCV/holdout disagreement: "
+                f"CV top={cv_agreement.get('cv_top_model')}, "
+                f"selected={cv_agreement.get('selected_model', cv_agreement.get('holdout_winner'))}, "
+                f"holdout-only={cv_agreement.get('holdout_pure_winner', '—')}."
+            )
+            if not args.allow_cv_disagreement:
                 print(
-                    "Policy source: run_manifest winner metrics "
-                    f"(operating threshold={manifest.get('threshold')})"
+                    "REJECTED: promotion blocked because cv_holdout_agreement=false. "
+                    "Re-train or pass --allow-cv-disagreement to override."
                 )
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            top = None
+                return 1
+            print("NOTE: continuing because --allow-cv-disagreement was set.")
+
     if top is None:
         policy = get_policy()
         gated = df[df["Recall@Threshold"] >= policy.MIN_RECALL_HARD]
@@ -89,21 +123,6 @@ def main() -> int:
         print(f"Policy threshold: {policy.THRESHOLD}")
         print(ranked.to_string(index=False))
         top = ranked.iloc[0].to_dict()
-
-    if os.path.exists(manifest_path):
-        try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                manifest = json.load(f)
-            protocol = manifest.get("selection_protocol") or {}
-            cv_agreement = protocol.get("cv_holdout_agreement")
-            if cv_agreement and cv_agreement.get("agreement") is False:
-                print(
-                    "\nNOTE: CV top model "
-                    f"({cv_agreement.get('cv_top_model')}) differs from holdout winner "
-                    f"({cv_agreement.get('holdout_winner')}). Holdout metrics govern promotion."
-                )
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            pass
 
     policy = get_policy()
     recall_value = float(top["Recall@Threshold"])

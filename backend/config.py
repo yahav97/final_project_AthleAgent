@@ -96,7 +96,6 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     APP_ENV: Literal["development", "demo", "production"] = "development"
     ENABLE_TEST_PREDICT_ENDPOINT: bool = False
-    REQUIRE_FIREBASE_AUTH: bool = False
 
     # -------------------------------------------------------------------------
     # ML model loading & live gates (see backend/docs/MODEL.md)

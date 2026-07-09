@@ -26,7 +26,7 @@ flowchart TD
 |------|----------|---------------|-------------------|
 | 1. Athlete CV (`ATHLETE_CV_SPLITS=2`) | `cross_validate_by_athlete` | No | No — stability only |
 | 2. Fixed holdout | `make_train_split` + `train_and_compare` | **Yes** | Metrics, gates, calibration plots |
-| 3. CV agreement check | `assess_cv_holdout_agreement` | No | Warning in manifest |
+| 3. CV agreement check | `assess_cv_holdout_agreement` | No | Blocks auto-promotion when false |
 | 4. Full-data refit | `refit_winner_for_serving` | No | **Yes** — `injury_model.pkl` |
 | 5. Promotion | `validate_metrics.py` | No | Blocks promote if hard gates fail |
 
@@ -58,7 +58,17 @@ Edit the tuple in `train_model.py` to change candidates project-wide.
 - Production holdout is **fixed** in `benchmark_holdout.csv` (seed 42 at creation).
 - Notebook demo uses the same functions; holdout seed 42 on the demo subset instead of the benchmark file.
 
-## Policy selection (`pick_best_model`)
+## Policy selection (`pick_best_model` + CV stability)
+
+Holdout candidates are ranked with a tiered threshold search (`pick_best_model`).
+When athlete CV is available, `select_winner_with_cv_stability` may override the pure
+holdout winner with the model that has the best combined CV + holdout rank among models
+that pass the recall hard gate on holdout.
+
+Auto-promotion (`validate_metrics.py`, `run_pipeline.py`) is **blocked** when
+`cv_holdout_agreement.agreement` is false unless `--allow-cv-disagreement` is passed.
+Agreement is true only when the selected model is both the CV leader and the pure
+holdout winner.
 
 Tiered threshold search per candidate, then rank by:
 

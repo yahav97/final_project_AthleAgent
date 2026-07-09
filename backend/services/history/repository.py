@@ -21,6 +21,20 @@ def read_firestore_document(doc_ref: Any) -> Any:
     return doc_ref.get()
 
 
+def read_firestore_documents(db: Any, doc_refs: list[Any]) -> list[Any]:
+    """
+    Batch-read Firestore documents in one round trip when the client supports ``get_all``.
+
+    Falls back to sequential ``doc_ref.get()`` for tests or minimal mocks without ``get_all``.
+    """
+    if not doc_refs:
+        return []
+    get_all = getattr(db, "get_all", None)
+    if callable(get_all):
+        return list(get_all(doc_refs))
+    return [read_firestore_document(ref) for ref in doc_refs]
+
+
 def stable_athlete_numeric_id(user_id: str) -> int:
     """Deterministic int id for ML CSV ``athlete_id`` (same uid → same id across runs)."""
     digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
@@ -55,11 +69,22 @@ def fetch_daily_firestore_snapshot(user_id: str, date_key: str) -> dict[str, Any
             checkin_ref.path,
             nutrition_yesterday_ref.path,
         )
-        user_doc = read_firestore_document(user_ref)
-        health_doc = read_firestore_document(health_ref)
-        health_yesterday_doc = read_firestore_document(health_yesterday_ref)
-        checkin_doc = read_firestore_document(checkin_ref)
-        nutrition_yesterday_doc = read_firestore_document(nutrition_yesterday_ref)
+        (
+            user_doc,
+            health_doc,
+            health_yesterday_doc,
+            checkin_doc,
+            nutrition_yesterday_doc,
+        ) = read_firestore_documents(
+            db,
+            [
+                user_ref,
+                health_ref,
+                health_yesterday_ref,
+                checkin_ref,
+                nutrition_yesterday_ref,
+            ],
+        )
     except Exception as exc:
         logger.warning(
             "fetch_daily_firestore_snapshot failed for user_id=%s date=%s: %s",
@@ -173,12 +198,45 @@ def fetch_user_history(
         )
         return []
 
-    merged_rows: list[dict[str, Any]] = []
-    for wake_up_key in date_keys_in_range(start_day, end_inclusive):
+    wake_up_keys = date_keys_in_range(start_day, end_inclusive)
+    ref_entries: list[tuple[str, Any]] = []
+    seen_cache_keys: set[str] = set()
+
+    def _queue_ref(cache_key: str, doc_ref: Any) -> None:
+        if cache_key in seen_cache_keys:
+            return
+        seen_cache_keys.add(cache_key)
+        ref_entries.append((cache_key, doc_ref))
+
+    for wake_up_key in wake_up_keys:
         physical_key = (to_date_key(wake_up_key) - timedelta(days=1)).strftime("%Y-%m-%d")
-        physical_doc = read_firestore_document(health_ref.document(physical_key))
-        wake_doc = read_firestore_document(health_ref.document(wake_up_key))
-        checkin_doc = read_firestore_document(checkin_ref.document(wake_up_key))
+        _queue_ref(f"health:{physical_key}", health_ref.document(physical_key))
+        _queue_ref(f"health:{wake_up_key}", health_ref.document(wake_up_key))
+        _queue_ref(f"checkin:{wake_up_key}", checkin_ref.document(wake_up_key))
+
+    try:
+        snapshots = read_firestore_documents(db, [doc_ref for _, doc_ref in ref_entries])
+    except Exception as exc:
+        logger.warning(
+            "fetch_user_history batch read failed for user_id=%s date=%s: %s",
+            user_id,
+            date_key,
+            exc,
+            exc_info=True,
+        )
+        return []
+
+    snapshot_by_key = {
+        cache_key: snapshots[index]
+        for index, (cache_key, _) in enumerate(ref_entries)
+    }
+
+    merged_rows: list[dict[str, Any]] = []
+    for wake_up_key in wake_up_keys:
+        physical_key = (to_date_key(wake_up_key) - timedelta(days=1)).strftime("%Y-%m-%d")
+        physical_doc = snapshot_by_key[f"health:{physical_key}"]
+        wake_doc = snapshot_by_key[f"health:{wake_up_key}"]
+        checkin_doc = snapshot_by_key[f"checkin:{wake_up_key}"]
         row = merge_wake_up_day_row(
             wake_up_key,
             physical_doc.to_dict() if physical_doc.exists else None,

@@ -7,7 +7,7 @@ import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import Response
 
 from config import settings
 from utils.logging import logger
@@ -65,47 +65,3 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 },
             )
             clear_request_context()
-
-
-_AUTH_PUBLIC_PATHS = frozenset({"/", "/health", "/docs", "/openapi.json", "/redoc"})
-
-
-def _extract_bearer_token(request: Request) -> str | None:
-    header = request.headers.get("Authorization", "")
-    if not header.startswith("Bearer "):
-        return None
-    token = header.removeprefix("Bearer ").strip()
-    return token or None
-
-
-class FirebaseAuthMiddleware(BaseHTTPMiddleware):
-    """Require a valid Firebase ID token when ``REQUIRE_FIREBASE_AUTH`` is enabled."""
-
-    async def dispatch(self, request: Request, call_next) -> Response:
-        if not settings.REQUIRE_FIREBASE_AUTH:
-            return await call_next(request)
-
-        path = request.url.path
-        if path in _AUTH_PUBLIC_PATHS or path.startswith("/api/v1/observability/"):
-            return await call_next(request)
-
-        token = _extract_bearer_token(request)
-        if token is None:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Missing Bearer token", "code": "auth_required"},
-            )
-
-        try:
-            from firebase_admin import auth
-
-            claims = auth.verify_id_token(token)
-        except Exception as exc:
-            logger.warning("firebase_auth_failed path=%s error=%s", path, exc)
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid or expired token", "code": "auth_invalid"},
-            )
-
-        request.state.firebase_uid = str(claims.get("uid") or "")
-        return await call_next(request)

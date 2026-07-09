@@ -61,6 +61,11 @@ def main() -> int:
         action="store_true",
         help="Promote when validate_metrics exits 2 (passes hard gate only, not all targets).",
     )
+    parser.add_argument(
+        "--allow-cv-disagreement",
+        action="store_true",
+        help="Promote when CV top model differs from selected holdout winner.",
+    )
     args = parser.parse_args()
 
     ml_dir = Path(__file__).resolve().parent
@@ -82,8 +87,11 @@ def main() -> int:
         benchmark_cmd.append("--force")
     _run(benchmark_cmd, ml_dir)
     _run([sys.executable, "train_model.py"], ml_dir)
+    validate_cmd = [sys.executable, "validate_metrics.py"]
+    if args.allow_cv_disagreement:
+        validate_cmd.append("--allow-cv-disagreement")
     validate_exit = _run(
-        [sys.executable, "validate_metrics.py"],
+        validate_cmd,
         ml_dir,
         allowed_exit_codes=(0, 2) if args.allow_degraded else (0,),
     )
