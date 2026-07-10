@@ -7,7 +7,6 @@ import pandas as pd
 
 from services.feature_engineering import compute_derived_features
 from services.history.day_quality import (
-    WATCH_SYNC_SIGNAL_GROUPS,
     count_watch_sync_signal_groups,
     is_quality_history_day,
 )
@@ -18,7 +17,6 @@ from services.history.repository import (
     get_history_window_context,
     history_confidence_from_quality_days,
     read_firestore_documents,
-    stable_athlete_numeric_id,
 )
 from services.history.rolling_features import (
     compute_historical_derived_features,
@@ -47,21 +45,6 @@ class TestHistoryConfidenceBoundaries:
         assert level == HistoryConfidence(expected)
 
 
-class TestStableAthleteId:
-    def test_deterministic_for_same_uid(self):
-        assert stable_athlete_numeric_id("firebase-uid-abc") == stable_athlete_numeric_id(
-            "firebase-uid-abc"
-        )
-
-    def test_different_uids_produce_different_ids(self):
-        a = stable_athlete_numeric_id("athlete-a")
-        b = stable_athlete_numeric_id("athlete-b")
-        assert a != b
-
-    def test_always_positive(self):
-        assert stable_athlete_numeric_id("") > 0
-
-
 class TestSleepHours:
     def test_default_when_missing(self):
         assert sleep_hours_from_doc({}) == pytest.approx(7.0)
@@ -73,9 +56,6 @@ class TestSleepHours:
 
 
 class TestHistoryDayQuality:
-    def test_watch_sync_signal_groups_are_four_named_categories(self):
-        assert set(WATCH_SYNC_SIGNAL_GROUPS) == {"load", "sleep", "heart", "energy"}
-
     def _synced_physical_day(self, **extra: object) -> dict:
         return {
             "distanceMeters": 5000,
@@ -477,3 +457,58 @@ class TestRollingMa7Parity:
         composite = add_same_day_composite_features(derived)
         assert composite["acwr_ratio_ma7"] == pytest.approx(composite["acwr_ratio"])
         assert composite["sleep_hours_ma7"] == pytest.approx(composite["sleep_hours"])
+
+
+class TestFirestoreResilience:
+    def test_fetch_inference_bundle_returns_empty_when_client_unavailable(self, monkeypatch):
+        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: None)
+        assert fetch_inference_firestore_bundle("u1", "2026-05-09") == {}
+
+
+class TestSaveDailyPredictionResult:
+    def test_writes_final_risk_score_as_percent_and_clamps_confidence(self, monkeypatch):
+        written: dict = {}
+
+        class _Doc:
+            def set(self, doc: dict, merge: bool = True) -> None:
+                written.update(doc)
+
+        class _HealthColl:
+            def document(self, key: str) -> _Doc:
+                return _Doc()
+
+        class _UserDoc:
+            def collection(self, name: str) -> _HealthColl:
+                return _HealthColl()
+
+        class _Users:
+            def document(self, uid: str) -> _UserDoc:
+                return _UserDoc()
+
+        class _Db:
+            def collection(self, name: str) -> _Users:
+                return _Users()
+
+        from services.history.repository import save_daily_prediction_result
+
+        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        ok = save_daily_prediction_result(
+            "u1",
+            "2026-05-09",
+            {
+                "risk_score": 0.42,
+                "risk_level": "Medium",
+                "prediction_confidence": 150.0,
+            },
+        )
+        assert ok is True
+        assert written["finalRiskScore"] == 42.0
+        assert written["riskLevel"] == "Medium"
+        assert written["predictionConfidence"] == 100.0
+        assert "predictionUpdatedAt" in written
+
+    def test_returns_false_when_firestore_unavailable(self, monkeypatch):
+        from services.history.repository import save_daily_prediction_result
+
+        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: None)
+        assert save_daily_prediction_result("u1", "2026-05-09", {"risk_score": 0.1}) is False

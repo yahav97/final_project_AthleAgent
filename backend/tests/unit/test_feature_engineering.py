@@ -36,3 +36,24 @@ def test_rest_day_low_acute():
     out = compute_derived_features(row)
     assert out["acute_load_7d"] >= 0.05
     assert out["sleep_debt_3d"] == 0.0
+
+
+def test_acwr_ratio_bounded_caps_at_upper_and_lower_limits():
+    assert acwr_ratio_bounded(100.0, 1.0) == pytest.approx(2.8)
+    assert acwr_ratio_bounded(0.1, 1.0) == pytest.approx(0.35)
+
+
+def test_zero_sleep_increases_sleep_debt_proxy():
+    row = {
+        "daily_distance_km": 10.0,
+        "active_calories_burned": 600.0,
+        "sleep_hours": 0.0,
+        "hrv_score": 55.0,
+        "resting_hr": 58.0,
+    }
+    out = compute_derived_features(row)
+    assert out["sleep_debt_3d"] > 0.0
+
+
+def test_acwr_ratio_returns_one_when_baseline_non_positive():
+    assert acwr_ratio_bounded(1.0, 0.0) == 1.0

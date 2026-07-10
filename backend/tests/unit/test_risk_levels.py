@@ -4,6 +4,8 @@ import pytest
 
 from services.risk_levels import classify_risk_level
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.parametrize(
     ("probability", "expected"),
@@ -20,4 +22,15 @@ from services.risk_levels import classify_risk_level
     ],
 )
 def test_classify_risk_level_matches_client_bands(probability, expected):
+    assert classify_risk_level(probability) == expected
+
+
+@pytest.mark.parametrize(
+    ("probability", "expected"),
+    [
+        (-0.1, "Low"),
+        (1.5, "High"),
+    ],
+)
+def test_classify_risk_level_handles_out_of_range_probability(probability, expected):
     assert classify_risk_level(probability) == expected

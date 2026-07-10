@@ -7,7 +7,6 @@ pytestmark = pytest.mark.integration
 DOCUMENTED_PATHS = {
     "/",
     "/health",
-    "/test_predict",
     "/predict/daily",
     "/status/ml",
     "/api/v1/observability/client-events",

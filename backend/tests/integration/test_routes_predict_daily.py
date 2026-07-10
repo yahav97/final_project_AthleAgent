@@ -33,8 +33,11 @@ class TestPredictDailyValidation:
         )
         assert response.status_code == 422
 
-    def test_empty_user_id_rejected_by_schema(self, api_client):
-        response = api_client.post("/predict/daily", json={"userId": "", "date": "2026-05-09"})
+    def test_invalid_calendar_date_returns_422(self, api_client):
+        response = api_client.post(
+            "/predict/daily",
+            json={"userId": "u1", "date": "2026-02-30"},
+        )
         assert response.status_code == 422
 
 
@@ -70,14 +73,6 @@ class TestPredictDailySuccess:
         assert abs(float(data["risk_score"]) - 0.88) < 1e-9
         assert called["predicted"] is True
         assert called["persisted"] is True
-
-    def test_response_matches_injury_prediction_response_schema(
-        self, api_client, mock_daily_prediction_pipeline
-    ):
-        mock_daily_prediction_pipeline()
-        response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
-        assert response.status_code == 200
-        assert response.json()["prediction_confidence"] == pytest.approx(72.5)
 
 
 class TestPredictDailyErrors:

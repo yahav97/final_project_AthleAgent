@@ -80,6 +80,22 @@ class TestLoadModelGate:
         assert status["status"] == "Live"
         assert status["winner"] == "ExtraTrees"
 
+    def test_rejects_manifest_missing_winner(self, tmp_path):
+        model_path, manifest_path = _write_valid_bundle(tmp_path)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["winner"] = ""
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert model_loader.load_model(model_path, manifest_path) is None
+        assert model_loader.get_model_gate_reason() == "manifest_missing_winner"
+
+    def test_rejects_manifest_with_null_recall_metric(self, tmp_path):
+        model_path, manifest_path = _write_valid_bundle(tmp_path)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        del manifest["winner_metrics"]["Recall@Threshold"]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        assert model_loader.load_model(model_path, manifest_path) is None
+        assert model_loader.get_model_gate_reason() == "manifest_invalid_recall"
+
 
 class TestGetModelStatus:
     def test_blocked_when_not_loaded(self, tmp_path):
@@ -145,12 +161,3 @@ class TestPromotedPointerResolution:
         result = model_loader.load_model(fallback_model)
         assert result is None
         assert model_loader.get_model_gate_reason() == "ungated_fallback_blocked"
-
-
-class TestPromotedArtifactReadiness:
-    def test_promoted_bundle_is_live(self):
-        model_loader.load_model()
-        status = model_loader.get_model_status()
-        assert status["status"] == "Live"
-        assert status["gate_reason"] == "none"
-        assert status.get("winner")

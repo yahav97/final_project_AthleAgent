@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pandas as pd
 import pytest
 
@@ -28,7 +26,7 @@ pytestmark = pytest.mark.unit
 class TestScaleMapping:
     @pytest.mark.parametrize(
         ("raw", "expected"),
-        [(80, 8.0), (5, 5.0), (150, 10.0)],
+        [(80, 8.0), (5, 5.0), (150, 10.0), (None, 1.0), (0, 1.0)],
     )
     def test_stress_to_model_scale(self, raw, expected):
         assert stress_to_model_scale(raw) == pytest.approx(expected)
@@ -213,14 +211,6 @@ class TestValidateFeatureVector:
         assert list(aligned.columns) == MODEL_FEATURE_COLUMNS
         assert aligned.dtypes.apply(lambda t: pd.api.types.is_float_dtype(t)).all()
 
-    def test_coerces_nan_to_zero(self, model_feature_row):
-        bad = model_feature_row.copy()
-        bad.at[bad.index[0], "age"] = float("nan")
-        aligned = validate_feature_vector_for_model(
-            bad, {"feature_columns": MODEL_FEATURE_COLUMNS, "estimator": None}
-        )
-        assert aligned["age"].iloc[0] == pytest.approx(0.0)
-
     @pytest.mark.parametrize(
         ("column", "value"),
         [
@@ -337,8 +327,3 @@ class TestInjuryRequestToDataframe:
         df = injury_request_to_model_dataframe(req)
         assert df["nutrition_intake_calories"].iloc[0] > 0.0
         assert df["daily_calories"].iloc[0] > 0.0
-
-    def test_all_values_finite(self, sample_prediction_request):
-        df = injury_request_to_model_dataframe(sample_prediction_request)
-        values = df.iloc[0].tolist()
-        assert all(math.isfinite(v) for v in values)

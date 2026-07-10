@@ -757,6 +757,119 @@ CalculationUtils.getRiskLevel(35)
 
 קובץ: `CalculationUtilsTest.kt` שורה 15.
 
+### 11.4 מבקרת איכות — מה למחוק, מה לתקן, מה להוסיף
+
+> **סטטוס:** סעיף זה מתעד החלטות מומלצות בלבד — **לא בוצעו שינויים בקוד האנדרואיד**. יש ליישם ידנית לפי הסדר למטה.
+
+#### 11.4.1 מצב נוכחי
+
+| מדד | ערך |
+| --- | --- |
+| קבצי unit test | 4 (`app/src/test/`) |
+| קבצי instrumented test | 1 (`app/src/androidTest/`) |
+| סה"כ מתודות `@Test` | **9** (8 unit + 1 instrumented) |
+| CI אוטומטי לאנדרואיד | **אין** — רק `backend-tests.yml` ב-GitHub Actions |
+
+#### 11.4.2 למחיקה — boilerplate וקוד מת
+
+| קובץ | פעולה | סיבה |
+| ---- | ----- | ---- |
+| `app/src/test/.../ExampleUnitTest.kt` | **מחק** | boilerplate של Android Studio (`2+2`) — אפס כיסוי production |
+| `app/src/androidTest/.../ExampleInstrumentedTest.kt` | **מחק** | בודק רק `packageName` — לא בודק התנהגות אפליקציה |
+| `app/src/test/.../util/CalculationUtilsTest.kt` | **מחק** (אם לא מחברים util ל-UI) | `CalculationUtils` לא מיובא בשום קובץ ב-`main` — ראו §15.2 |
+| `app/src/main/.../util/CalculationUtils.kt` | **מחק** (יחד עם הטסט) | קוד מת; dashboards משתמשים ב-thresholds hardcoded במקום |
+
+**אחרי מחיקה מינימלית:** 3 unit tests (`RequestIdHolderTest` ×2, `ClientEventReporterTest` ×1), 0 instrumented.
+
+#### 11.4.3 החלטה נדרשת — `CalculationUtils`
+
+יש שתי אפשרויות תקפות; יש לבחור **אחת** לפני שממשיכים:
+
+**אפשרות A — מחיקה (מומלץ אם לא מתכננים refactor מיידי):**
+
+1. מחק `CalculationUtils.kt` + `CalculationUtilsTest.kt`.
+2. השאר thresholds ב-`AthleteDashboardActivity` / `CoachDashboardActivity` כפי שהם.
+3. ודא ש-bands תואמים ל-backend (`test_risk_levels.py` — `Low` עד 20%, `Medium` עד 70%, `High` מעל).
+
+**אפשרות B — חיבור ל-production (מומלץ לטווח ארוך):**
+
+1. תקן את הבאג בטסט **או** בקוד — `getRiskLevel(35)`:
+   - קוד נוכחי: `score <= 35 → "Low"`
+   - טסט מצפה: `"Medium"`
+   - **יש ליישר** לפי bands של השרת (0–20 Low, 21–70 Medium, 71+ High) — לא לפי הטסט הישן.
+2. החלף thresholds hardcoded ב-dashboards בקריאות ל-`CalculationUtils.getRiskLevel()`.
+3. החלף `SimpleDateFormat("yyyy-MM-dd")` ב-8+ activities ב-`CalculationUtils.formatDateToKey()`.
+4. הוסף `isTeamCodeValid()` ב-`CreateTeamActivity` / `JoinTeamActivity`.
+5. רק אז — השאר את `CalculationUtilsTest.kt` עם assertions מעודכנים.
+
+#### 11.4.4 לשמור ולשפר — טסטים עם ערך אמיתי
+
+| קובץ | פעולה | פירוט |
+| ---- | ----- | ----- |
+| `RequestIdHolderTest.kt` | **שמור + תקן קל** | החלף `private fun assertTrue` ב-`org.junit.Assert.assertTrue` (שורות 26–28) |
+| `ClientEventReporterTest.kt` | **שמור + שכתב** | הבעיה: `ClientEventReporter` משתמש ב-`CoroutineScope(Dispatchers.IO)` — `runTest` + `verify()` עלולים לרוץ לפני שה-coroutine מסתיים (flaky). **פתרון:** הזרק `TestDispatcher` / `CoroutineScope` ל-constructor, או השתמש ב-`runTest` עם `advanceUntilIdle()`. הוסף assertions על payload: `eventType`, `screen`, `metadata`. |
+
+#### 11.4.5 תיקון build — חובה לפני הרצת טסטים
+
+כיום `testDebugUnitTest` **נכשל בקומפילציה**:
+
+```
+ClientEventReporterTest.kt:38 — Cannot inline bytecode built with JVM target 11
+into bytecode that is being built with JVM target 1.8
+```
+
+**פתרון** — ב-`app/build.gradle.kts`, בתוך `android { }`:
+
+```kotlin
+compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+kotlinOptions {
+    jvmTarget = "11"
+}
+```
+
+או הורד גרסת `mockito-kotlin` לגרסה תואמת JVM 8 — פחות מומלץ.
+
+#### 11.4.6 הרצת הבדיקות (מקומית)
+
+```bash
+# מתוך android_app/AthleAgent
+.\gradlew.bat testDebugUnitTest          # unit tests (JVM, ללא מכשיר)
+.\gradlew.bat connectedAndroidTest       # instrumented (דורש emulator/מכשיר)
+```
+
+**ב-Android Studio:** לחץ ימני על `app/src/test` → *Run 'Tests in …'*
+
+#### 11.4.7 טסטים חדשים מומלצים (עדיפות)
+
+| עדיפות | קובץ מוצע | מה לבדוק |
+| ------ | --------- | -------- |
+| P1 | `ClientEventReporterTest.kt` (הרחבה) | נרמול `eventType`, דה-דופליקציה של screen views, error path |
+| P1 | `CorrelationIdInterceptorTest.kt` (חדש) | `X-Request-ID` header נוסף לכל בקשת Retrofit |
+| P2 | `PredictionTriggerTest.kt` (חדש) | תנאי trigger: שינה > 0, steps אתמול > 0, survey קיים — לוגיקה משותפת מ-`DailyCheckInActivity` / `WearableSyncActivity` |
+| P2 | `GeminiResponseParserTest.kt` (חדש) | JSON פגום, markdown wrappers ב-`AnalyzingMealActivity` |
+| P3 | `LoginFlowInstrumentedTest.kt` (חדש) | מחליף את `ExampleInstrumentedTest` — launch `LoginActivity`, בדיקת UI בסיסית |
+
+#### 11.4.8 יעד כמותי אחרי ניקוי
+
+| שלב | Unit | Instrumented | סה"כ |
+| --- | ---- | ------------ | ---- |
+| נוכחי | 8 | 1 | 9 |
+| אחרי מחיקת boilerplate + CalculationUtils | 3 | 0 | 3 |
+| יעד בריא (לאחר הוספות מומלצות) | 6–10 | 1–3 | **7–13** |
+
+#### 11.4.9 סדר ביצוע מומלץ
+
+1. תקן JVM target (§11.4.5) — ודא ש-`testDebugUnitTest` עובר.
+2. החלט על `CalculationUtils` — מחיקה (A) או חיבור (B) (§11.4.3).
+3. מחק boilerplate: `ExampleUnitTest`, `ExampleInstrumentedTest` (§11.4.2).
+4. תקן `RequestIdHolderTest` — import נכון ל-`assertTrue` (§11.4.4).
+5. שכתב `ClientEventReporterTest` עם TestDispatcher (§11.4.4).
+6. הוסף טסטים חדשים לפי §11.4.7 — לפי עדיפות.
+7. (אופציונלי) הוסף `android-ci.yml` — `.\gradlew.bat testDebugUnitTest` ב-push/PR.
+
 ---
 
 ## 12. מפת מסכים (Activities)

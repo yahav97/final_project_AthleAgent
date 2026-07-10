@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -44,13 +43,6 @@ def read_firestore_documents(
             return list(get_all(doc_refs, field_paths=field_paths))
         return list(get_all(doc_refs))
     return [read_firestore_document(ref, field_paths=field_paths) for ref in doc_refs]
-
-
-def stable_athlete_numeric_id(user_id: str) -> int:
-    """Deterministic int id for ML CSV ``athlete_id`` (same uid → same id across runs)."""
-    digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
-    numeric_id = int(digest[:12], 16) % (2**31 - 1)
-    return numeric_id if numeric_id > 0 else 1
 
 
 def _queue_unique_ref(

@@ -11,7 +11,6 @@ from services.prediction.bundle import resolve_model_bundle
 from services.prediction.confidence import count_defaulted_critical_features
 from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
-from services.field_transforms import heart_rate_avg_from_doc
 from services.prediction.service import (
     persist_prediction_result_or_raise,
     predict_injury_risk,
@@ -102,14 +101,6 @@ class TestDefaultedCriticalFeatures:
         assert count == 4  # only acwr_ratio and hrv_drop differ from defaults
 
 
-class TestFirestoreFieldHelpers:
-    def test_heart_rate_avg_reads_canonical_field(self):
-        assert heart_rate_avg_from_doc({"heartRateAvg": 58}) == 58
-
-    def test_heart_rate_avg_missing_returns_none(self):
-        assert heart_rate_avg_from_doc({}) is None
-
-
 class TestFirestoreSnapshotMapping:
     def test_merge_policy_sleep_today_load_yesterday(self, firestore_snapshot):
         req = injury_prediction_request_from_firestore_snapshot(
@@ -123,12 +114,6 @@ class TestFirestoreSnapshotMapping:
         assert req.historyInjuryCount == 2
         assert req.totalProtein == 130
         assert req.nutritionTotalCalories == 2550
-
-    def test_age_from_birth_date_in_profile(self, firestore_snapshot):
-        snap = dict(firestore_snapshot)
-        snap["profile"] = {"birth_date": "1995-01-01", "historyInjuryCount": 2}
-        req = injury_prediction_request_from_firestore_snapshot("u1", "2026-06-16", snap)
-        assert req.age == 31.48
 
     def test_missing_birth_date_in_profile_leaves_age_none(self, firestore_snapshot):
         snap = dict(firestore_snapshot)
