@@ -13,6 +13,6 @@ Avoid duplicating content across files. Use this map:
 | [`BACKEND.md`](BACKEND.md) | API, architecture, code layout |
 | [`../../docs/DOCKER.md`](../../docs/DOCKER.md) | Backend + ML — Docker setup for reviewers |
 
-**Project-wide design docs:** [`docs/HLD_PROJECT.md`](../../docs/HLD_PROJECT.md) · [`docs/LLD_PROJECT.md`](../../docs/LLD_PROJECT.md) · [`docs/DOCKER.md`](../../docs/DOCKER.md)
+**Project-wide design docs:** [`docs/HLD_PROJECT.md`](../../docs/HLD_PROJECT.md) · [`docs/LLD_PROJECT.md`](../../docs/LLD_PROJECT.md) · [`docs/DOCKER.md`](../../docs/DOCKER.md) · [`docs/NFR.md`](../../docs/NFR.md) · [`docs/PROJECT_BOOK_IMPROVEMENTS_HE.md`](../../docs/PROJECT_BOOK_IMPROVEMENTS_HE.md) · [`docs/FRONTEND_CODE_REVIEW_HE.md`](../../docs/FRONTEND_CODE_REVIEW_HE.md)
 
 **Code of truth for feature names:** `backend/services/model_features.py` + `backend/data/model_feature_contract.json` (`integer_feature_columns`)

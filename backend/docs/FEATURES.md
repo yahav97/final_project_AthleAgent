@@ -28,7 +28,7 @@
 | שעון / עומס | `daily_health/{D-1}` | צעדים, מרחק, קלוריות שרופות, דופק, HRV… (יום מלא אתמול) |
 | סקר | `daily_checkins/{D}` | סטרס, כאב, אנרגיה, **`injuredYesterday`** (= פציעה ב-**D−1**) |
 | תזונה | `daily_nutrition/{D-1}` | צריכה אתמול |
-| תזונה (חסר) | ממוצעים כלליים (`nutrition_defaults.py`) | 2500 kcal, 125g protein, 290g carbs, 3 meals — `nutritionImputed` מוריד confidence |
+| תזונה (חסר) | ממוצעים כלליים (`nutrition_defaults.py`) | 2600 kcal, 130g protein, 300g carbs, 3 meals — `nutritionImputed` מוריד confidence |
 | היסטוריה | 7 ימים עד **D−1** | ACWR, חוב שינה, `hrv_drop` (rolling) |
 
 **מה יוצא:**
@@ -142,7 +142,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 |---|---|---|
 | `totalProtein` | גרם חלבון | `daily_calories` (derive), `nutrition_intake_calories` |
 | `totalCarbs` | גרם פחמימות | כמו למעלה |
-| `mealsLoggedCount` | מספר ארוחות | fallback לאומדן קלוריות |
+| `mealsLoggedCount` | מספר ארוחות | מושלם מ-`nutrition_defaults.py` כשחסר/חלש |
 | `totalCalories` | קלוריות **צריכה** (לא שריפה!) | `nutrition_intake_calories` |
 
 **ממוצעים כלליים:** אם שדות חסרים ב-`daily_nutrition/{D-1}`, `apply_nutrition_population_defaults` ממלא מ-`nutrition_defaults.py` (לא סריקת 14 ימים). דגל פנימי `nutritionImputed` מוריד `quality_score` ב-**0.12** (~**4.8** נקודות confidence בהיסטוריה high).
@@ -310,9 +310,8 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 |---|---|
 | יש `totalCalories` מ-nutrition | משתמש ישירות |
 | אין totalCalories, יש protein + carbs | `(protein × 4 + carbs × 4) × 1.2` |
-| אין כלום, יש `mealsLoggedCount` | `2500 × (0.6 + meals × 0.2)` |
-| אין כלום בכלל | **2500 קלוריות** (default) |
-| אין `totalCalories` / מאקרו | ממוצעים מ-`nutrition_defaults.py` (125g P, 290g C, 3 meals, 2500 kcal) |
+| שדה תזונה חלש/חסר (calories, macros, meals) | `nutrition_defaults.py` → **2600 kcal, 130g P, 300g C, 3 meals** (`config.py`) |
+| אין `totalCalories` / מאקרו אחרי imputation | ממוצעים מ-`nutrition_defaults.py` (130g P, 300g C, 3 meals, 2600 kcal) |
 
 ### ברירות מחדל לכל הפיצ'רים
 
@@ -343,8 +342,8 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | `age` | 22.0 | מקור: `settings.PROFILE_DEFAULT_AGE` |
 | `load_recovery_imbalance` | 1.0 | — |
 | `speed_intensity_ratio` | 1.3 | — |
-| `nutrition_intake_calories` | 2500 | — |
-| `daily_calories` | 2500 | — |
+| `nutrition_intake_calories` | 2600 | — |
+| `daily_calories` | 2600 | — |
 | `total_calories_burned` | 2450 | — |
 | `calorie_balance` | 0 | ניטרלי |
 
@@ -372,7 +371,7 @@ Cross-trigger: כל מסך ממתין לנתון מהמקור המשלים.
 | `daily_checkins` | `energyLevel` | `energy_level` |
 | `daily_nutrition` | `totalProtein` | `daily_calories` (derive) |
 | `daily_nutrition` | `totalCarbs` | `daily_calories` (derive) |
-| `daily_nutrition` | `mealsLoggedCount` | `daily_calories` (derive) |
+| `daily_nutrition` | `mealsLoggedCount` | imputation בלבד (`nutrition_defaults.py`) |
 
 **הבחנה קריטית:** `totalCalories` ב-`daily_health` = שריפה (מ-Health Connect). `totalCalories` ב-`daily_nutrition` = צריכה (ממזון). לא לבלבל!
 

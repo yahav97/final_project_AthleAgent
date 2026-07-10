@@ -154,6 +154,8 @@ Point the app Retrofit base URL at your backend host (see `ApiClient.kt` — emu
 | [`docs/LLD_PROJECT.md`](docs/LLD_PROJECT.md) | Low-level design |
 | [`docs/NFR.md`](docs/NFR.md) | Non-functional requirements |
 | [`docs/LOGGING_HE.md`](docs/LOGGING_HE.md) | Unified logging + telemetry |
+| [`docs/PROJECT_BOOK_IMPROVEMENTS_HE.md`](docs/PROJECT_BOOK_IMPROVEMENTS_HE.md) | Project book improvement guide (Hebrew) |
+| [`docs/FRONTEND_CODE_REVIEW_HE.md`](docs/FRONTEND_CODE_REVIEW_HE.md) | Android code review (Hebrew) |
 | [`ML_model/README.md`](ML_model/README.md) | Training pipeline + artifacts |
 | [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline end-to-end |
 | [`backend/README.md`](backend/README.md) | Backend setup and API |

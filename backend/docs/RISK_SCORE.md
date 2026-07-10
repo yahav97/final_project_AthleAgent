@@ -108,7 +108,7 @@ POST /predict/daily
 | 3 | עומס פיזי | `daily_health/{D-1}` | **אתמול** | צעדים, מרחק, דופק, HRV, קלוריות שרופות… |
 | 4 | סקר | `daily_checkins/{D}` | **היום** | סטרס, כאב, אנרגיה, פציעה אתמול |
 | 5 | תזונה | `daily_nutrition/{D-1}` | **אתמול** | קלוריות צריכה, מאקרו |
-| 6 | תזונה (חסר) | ממוצעים (`nutrition_defaults.py`) | — | 2500 kcal, 125g P, 290g C, 3 meals |
+| 6 | תזונה (חסר) | ממוצעים (`nutrition_defaults.py`) | — | 2600 kcal, 130g P, 300g C, 3 meals |
 | 7 | היסטוריה rolling | `daily_health` + `daily_checkins` | **D-7 … D-1** | ACWR, חוב שינה, ירידת HRV |
 
 ### 3.3 חלון ההיסטוריה — בדיוק אילו ימים?
@@ -254,8 +254,8 @@ Cross-trigger בין סקר לשעון — כל מסך ממתין לנתון מ�
 |---------------|-----------|--------|
 | `totalCalories` | `nutrition_intake_calories`, `daily_calories` | עדיפות ראשונה |
 | `totalProtein` + `totalCarbs` | `daily_calories` (אומדן) | `(P×4 + C×4) × 1.2` |
-| `mealsLoggedCount` | `daily_calories` (אומדן) | `2500 × (0.6 + meals×0.2)` |
-| שדה חסר ב-`{D-1}` | ממוצע אוכלוסייה | `nutrition_defaults.py`: 2500 kcal, 125g P, 290g C, 3 meals |
+| `mealsLoggedCount` | — | מושלם מ-`nutrition_defaults.py` כשחסר/חלש (לא נוסחת קלוריות) |
+| שדה חסר ב-`{D-1}` | ממוצע אוכלוסייה | `nutrition_defaults.py`: 2600 kcal, 130g P, 300g C, 3 meals |
 | `nutritionImputed` | `quality_score` | **−0.12** (~4.8 נקודות confidence בהיסטוריה high) |
 
 `calorie_balance` = `daily_calories − total_calories_burned` (צריכה מינוס שריפה).
@@ -421,8 +421,8 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 
 | פיצ'ר | Default | פיצ'ר | Default |
 |--------|---------|--------|---------|
-| `bmi` | 23.5 | `nutrition_intake_calories` | 2500 |
-| `age` | 22 | `daily_calories` | 2500 |
+| `bmi` | 23.5 | `nutrition_intake_calories` | 2600 |
+| `age` | 22 | `daily_calories` | 2600 |
 | `body_fat_pct` | 16 | `total_calories_burned` | 2450 |
 | `vo2_max` | 48 | `stress_level` | 5 |
 | `history_injury_count` | 0 | `muscle_soreness` | 5 |
@@ -486,10 +486,10 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
 
 | מטריקה @ 0.10 | ערך |
 |---------------|-----|
-| Recall | ~81.1% |
-| Precision | ~28.7% |
-| F1 | ~42.5% |
-| ROC-AUC | ~79.3% |
+| Recall | ~80.8% |
+| Precision | ~27.1% |
+| F1 | ~40.6% |
+| ROC-AUC | ~78.3% |
 
 סף זה נבחר באימון כדי **למקסם Recall** (לתפוס כמה שיותר פציעות) תוך הגבלת False Positive Rate.  
 **הוא נשמר ב-bundle** אך **לא משמש כרגע** לקביעת `risk_level` בשרת (ראו סעיף 12).

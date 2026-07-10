@@ -12,10 +12,12 @@
 
 | Item | Value |
 |------|-------|
-| Model family | See `run_manifest.json` → `winner` (e.g. `XGBoostDeep`) |
+| Model family | **XGBoostCalibratedTuned** (`run_manifest.json` → `winner`) |
+| Promoted run | `20260709_104916` (`ML_model/artifacts/promoted.json`) |
 | Feature count | 35 (`backend/data/model_feature_contract.json`) |
 | Integer features | 15 whole-number columns (`integer_feature_columns`) — rounded at train + serve |
-| Operating threshold | From policy sweep — see manifest `threshold` |
+| Operating threshold | **0.10** (manifest `threshold`) |
+| Holdout metrics | Recall **80.8%** · ROC-AUC **78.3%** · Brier **0.111** |
 | Production risk bands | Low ≤ 20% · Medium 21–70% · High > 70% — `services/risk_levels.py` |
 | Prediction target | Injury risk **today** (calendar day D), morning inference |
 

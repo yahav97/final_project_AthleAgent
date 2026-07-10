@@ -332,7 +332,7 @@ final_project_AthleAgent/
 |------|--------|
 | **ארכיטקטורת Android** | Activity-centric + View Binding; אין ViewModel/Repository (ראו README) |
 | **Date-split sync** | מיושם: שינה ב-`{D}`, עומס ב-`{D-1}`; **פער:** gate פרונט לא בודק עומס `{D-1}` > 0 |
-| **תזונה חסרה** | ממוצעים מ-`nutrition_defaults.py` (לא 14 ימים אחורה); `nutritionImputed` מוריד confidence |
+| **תזונה חסרה** | ממוצעים מ-`nutrition_defaults.py` (2600 kcal, 130g P, 300g C); `nutritionImputed` מוריד confidence |
 | **Backend auth** | לא מיושם ב-production routes |
 | **Gemini בבקאנד** | מפתח ב-config אך אין routes — Gemini רץ רק בלקוח |
 

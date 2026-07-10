@@ -58,7 +58,7 @@
 | NFR-UX-02    | UX מדיד       | Sync success rate                  | ≥ 90%                | P1     |
 
 
-**Baseline נוכחי (מודל promoted):** run `20260629_113445` — ראו [§3.1](#31-מדדי-איכות-ml-offline).
+**Baseline נוכחי (מודל promoted):** run `20260709_104916` — ראו [§3.1](#31-מדדי-איכות-ml-offline).
 
 ---
 
@@ -71,12 +71,12 @@
 
 | מדד                 | יעד (gate)      | Baseline (holdout) | מקור                                                   |
 | ------------------- | --------------- | ------------------ | ------------------------------------------------------ |
-| Recall@Threshold    | ≥ 0.80          | **0.811**          | `ML_model/artifacts/20260629_184034/run_manifest.json` |
-| ROC-AUC             | ≥ 0.68          | **0.793**          | אותו manifest                                          |
-| Precision@Threshold | ≥ 0.13 (policy) | **0.287**          | אותו manifest                                          |
-| F1@Threshold        | ≥ 0.22 (policy) | **0.425**          | אותו manifest                                          |
-| Brier Score         | ≤ 0.15          | **0.113**          | אותו manifest                                          |
-| FPR@Threshold       | ≤ 0.70 (policy) | **0.417**          | אותו manifest                                          |
+| Recall@Threshold    | ≥ 0.80          | **0.808**          | `ML_model/artifacts/20260709_104916/run_manifest.json` |
+| ROC-AUC             | ≥ 0.68          | **0.783**          | אותו manifest                                          |
+| Precision@Threshold | ≥ 0.13 (policy) | **0.271**          | אותו manifest                                          |
+| F1@Threshold        | ≥ 0.22 (policy) | **0.406**          | אותו manifest                                          |
+| Brier Score         | ≤ 0.15          | **0.111**          | אותו manifest                                          |
+| FPR@Threshold       | ≤ 0.70 (policy) | **0.425**          | אותו manifest                                          |
 
 
 **Calibration (risk bins):**
@@ -84,9 +84,9 @@
 
 | bin (finalRiskScore) | injury rate בפועל |
 | -------------------- | ----------------- |
-| 0–20 (green)         | 5.6%              |
-| 21–50 (yellow)       | 16.6%             |
-| 51–100 (red)         | 51.5%             |
+| 0–20 (green)         | 9.2%              |
+| 21–50 (yellow)       | 30.9%             |
+| 51–100 (red)         | 62.6%             |
 
 
 > מונוטוניות: ככל שהציון גבוה יותר, שיעור הפציעות בדאטה גבוה יותר — evidence ל-calibration.
@@ -119,7 +119,7 @@
 | **יעד**       | ≥ 0.68                                                |
 | **מדידה**     | holdout benchmark — `ML_model/benchmark_holdout.csv`  |
 | **Gate בקוד** | `MIN_AUC_FOR_LIVE = 0.68`                             |
-| **Baseline**  | 0.723                                                 |
+| **Baseline**  | 0.783                                                 |
 | **ראיה**      | notebook `model_improvement_journey.ipynb` + manifest |
 
 
@@ -133,7 +133,7 @@
 | **תיאור**    | הסתברויות שהמודל מחזיר קרובות לשיעור הפציעות בפועל |
 | **מדד**      | Brier Score                                        |
 | **יעד**      | ≤ 0.15                                             |
-| **Baseline** | 0.115                                              |
+| **Baseline** | 0.111                                              |
 | **מדידה**    | `winner_metrics.BrierScore` ב-manifest             |
 | **ראיה**     | manifest + טבלת risk_bins (§3.1)                   |
 
@@ -655,6 +655,8 @@ cd backend && pytest -q
 | [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)                                           | confidence formula, risk bins    |
 | [FEATURES.md](../backend/docs/FEATURES.md)                                               | data completeness contract       |
 | [LOGGING_HE.md](LOGGING_HE.md)                                                           | observability, trace, PHI policy |
+| [PROJECT_BOOK_IMPROVEMENTS_HE.md](PROJECT_BOOK_IMPROVEMENTS_HE.md)                       | מדריך לשיפור ספר הפרויקט         |
+| [FRONTEND_CODE_REVIEW_HE.md](FRONTEND_CODE_REVIEW_HE.md)                                 | סקירת קוד Android                |
 | [HLD §13](../backend/docs/HLD.md)                                                        | SLOs מקוריים                     |
 | [model_improvement_journey.ipynb](../ML_model/notebooks/model_improvement_journey.ipynb) | ML narrative + graphs            |
 
@@ -668,6 +670,7 @@ cd backend && pytest -q
 | ---- | ---------- | ------------------------------------------------- |
 | 1.0  | 2026-06-20 | מסמך ראשון — 21 NFRs עם baseline מ-promoted model |
 | 1.1  | 2026-06-20 | NFR-MAINT-03 — הוספת Docker; מפת מסמכים |
+| 1.2  | 2026-07-10 | עדכון baseline ל-run `20260709_104916` (מדדים, risk bins, תזונה) |
 
 
 ---

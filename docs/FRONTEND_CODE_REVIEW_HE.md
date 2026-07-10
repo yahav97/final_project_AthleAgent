@@ -177,7 +177,7 @@
 | 7 | `RequestIdHolder.generateNewId()` לא נקרא בתחילת session | `RequestIdHolder.kt` | 13–16 |
 | 8 | `CreateTeamActivity` — אין ולידציה לפורמט קוד קבוצה; מאמן יכול ליצור כמה קבוצות | `CreateTeamActivity.kt` | 32–82 |
 | 9 | `JoinTeamActivity` — `.set()` עם UID כ-doc ID דורס בקשה קיימת | `JoinTeamActivity.kt` | 84–85 |
-| 10 | יעדי תזונה קשיחים (2500 kcal, 150g חלבון, 300g פחמימות) | `MealAnalysisActivity.kt` | 23–25 |
+| 10 | יעדי תזונה קשיחים ב-UI (2500 kcal, 150g חלבון, 300g פחמימות) — לא תואמים לשרת (2600/130/300 ב-`config.py`) | `MealAnalysisActivity.kt` | 23–25 |
 | 11 | Coach dashboard — "AI Doctor is offline" ללא retry | `CoachDashboardActivity.kt` | 114, 199–202 |
 | 12 | `PrivacyPolicyActivity` מוגדר `exported="true"` | `AndroidManifest.xml` | 94–100 |
 | 13 | אין ולידציה לחוזק סיסמה / פורמט אימייל | `RegisterActivity.kt`, `LoginManager.kt` | — |

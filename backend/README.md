@@ -71,8 +71,8 @@ The backend loads a **joblib** bundle (estimator type from `promoted.json` / `ru
 | Package | Version | Role |
 |---------|---------|------|
 | `joblib` | `1.5.3` | Load `injury_model.pkl` at startup |
-| `scikit-learn` | `1.8.0` | Preprocessing pipeline + RandomForest (current promoted model) |
-| `xgboost` | `3.1.2` | Training pipeline / optional if a boosted model is promoted |
+| `scikit-learn` | `1.8.0` | Preprocessing pipeline + calibrated estimators in training |
+| `xgboost` | `3.1.2` | Training pipeline + **XGBoostCalibratedTuned** (current promoted model) |
 
 Promoted model pointer: `ML_model/artifacts/promoted.json`  
 After install, verify ML status: `GET http://localhost:8000/status/ml` → expect `"status": "Live"`.
