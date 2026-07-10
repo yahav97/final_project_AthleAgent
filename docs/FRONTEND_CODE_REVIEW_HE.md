@@ -18,12 +18,12 @@
 
 **חוזקות:** UI מלוטש עם `SignalManager`, זרימות athlete/coach ברורות, שילוב Health Connect ו-Gemini Vision, שכבת observability בסיסית (correlation ID, client events).
 
-**חולשות עיקריות:** מפתחות API בצד הלקוח, fallbacks ל-UID מזויף, memory leaks ב-`onResume`, כפילויות לוגיקה, כיסוי בדיקות דל, **קבצים ארוכים עם יותר מדי אחריות**, **חוסר שכבת domain**, **קוד מת + משאבים לא מקושרים** (פרק 15), ו**הערות בקוד לא עקביות — חלק בעברית, חסרות בקבצים מורכבים** (פרק 9.5).
+**חולשות עיקריות:** מפתחות API בצד הלקוח, fallbacks ל-UID מזויף, memory leaks ב-`onResume`, כפילויות לוגיקה, **קבצים ארוכים עם יותר מדי אחריות**, **חוסר שכבת domain**, **קוד מת + משאבים לא מקושרים** (פרק 15), ו**הערות בקוד לא עקביות — חלק בעברית, חסרות בקבצים מורכבים** (פרק 9.5).
 
 | הערכה              | ציון | הערה                                      |
 | ------------------ | ---- | ----------------------------------------- |
 | פרויקט גמר / דמו   | 7/10 | זרימות שלמות, אינטגרציות מרשימות          |
-| מוכנות לפרודקשן    | 4/10 | P0 באבטחה ו-stability, בדיקות לא מספיקות |
+| מוכנות לפרודקשן    | 4/10 | P0 באבטחה ו-stability; בדיקות אוטומטיות מרוכזות בשרת |
 | מבנה קוד וארגון    | 5/10 | God Activities, כפילויות, חוסר שכבות, הערות לא עקביות |
 
 ---
@@ -45,7 +45,7 @@
 | תצורה | `AndroidManifest.xml`, `app/build.gradle.kts`, `network_security_config.xml` |
 | בדיקות | `app/src/test/**`, `app/src/androidTest/**` |
 
-**סה"כ:** 32 קבצי Kotlin ב-`main`, layouts רלוונטיים, 5 קבצי test.
+**סה"כ:** 32 קבצי Kotlin ב-`main`, layouts רלוונטיים, 5 קבצי test (מתוכם 2 boilerplate + 1 על קוד מת).
 
 ### 2.2 מה לא נכלל
 
@@ -162,7 +162,7 @@
 
 | # | ממצא | קובץ | שורות |
 | - | ---- | ---- | ----- |
-| 16 | `CalculationUtilsTest` מצפה `getRiskLevel(35) == "Medium"` אך הקוד מחזיר `"Low"` | `CalculationUtilsTest.kt` / `CalculationUtils.kt` | 15 / 14 |
+| 16 | `CalculationUtils` + `CalculationUtilsTest` — קוד מת שלא בשימוש ב-`main` | `CalculationUtils.kt` / `CalculationUtilsTest.kt` | מחק (ראו §11) |
 
 ### 4.3 P2 — בינוני
 
@@ -724,151 +724,65 @@ com.yahav.athleagent/
 
 ## 11. בדיקות (Testing)
 
-### 11.1 כיסוי קיים
+### 11.1 עקרון — צנוע ומקצועי
 
-| קובץ | מה נבדק |
-| ---- | ------- |
-| `CalculationUtilsTest.kt` | `getRiskLevel`, `formatDateToKey`, `isTeamCodeValid`, `getSleepHours` |
-| `RequestIdHolderTest.kt` | יצירת request ID |
-| `ClientEventReporterTest.kt` | קריאת API (עלול להיות flaky) |
-| `ExampleUnitTest.kt` | boilerplate |
-| `ExampleInstrumentedTest.kt` | בדיקת package name בלבד |
+בפרויקט זה **הכובד של הבדיקות האוטומטיות נמצא בשרת** (225+ בדיקות pytest). בצד האנדרואיד אין צורך ב"מערך בדיקות מלא" מסוג enterprise — Activity flows, Espresso, instrumented suites ו-CI נפרד.
 
-### 11.2 פערים (חסר לחלוטין)
+**מה כן מתאים ללקוח מובייל בפרויקט גמר:**
 
-| קטגוריה | דוגמאות |
-| ------- | ------- |
-| Activity / flow tests | Login, register, check-in, sync, meal analysis |
-| Integration tests | Firebase / Retrofit (mocked) |
-| Adapter tests | `AlertsAdapter`, `AthleteAdapter`, `RequestsAdapter` |
-| ML trigger preconditions | sleep > 0, steps אתמול > 0, survey קיים |
-| Security tests | אין `test_user_123` ב-production paths |
-| Gemini parsing | JSON פגום, markdown wrappers |
-| Health Connect | הרשאות ו-sync |
-| UI / Instrumentation | מעבר boilerplate |
+| עיקרון | פירוט |
+| ------ | ----- |
+| **מעט unit tests** | רק על לוגיקה טהורה שבשימוש אמיתי ב-production |
+| **ללא instrumented tests** | בדיקות ידניות על מכשיר מספיקות ל-UI ו-Firebase |
+| **ללא CI לאנדרואיד** | הרצה מקומית לפני demo — `gradlew testDebugUnitTest` |
+| **כנות** | לא להציג 9 טסטים (כולל boilerplate) כ"כיסוי מקיף" |
 
-### 11.3 באג בבדיקה קיימת
+**יעד מומלץ:** 2 קבצי unit test, **3 מתודות `@Test`** — observability בלבד.
 
-```
-CalculationUtils.getRiskLevel(35)
-  Implementation: score <= 35 → "Low"
-  Test expects:  "Medium"
-```
+### 11.2 מצב נוכחי
 
-קובץ: `CalculationUtilsTest.kt` שורה 15.
-
-### 11.4 מבקרת איכות — מה למחוק, מה לתקן, מה להוסיף
-
-> **סטטוס:** סעיף זה מתעד החלטות מומלצות בלבד — **לא בוצעו שינויים בקוד האנדרואיד**. יש ליישם ידנית לפי הסדר למטה.
-
-#### 11.4.1 מצב נוכחי
-
-| מדד | ערך |
-| --- | --- |
-| קבצי unit test | 4 (`app/src/test/`) |
-| קבצי instrumented test | 1 (`app/src/androidTest/`) |
-| סה"כ מתודות `@Test` | **9** (8 unit + 1 instrumented) |
-| CI אוטומטי לאנדרואיד | **אין** — רק `backend-tests.yml` ב-GitHub Actions |
-
-#### 11.4.2 למחיקה — boilerplate וקוד מת
-
-| קובץ | פעולה | סיבה |
-| ---- | ----- | ---- |
-| `app/src/test/.../ExampleUnitTest.kt` | **מחק** | boilerplate של Android Studio (`2+2`) — אפס כיסוי production |
-| `app/src/androidTest/.../ExampleInstrumentedTest.kt` | **מחק** | בודק רק `packageName` — לא בודק התנהגות אפליקציה |
-| `app/src/test/.../util/CalculationUtilsTest.kt` | **מחק** (אם לא מחברים util ל-UI) | `CalculationUtils` לא מיובא בשום קובץ ב-`main` — ראו §15.2 |
-| `app/src/main/.../util/CalculationUtils.kt` | **מחק** (יחד עם הטסט) | קוד מת; dashboards משתמשים ב-thresholds hardcoded במקום |
-
-**אחרי מחיקה מינימלית:** 3 unit tests (`RequestIdHolderTest` ×2, `ClientEventReporterTest` ×1), 0 instrumented.
-
-#### 11.4.3 החלטה נדרשת — `CalculationUtils`
-
-יש שתי אפשרויות תקפות; יש לבחור **אחת** לפני שממשיכים:
-
-**אפשרות A — מחיקה (מומלץ אם לא מתכננים refactor מיידי):**
-
-1. מחק `CalculationUtils.kt` + `CalculationUtilsTest.kt`.
-2. השאר thresholds ב-`AthleteDashboardActivity` / `CoachDashboardActivity` כפי שהם.
-3. ודא ש-bands תואמים ל-backend (`test_risk_levels.py` — `Low` עד 20%, `Medium` עד 70%, `High` מעל).
-
-**אפשרות B — חיבור ל-production (מומלץ לטווח ארוך):**
-
-1. תקן את הבאג בטסט **או** בקוד — `getRiskLevel(35)`:
-   - קוד נוכחי: `score <= 35 → "Low"`
-   - טסט מצפה: `"Medium"`
-   - **יש ליישר** לפי bands של השרת (0–20 Low, 21–70 Medium, 71+ High) — לא לפי הטסט הישן.
-2. החלף thresholds hardcoded ב-dashboards בקריאות ל-`CalculationUtils.getRiskLevel()`.
-3. החלף `SimpleDateFormat("yyyy-MM-dd")` ב-8+ activities ב-`CalculationUtils.formatDateToKey()`.
-4. הוסף `isTeamCodeValid()` ב-`CreateTeamActivity` / `JoinTeamActivity`.
-5. רק אז — השאר את `CalculationUtilsTest.kt` עם assertions מעודכנים.
-
-#### 11.4.4 לשמור ולשפר — טסטים עם ערך אמיתי
-
-| קובץ | פעולה | פירוט |
+| קובץ | סטטוס | המלצה |
 | ---- | ----- | ----- |
-| `RequestIdHolderTest.kt` | **שמור + תקן קל** | החלף `private fun assertTrue` ב-`org.junit.Assert.assertTrue` (שורות 26–28) |
-| `ClientEventReporterTest.kt` | **שמור + שכתב** | הבעיה: `ClientEventReporter` משתמש ב-`CoroutineScope(Dispatchers.IO)` — `runTest` + `verify()` עלולים לרוץ לפני שה-coroutine מסתיים (flaky). **פתרון:** הזרק `TestDispatcher` / `CoroutineScope` ל-constructor, או השתמש ב-`runTest` עם `advanceUntilIdle()`. הוסף assertions על payload: `eventType`, `screen`, `metadata`. |
+| `RequestIdHolderTest.kt` | בשימוש (`CorrelationIdInterceptor`) | **שמור** |
+| `ClientEventReporterTest.kt` | בשימוש (5 activities) | **שמור** — לתקן build (JVM 11) |
+| `ExampleUnitTest.kt` | boilerplate (`2+2`) | **מחק** |
+| `ExampleInstrumentedTest.kt` | boilerplate (package name) | **מחק** |
+| `CalculationUtilsTest.kt` | בודק קוד שלא ב-`main` | **מחק** (יחד עם `CalculationUtils.kt`) |
 
-#### 11.4.5 תיקון build — חובה לפני הרצת טסטים
+**סה"כ היום:** 9 מתודות — מתוכן 6 מיותרות.
 
-כיום `testDebugUnitTest` **נכשל בקומפילציה**:
+### 11.3 מה לעשות (רשימה קצרה)
 
-```
-ClientEventReporterTest.kt:38 — Cannot inline bytecode built with JVM target 11
-into bytecode that is being built with JVM target 1.8
-```
+> **לא בוצע בקוד** — להנחיה בלבד.
 
-**פתרון** — ב-`app/build.gradle.kts`, בתוך `android { }`:
+1. **תקן build** — ב-`app/build.gradle.kts` הגדר `jvmTarget = "11"` (כיום `testDebugUnitTest` נכשל בקומפילציה).
+2. **מחק boilerplate** — `ExampleUnitTest.kt`, `ExampleInstrumentedTest.kt`.
+3. **מחק קוד מת** — `CalculationUtils.kt` + `CalculationUtilsTest.kt`.
+4. **שמור 2 קבצים** — `RequestIdHolderTest` (2 טסטים), `ClientEventReporterTest` (1 טסט).
+5. **תיקון קוסמטי** — ב-`RequestIdHolderTest` השתמש ב-`org.junit.Assert.assertTrue` במקום helper פרטי.
 
-```kotlin
-compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-}
-kotlinOptions {
-    jvmTarget = "11"
-}
-```
+**זהו.** אין להוסיף סוגי בדיקות נוספים בפרויקט זה.
 
-או הורד גרסת `mockito-kotlin` לגרסה תואמת JVM 8 — פחות מומלץ.
+### 11.4 מה לא נדרש (מכוון)
 
-#### 11.4.6 הרצת הבדיקות (מקומית)
+הדברים הבאים **לא חלק מה-scope** של פרויקט גמר עם שרת נבדק היטב:
+
+- Activity / flow tests, Adapter tests, Integration tests ל-Firebase
+- Instrumented / Espresso tests, CI workflow נפרד
+- Health Connect permission tests
+
+בדיקות אלו נשארות **ידניות** — demo על מכשיר אמיתי.
+
+### 11.5 הרצה
 
 ```bash
-# מתוך android_app/AthleAgent
-.\gradlew.bat testDebugUnitTest          # unit tests (JVM, ללא מכשיר)
-.\gradlew.bat connectedAndroidTest       # instrumented (דורש emulator/מכשיר)
+cd android_app/AthleAgent
+.\gradlew.bat testDebugUnitTest
 ```
 
-**ב-Android Studio:** לחץ ימני על `app/src/test` → *Run 'Tests in …'*
+### 11.6 ניסוח לספר הפרויקט
 
-#### 11.4.7 טסטים חדשים מומלצים (עדיפות)
-
-| עדיפות | קובץ מוצע | מה לבדוק |
-| ------ | --------- | -------- |
-| P1 | `ClientEventReporterTest.kt` (הרחבה) | נרמול `eventType`, דה-דופליקציה של screen views, error path |
-| P1 | `CorrelationIdInterceptorTest.kt` (חדש) | `X-Request-ID` header נוסף לכל בקשת Retrofit |
-| P2 | `PredictionTriggerTest.kt` (חדש) | תנאי trigger: שינה > 0, steps אתמול > 0, survey קיים — לוגיקה משותפת מ-`DailyCheckInActivity` / `WearableSyncActivity` |
-| P2 | `GeminiResponseParserTest.kt` (חדש) | JSON פגום, markdown wrappers ב-`AnalyzingMealActivity` |
-| P3 | `LoginFlowInstrumentedTest.kt` (חדש) | מחליף את `ExampleInstrumentedTest` — launch `LoginActivity`, בדיקת UI בסיסית |
-
-#### 11.4.8 יעד כמותי אחרי ניקוי
-
-| שלב | Unit | Instrumented | סה"כ |
-| --- | ---- | ------------ | ---- |
-| נוכחי | 8 | 1 | 9 |
-| אחרי מחיקת boilerplate + CalculationUtils | 3 | 0 | 3 |
-| יעד בריא (לאחר הוספות מומלצות) | 6–10 | 1–3 | **7–13** |
-
-#### 11.4.9 סדר ביצוע מומלץ
-
-1. תקן JVM target (§11.4.5) — ודא ש-`testDebugUnitTest` עובר.
-2. החלט על `CalculationUtils` — מחיקה (A) או חיבור (B) (§11.4.3).
-3. מחק boilerplate: `ExampleUnitTest`, `ExampleInstrumentedTest` (§11.4.2).
-4. תקן `RequestIdHolderTest` — import נכון ל-`assertTrue` (§11.4.4).
-5. שכתב `ClientEventReporterTest` עם TestDispatcher (§11.4.4).
-6. הוסף טסטים חדשים לפי §11.4.7 — לפי עדיפות.
-7. (אופציונלי) הוסף `android-ci.yml` — `.\gradlew.bat testDebugUnitTest` ב-push/PR.
+> **הצד של האפליקציה (Android):** בדיקות אוטומטיות מצומצמות — 3 unit tests על observability (`RequestIdHolder`, `ClientEventReporter`). זרימות UI, Firebase ו-Health Connect נבדקות ידנית. הכיסוי האוטומטי המשמעותי (225+ בדיקות) מרוכז בשרת FastAPI.
 
 ---
 
@@ -927,17 +841,16 @@ kotlinOptions {
 | עדיפות | פעולה | ממצאים |
 | ------ | ----- | ------ |
 | 12 | חילוץ `checkAndTriggerPredictionInBackground` ל-shared class | P2 #1 |
-| 13 | שימוש ב-`CalculationUtils` בכל ה-UI | P2 thresholds |
+| 13 | מחיקת `CalculationUtils` + טסט (קוד מת) | §11, §15.2 |
 | 14 | מחיקת dead code ומשאבים מיותרים (פרק 15) | P2 |
-| 15 | תיקון `CalculationUtilsTest` או הקוד | P1 #16 |
 
-### שלב 5 — בדיקות
+### שלב 5 — בדיקות (מינימלי)
 
 | עדיפות | פעולה |
 | ------ | ----- |
-| 16 | Unit tests ל-Gemini JSON parsing |
-| 17 | Unit tests ל-ML trigger preconditions |
-| 18 | Instrumentation test ל-login flow |
+| 15 | תקן JVM target 11 ב-`build.gradle.kts` |
+| 16 | מחק boilerplate + `CalculationUtils` (ראו §11.3) |
+| 17 | הרץ `.\gradlew.bat testDebugUnitTest` — ודא 3 טסטים עוברים |
 
 ### שלב 6 — מבנה קוד
 
@@ -994,7 +907,7 @@ kotlinOptions {
 | ---- | ---- | -------------- | ----- |
 | `MainActivity` | `ui/auth/MainActivity.kt` | רשום ב-Manifest אך **אין אף `Intent` שמפנה אליו**. `LoginActivity` הוא LAUNCHER ומבצע routing זהה (`checkUserRoleAndNavigate`) | **מחק** את הקלאס + הסרה מ-Manifest, **או** הפוך ל-LAUNCHER והסר routing מ-`LoginActivity` |
 | `activity_main.xml` | `res/layout/activity_main.xml` | Layout יחיד של `MainActivity` | מחק יחד עם `MainActivity` |
-| `CalculationUtils` (כולו) | `util/CalculationUtils.kt` | **אף קריאה מ-`main`** — רק `CalculationUtilsTest.kt`. Dashboards משתמשים ב-thresholds hardcoded | **או** חבר ל-UI (`getRiskLevel`, `formatDateToKey`, `isTeamCodeValid`) **או** מחק util + tests |
+| `CalculationUtils` (כולו) | `util/CalculationUtils.kt` | **אף קריאה מ-`main`** — רק `CalculationUtilsTest.kt` | **מחק** util + test (ראו §11) |
 
 #### Medium — כפילות / פונקציות מתות
 
@@ -1002,7 +915,7 @@ kotlinOptions {
 | ---- | ---- | -------------- | ----- |
 | `PredictionResponse` (מודל נפרד) | `model/PredictionModels.kt` | **לא מיובא בשום מקום**. הקוד משתמש ב-`ApiService.PredictionResponse` (שדות שונים: `risk_score` vs `risk_percentage`) | מחק `PredictionModels.kt` |
 | `updateUIWithMissingDataState()` | `AthleteDashboardActivity.kt` (206–216) | מוגדר, **לא נקרא** | מחק או חבר ל-flow חסר נתונים |
-| `CalculationUtilsTest` | `app/src/test/.../CalculationUtilsTest.kt` | תלוי ב-util שלא מחובר ל-production | מחק אם מוחקים את `CalculationUtils`; אחרת תקן לפני חיבור |
+| `CalculationUtilsTest` | `app/src/test/.../CalculationUtilsTest.kt` | תלוי ב-util שלא מחובר ל-production | מחק יחד עם `CalculationUtils.kt` |
 | `injectSevenDaysOfWearableDemoData()` | `WearableSyncActivity.kt` (89–177) | **לא dead** — פעיל (long-press). מזריק נתונים אקראיים ל-Firestore | **הסר** מ-production או עטוף ב-`BuildConfig.DEBUG` |
 
 #### Low — שדות / פונקציות מתות
