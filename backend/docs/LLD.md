@@ -242,13 +242,15 @@ All fields optional — the service applies defaults.
 | Module / Function | Responsibility |
 |-------------------|----------------|
 | `firestore_client.get_firestore_client()` | Firebase Admin init (singleton) |
-| `repository.fetch_daily_firestore_snapshot` | Profile + D + D-1 docs |
-| `repository.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
+| `firestore_io.read_firestore_documents` | Batch / sequential document reads |
+| `inference_bundle.fetch_inference_firestore_bundle` | Single batch: snapshot + history window |
+| `history_window.get_history_window_context` | Rolling features + `HistoryConfidence` enum |
+| `history_window.fetch_user_history` | Wake-up-day merged history rows |
 | `day_quality.count_quality_history_days` | Usable watch-sync days (≥3 of 4 categories) |
 | `history_merge.merge_wake_up_day_row` | physical@W-1 + sleep/survey@W |
 | `rolling_features.compute_historical_derived_features` | ACWR, sleep_debt, hrv_drop |
-| `repository.save_daily_prediction_result` | Merge write to daily_health |
-| `repository.stable_athlete_numeric_id` | SHA256 → deterministic int id |
+| `persist.save_daily_prediction_result` | Merge write to daily_health |
+| `repository` | Thin re-export facade for the modules above |
 
 #### Rolling Features (`compute_historical_derived_features`)
 
@@ -271,7 +273,9 @@ A **quality day** = merged wake-up row with ≥ `HISTORY_MIN_WATCH_SYNC_SIGNAL_G
 | `HistoryConfidence.MEDIUM` | ≥ `HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS` (4) | computed |
 | `HistoryConfidence.LOW` | below medium threshold | `DEFAULT_FEATURE_VALUES` for rolling cols |
 
-#### Firestore Read (`fetch_daily_firestore_snapshot`)
+#### Firestore Read (`fetch_inference_firestore_bundle`)
+
+Single batch read covering snapshot inputs **and** the history window:
 
 ```
 users/{uid}                                    → profile
@@ -279,8 +283,8 @@ users/{uid}/daily_health/{date}                → health_today
 users/{uid}/daily_health/{date-1}              → health_yesterday
 users/{uid}/daily_checkins/{date}              → checkins
 users/{uid}/daily_nutrition/{date-1}           → nutrition_yesterday
+users/{uid}/daily_health|checkins/{W} …        → history wake-up days (lookback)
 ```
-
 #### Firestore Write (`save_daily_prediction_result`)
 
 ```python
@@ -437,9 +441,9 @@ Used in: `prediction_confidence = 0.6 × history_score + 0.4 × quality_score`
 
 | Error | Source | HTTP | When |
 |-------|--------|------|------|
-| `firestore_snapshot_unavailable` | `history/repository` | 503 | Firestore client None or read fail |
+| `firestore_snapshot_unavailable` | `history/inference_bundle` | 503 | Firestore client None or read fail |
 | `model_not_live:*` | `prediction/service` | 503 | Gate failed or model not loaded |
-| `prediction_persist_failed` | `history/repository` | 503 | Write returned False |
+| `prediction_persist_failed` | `history/persist` | 503 | Write returned False |
 
 ---
 
@@ -487,22 +491,19 @@ sequenceDiagram
     participant R as predict.py
     participant PS as prediction/service
     participant FM as firestore_mapping
-    participant HS as history/repository
+    participant HS as history package
     participant PP as preprocessing
     participant ML as model_loader
     participant FS as Firestore
 
     R->>PS: predict_injury_risk_from_firestore(uid, date)
-    PS->>HS: fetch_daily_firestore_snapshot(uid, date)
-    HS->>FS: parallel reads (profile, health×2, checkin, nutrition)
-    FS-->>HS: snapshot
+    PS->>HS: fetch_inference_firestore_bundle(uid, date)
+    HS->>FS: batch read (snapshot + history window)
+    FS-->>HS: snapshot + history_context
     PS->>FM: injury_prediction_request_from_firestore_snapshot()
     PS->>PP: injury_request_to_model_dataframe()
     PP-->>PS: df (35 cols)
-    PS->>HS: get_history_window_context(uid, date, 7)
-    HS->>FS: read historical daily_health
-    HS-->>PS: {confidence, features}
-    PS->>PS: apply_history_confidence_fallback()
+    PS->>PS: apply_history_confidence_fallback(history_context)
     PS->>PP: calculate_data_quality_score()
     PS->>ML: get_model()
     ML-->>PS: estimator + feature_columns
@@ -513,7 +514,6 @@ sequenceDiagram
     HS->>FS: merge write
     R-->>R: InjuryPredictionResponse
 ```
-
 ---
 
 ## 13. Class / Module Dependency Graph
@@ -527,7 +527,7 @@ flowchart TD
     predict_route --> prediction_svc[prediction/service]
     predict_route --> schemas
 
-    prediction_svc --> history_repo[history/repository]
+    prediction_svc --> history_pkg[history/inference_bundle + persist]
     prediction_svc --> preprocessing
     prediction_svc --> model_features
     prediction_svc --> model_loader
@@ -536,11 +536,10 @@ flowchart TD
     preprocessing --> feature_engineering
     preprocessing --> model_features
 
-    history_repo --> config
+    history_pkg --> config
 
     model_loader --> logging
 ```
-
 ---
 
 ## 14. Known Implementation Gaps
@@ -559,6 +558,6 @@ flowchart TD
 | Nutrition defaults | `services/nutrition_defaults.py` |
 | API contract | `schemas/inference.py` |
 | Merge policy | `services/prediction/firestore_mapping.py` |
-| Firestore I/O | `services/history/repository.py` |
+| Firestore I/O | `services/history/inference_bundle.py`, `persist.py`, `firestore_io.py` |
 | Model gates | `ml/model_loader.py` |
 | Settings | `config.py` |

@@ -3,7 +3,7 @@
 
 | שדה               | ערך                                                                 |
 | ----------------- | ------------------------------------------------------------------- |
-| **גרסה**          | 1.0                                                                 |
+| **גרסה**          | 1.1                                                                 |
 | **תאריך**         | 2026-07-11                                                          |
 | **קהל יעד**       | מפתחי Backend / ML, בוחני פרויקט גמר, reviewers                     |
 | **היקף**          | `backend/` בלבד — ללא Android / אימון ML מלא                        |
@@ -18,13 +18,13 @@
 
 **חוזקות:** שכבות ברורות (routes → service → history/preprocessing/ML), מדיניות merge מתועדת ליום התעוררות, שערי איכות מודל (Recall/AUC), חוזה פיצ'רים ב-JSON, correlation ID בלוגים, וסוללת unit/integration tests חזקה יחסית.
 
-**חולשות עיקריות:** **אין אימות API** על `/predict/daily` למרות כתיבה עם service account, **`config.py` מתעלם ממשתני סביבה** (כולל `APP_ENV=demo` ב-Docker), אין rate limit על inference, ספי המודל נטענים אך לא משמשים לסיווג, וקיים drift בין תיעוד (pydantic-settings) לקוד (dataclass).
+**חולשות עיקריות:** **אין אימות API** על `/predict/daily` למרות כתיבה עם service account, אין rate limit על inference, ספי המודל נטענים אך לא משמשים לסיווג, deps מיותרים ב-requirements.
 
 | הערכה              | ציון | הערה                                                         |
 | ------------------ | ---- | ------------------------------------------------------------ |
 | פרויקט גמר / דמו   | 8/10 | זרימת inference שלמה, gates, טסטים, Docker localhost bind   |
-| מוכנות לפרודקשן    | 4/10 | P0 באבטחה + config שלא נטען מ-env                             |
-| מבנה קוד וארגון    | 7/10 | שכבות טובות; `repository.py` God-module; קוד מת / deps מיותרים |
+| מוכנות לפרודקשן    | 4/10 | P0 באבטחה (אין auth)                                          |
+| מבנה קוד וארגון    | 8/10 | שכבות טובות; `history/` מפוצל; Settings מ-env                |
 
 ---
 
@@ -76,10 +76,19 @@
               Firestore (Admin SDK) + promoted joblib model
 ```
 
-**יש:** הפרדת routes / services / schemas / ML, domain exceptions, feature contract.
+**יש:** הפרדת routes / services / schemas / ML, domain exceptions, feature contract, Settings מ-env (`pydantic-settings`), חבילת `history/` מפוצלת.
 
-**אין:** Auth middleware, DI container, rate limit על prediction, טעינת Settings מ-env.
+**אין:** Auth middleware, DI container, rate limit על prediction.
 
+### 3.1.1 `services/history/` (אחרי פיצול)
+
+| מודול | תפקיד | ~שורות |
+| ----- | ----- | -----: |
+| `firestore_io.py` | קריאות document / batch | ~35 |
+| `inference_bundle.py` | טעינת snapshot+history לחיזוי | ~130 |
+| `history_window.py` | חלון היסטוריה + confidence | ~170 |
+| `persist.py` | שמירת תוצאת prediction | ~45 |
+| `repository.py` | facade ל-re-export בלבד | ~40 |
 ### 3.2 זרימת `POST /predict/daily`
 
 ```
@@ -114,12 +123,11 @@
 | חומרה | ממצא | מיקום |
 | ----- | ---- | ----- |
 | P0 | אין auth — `userId` בגוף הבקשה הוא ה"הרשאה" היחידה | `api/routes/predict.py` |
-| P0 | Settings לא נטענים מ-env / Docker | `config.py` |
-| P1 | `repository.py` God-module (~402 שורות) | `services/history/repository.py` |
 | P1 | ספי מודל ב-bundle לא משמשים לסיווג | `bundle.py` ↔ `risk_levels.py` |
-| P2 | `fetch_daily_firestore_snapshot` מת / docs עדיין מצביעים עליו | `repository.py`, `docs/HLD.md` |
 | P2 | `AuthorizationError` מוגדר אך לא בשימוש | `utils/exceptions.py` |
 | P3 | deps לא בשימוש: `google-generativeai`, `pillow` | `requirements.txt` |
+
+**תוקן ב-1.1:** Settings מ-env; פיצול `history/`; הסרת `fetch_daily_firestore_snapshot` + יישור docs.
 
 ---
 
@@ -130,10 +138,9 @@
 | # | ממצא | קובץ | שורות | השפעה |
 | - | ---- | ---- | ----- | ----- |
 | 1 | **`POST /predict/daily` ללא אימות** — מתועד במפורש; כל מי שמגיע לפורט יכול להריץ inference | `api/routes/predict.py` | 41–56 | ניבוי / עומס על כל `userId` |
-| 2 | **כתיבה מועדפת ל-Firestore** אחרי prediction — Admin SDK דורס `finalRiskScore` / `riskLevel` / `predictionConfidence` | `repository.py` (`save_daily_prediction_result`) | 277–298 | זיוף סיכון לספורטאי אחר |
-| 3 | **`Settings` הוא dataclass סטטי** — לא pydantic-settings; רוב משתני `.env` / Docker לא משפיעים | `config.py` | 26–114 | `APP_ENV=demo` ב-compose נשאר `"development"` בקוד |
-| 4 | כתוצאה מ-#3: **OpenAPI נשאר פתוח** (`openapi_enabled` תלוי ב-`APP_ENV=="development"`) גם ב-Docker demo | `config.py`, `main.py` | 109–111 / 44–53 | חשיפת סכמה בסביבה "demo" |
-| 5 | כתוצאה מ-#3: **fallback ללא manifest מותר** כי `APP_ENV` תמיד development כברירת מחדל | `ml/model_loader.py` | 205–228 | מודל לא-מקוּדם עלול להיטען כ-Live |
+| 2 | **כתיבה מועדפת ל-Firestore** אחרי prediction — Admin SDK דורס `finalRiskScore` / `riskLevel` / `predictionConfidence` | `persist.py` (`save_daily_prediction_result`) | — | זיוף סיכון לספורטאי אחר |
+
+~~P0 #3–5 (Settings / APP_ENV / OpenAPI / ungated fallback)~~ — **תוקן ב-1.1:** `config.py` הוא `pydantic-settings.BaseSettings`; Docker `APP_ENV=demo` נטען בפועל.
 
 **הקלה קיימת:** `docker-compose.yml` קושר ל-`127.0.0.1:8000` בלבד. ההקלה **לא** חלה על `uvicorn --host 0.0.0.0` מקומי או פרסום פורט ציבורי.
 
@@ -161,19 +168,19 @@
 
 | # | ממצא | קובץ | שורות |
 | - | ---- | ---- | ----- |
-| 9 | `repository.py` ~402 שורות — I/O, history, persist, helpers | `services/history/repository.py` | — |
-| 10 | תיעוד מצהיר pydantic-settings / override מ-env — הקוד לא מממש | `.env.example`, `README.md`, `docs/LLD.md` | — |
+| 9 | ~~`repository.py` God-module~~ — **תוקן ב-1.1** (פיצול ל-`firestore_io` / `inference_bundle` / `history_window` / `persist`) | `services/history/` | — |
+| 10 | ~~תיעוד pydantic-settings ללא מימוש~~ — **תוקן ב-1.1** | `config.py` | — |
 | 11 | deps מיותרים ב-image: `google-generativeai`, `pillow` (אין imports) | `requirements.txt` | 35–38 |
 
 ### 4.3 P2 — בינוני
 
 | # | ממצא | קובץ | שורות |
 | - | ---- | ---- | ----- |
-| 1 | `fetch_daily_firestore_snapshot` לא בנתיב production (משתמשים ב-`fetch_inference_firestore_bundle`) | `repository.py` | 212–274 |
-| 2 | Docs (`HLD`/`LLD`/`RISK_SCORE`) עדיין מתארים את הפונקציה הישנה | `backend/docs/*` | — |
+| 1 | ~~`fetch_daily_firestore_snapshot` מת~~ — **הוסר ב-1.1**; docs עודכנו ל-`fetch_inference_firestore_bundle` | — | — |
+| 2 | ~~Docs מצביעים על פונקציה ישנה~~ — **תוקן ב-1.1** | `backend/docs/*` | — |
 | 3 | `AuthorizationError` + טסטים עליו — ללא שימוש ב-routes | `utils/exceptions.py` | 27–30 |
 | 4 | `LOG_FORMAT=json` מתועד ב-`.env.example` אך הפורמטר טקסטואלי | `utils/logging.py` | — |
-| 5 | כפילות הרכבת שורות history בין נתיבי bundle / `fetch_user_history` | `repository.py` | — |
+| 5 | ~~כפילות הרכבת שורות history~~ — **הופחת ב-1.1** (`history_rows_from_snapshots` משותף) | `history_window.py` | — |
 | 6 | אם `history_context` חסר — `confidence` עלול לעשות round-trip נוסף ל-Firestore | `confidence.py` | ~50–58 |
 | 7 | pytest ללא coverage gate | `pytest.ini` | — |
 | 8 | אינטגרציית `/predict/daily` בעיקר mock של השירות — E2E Firestore מוגבל | `tests/integration/test_routes_predict_daily.py` | — |
@@ -219,7 +226,7 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 | CORS | localhost:3000/8080 + credentials — סביר ל-demo |
 | Secrets | `firebase-key.json` ב-gitignore; נטען מ-env path או קובץ מקומי |
 | Rate limit | רק `/api/v1/observability/client-events` |
-| OpenAPI | אמור להיסגר מחוץ ל-development — **לא עובד** בגלל config |
+| OpenAPI | נסגר כש-`APP_ENV != "development"` (עובד עם Docker `APP_ENV=demo`) |
 | Input validation | Pydantic על trigger; אין range clamp על מדדי בריאות מ-Firestore |
 
 ### 5.3 קשר לפרונטאנד
@@ -230,23 +237,23 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 
 ## 6. קונפיגורציה ופריסה
 
-### 6.1 הפער בין docs לקוד
+### 6.1 טעינת Settings (תוקן ב-1.1)
 
-| מקור | מה נטען |
-| ---- | ------- |
-| `.env.example` / README | "pydantic-settings", overrides מ-env |
-| `backend/docs/LLD.md` | דוגמת `class Settings(BaseSettings)` |
-| **`config.py` בפועל** | `@dataclass` עם defaults בקוד; רק נתיב Firebase נקרא מ-`os.environ` |
+`config.Settings` הוא `pydantic-settings.BaseSettings`: משתני סביבה, `backend/.env` ו-`.env` בשורש הפרויקט דורסים defaults.
 
-משתנים ש-Docker מגדיר ו-**Settings מתעלם מהם:** `APP_ENV`, `LOG_DIR`, ורוב הכפתורים ב-`.env.example` (risk cutoffs, confidence weights, וכו').
+| מקור | דוגמה | השפעה |
+| ---- | ----- | ----- |
+| Docker `APP_ENV=demo` | `openapi_enabled == False` | `/docs` כבוי |
+| Docker `LOG_DIR=/app/logs` | לוגים לנתיב הקונטיינר | volume `./logs` |
+| `.env` / compose | `RISK_*`, confidence weights, Firebase path | overrides בלי עריכת קוד |
 
-מה שכן עובד דרך סביבה: `PORT` ב-shell של הקונטיינר, `FIREBASE_SERVICE_ACCOUNT_KEY` דרך `_default_firebase_key()`.
+מה שכן עובד דרך סביבה: כל שדות `Settings`, כולל `PORT` (גם ב-shell של הקונטיינר), `FIREBASE_SERVICE_ACCOUNT_KEY`, `APP_ENV`, `LOG_DIR`.
 
 ### 6.2 Docker
 
 - Image: Python 3.12-slim, מעתיק `backend/` + artifacts מקודמים.
 - Compose: bind `127.0.0.1:8000`, mount ל-firebase key, healthcheck על `/health`.
-- המלצה לסקירה: לתקן טעינת Settings לפני שמסתמכים על `APP_ENV=demo`.
+- `APP_ENV=demo` ב-compose סוגר OpenAPI וחוסם ungated fallback.
 
 ---
 
@@ -301,17 +308,18 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 
 | שורות | מודול | הערה |
 | ----: | ----- | ---- |
-| 402 | `services/history/repository.py` | מועמד לפיצול |
-| 254 | `ml/model_loader.py` | סביר יחסית למורכבות gates |
-| 176 | `services/preprocessing/request_features.py` | |
-| 132 | `schemas/inference.py` | |
-| 115 | `services/prediction/service.py` | אורקסטרציה ברורה |
+| ~254 | `ml/model_loader.py` | סביר יחסית למורכבות gates |
+| ~176 | `services/preprocessing/request_features.py` | |
+| ~170 | `services/history/history_window.py` | אחרי פיצול |
+| ~132 | `schemas/inference.py` | |
+| ~130 | `services/history/inference_bundle.py` | אחרי פיצול |
+| ~115 | `services/prediction/service.py` | אורקסטרציה ברורה |
 
 ### 9.2 קוד מת / מיותר
 
 | פריט | המלצה |
 | ---- | ----- |
-| `fetch_daily_firestore_snapshot` | מחק או סמן deprecated; עדכן docs |
+| ~~`fetch_daily_firestore_snapshot`~~ | **הוסר ב-1.1** |
 | `AuthorizationError` (ללא שימוש) | השאר רק אם auth מתוכנן מיד; אחרת הסר |
 | `google-generativeai`, `pillow` | הסר מ-`requirements.txt` |
 | ספי bundle שלא בשימוש | או חבר לסיווג, או תעד במפורש "UI bands only" והסר מה-contract החובה |
@@ -339,12 +347,12 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 | פער | חומרה |
 | --- | ----- |
 | אין טסטי auth (middleware הוסר) | P1 (כשיוסיפו auth) |
-| אין טסט שמוכיח טעינת env → Settings | P0/P1 — כרגע אין מה לבדוק |
+| טענת env → Settings | **יש** (`tests/unit/test_config.py` — תוקן ב-1.1) |
 | `/predict/daily` integration עם mock כבד | P2 |
 | אין coverage threshold ב-CI | P2 |
 | Docs מזכירים לפעמים קבצי טסט/auth ישנים | P2 |
 
-**הערכה:** לבקאנד של פרויקט גמר — **כיסוי לוגיקת ML-serving טוב מאוד**; אבטחה וקונפיג חלשים כי החורים בקוד עצמו.
+**הערכה:** לבקאנד של פרויקט גמר — **כיסוי לוגיקת ML-serving טוב מאוד**; אבטחה עדיין החולשה העיקרית.
 
 ---
 
@@ -368,15 +376,14 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 | ------ | ----- | ------ |
 | 1 | Firebase ID token middleware + התאמת `uid` ל-`userId` | P0 #1–2 |
 | 2 | Rate limit על `/predict/daily` | P1 #1 |
-| 3 | לסגור `/docs` ו-`/status/ml` מחוץ ל-dev או להגן ב-auth | P0 #4, P1 #2 |
+| 3 | להגן על `/status/ml` ב-auth (או לסגור מחוץ ל-dev) | P1 #2 |
 
 ### שלב 2 — Config אמיתי
 
 | עדיפות | פעולה | ממצאים |
 | ------ | ----- | ------ |
-| 4 | המרת `Settings` ל-pydantic-settings / קריאת env מפורשת | P0 #3–5 |
-| 5 | יישור `.env.example`, README, LLD לקוד | P1 #10 |
-| 6 | וידוא ש-`APP_ENV=demo` ב-Docker באמת משנה התנהגות | P0 #3 |
+| 4 | ~~המרת Settings ל-pydantic-settings~~ | **בוצע ב-1.1** |
+| 5 | ~~יישור docs~~ | **בוצע ב-1.1** (HLD/LLD/RISK_SCORE/BACKEND) |
 
 ### שלב 3 — בהירות ML
 
@@ -390,15 +397,15 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 
 | עדיפות | פעולה | ממצאים |
 | ------ | ----- | ------ |
-| 10 | מחיקת `fetch_daily_firestore_snapshot` / עדכון docs | P2 #1–2 |
+| 10 | ~~מחיקת `fetch_daily_firestore_snapshot` / עדכון docs~~ | **בוצע ב-1.1** |
 | 11 | הסרת deps מיותרים | P1 #11 |
-| 12 | פיצול `repository.py` (I/O / history / persist) | P1 #9 |
+| 12 | ~~פיצול `repository.py`~~ | **בוצע ב-1.1** |
 
 ### שלב 5 — בדיקות
 
 | עדיפות | פעולה |
 | ------ | ----- |
-| 13 | טסטי auth + העברת env ל-Settings |
+| 13 | טסטי auth (+ env→Settings כבר קיימים) |
 | 14 | smoke E2E עם emulator/Firestore test doubles |
 | 15 | coverage מינימלי ב-CI על `services/` + `ml/` |
 
@@ -408,9 +415,9 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 
 | חומרה מקסימלית | קבצים |
 | -------------- | ----- |
-| **P0** | `api/routes/predict.py`, `services/history/repository.py` (persist), `config.py`, `ml/model_loader.py` (fallback+APP_ENV), `main.py` (OpenAPI), `docker-compose.yml` (הקלה בלבד) |
-| **P1** | `services/prediction/bundle.py`, `services/risk_levels.py`, `services/feature_engineering.py`, `services/preprocessing/request_mapping.py`, `utils/client_event_limiter.py`, `requirements.txt`, `backend/.env.example` |
-| **P2** | `services/history/repository.py` (legacy fetch), `utils/exceptions.py`, `utils/logging.py`, `services/prediction/confidence.py`, `backend/docs/*`, `.gitignore` |
+| **P0** | `api/routes/predict.py`, `services/history/persist.py`, `docker-compose.yml` (הקלה localhost בלבד) |
+| **P1** | `services/prediction/bundle.py`, `services/risk_levels.py`, `services/feature_engineering.py`, `services/preprocessing/request_mapping.py`, `utils/client_event_limiter.py`, `requirements.txt` |
+| **P2** | `utils/exceptions.py`, `utils/logging.py`, `services/prediction/confidence.py`, `.gitignore` |
 | **P3** | `requirements.txt` (pins), חוסר metrics |
 
 ---
@@ -419,11 +426,10 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 
 | חומרה | פריט | המלצה |
 | ----- | ---- | ----- |
-| Medium | `fetch_daily_firestore_snapshot` | מחק + עדכן HLD/LLD/RISK_SCORE |
+| ~~Medium~~ | ~~`fetch_daily_firestore_snapshot`~~ | **הוסר ב-1.1** |
 | Medium | `google-generativeai`, `pillow` | הסר מ-requirements |
 | Low | `AuthorizationError` ללא raise | מחק או חבר ל-auth עתידי |
 | Low | שדות threshold ב-bundle אם נשארים UI-only | הפחת חובת ולידציה או השתמש בהם |
-| Docs | אזכורי `BaseSettings` / auth middleware ישן | יישור למציאות |
 
 ---
 
@@ -433,9 +439,9 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 | ---- | ------- | ------- |
 | Auth ל-API | אין Bearer | אין אימות — **אותה חולשה משותפת** |
 | סודות | Gemini ב-BuildConfig (P0) | Service account בקובץ מקומי (gitignore) |
-| ארכיטקטורה | God Activities | שכבות טובות יותר |
+| ארכיטקטורה | God Activities | שכבות + `history/` מפוצל |
 | טסטים | דלים ב-app | חזקים יחסית |
-| מוכנות פרודקשן | 4/10 | 4/10 (סיבות שונות) |
+| מוכנות פרודקשן | 4/10 | 4/10 (auth עדיין חוסם) |
 
 ---
 
@@ -444,3 +450,4 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
 | גרסה | תאריך | שינוי |
 | ---- | ----- | ----- |
 | 1.0 | 2026-07-11 | סקירה ראשונית מלאה של בקאנד FastAPI |
+| 1.1 | 2026-07-11 | תיקון Settings מ-env; פיצול `history/`; הסרת snapshot ישן; עדכון ממצאים וdocs |

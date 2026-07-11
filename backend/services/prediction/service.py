@@ -7,10 +7,8 @@ from typing import Any
 from ml.model_loader import get_model, get_model_gate_reason
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
-from services.history.repository import (
-    fetch_inference_firestore_bundle,
-    save_daily_prediction_result,
-)
+from services.history.inference_bundle import fetch_inference_firestore_bundle
+from services.history.persist import save_daily_prediction_result
 from services.nutrition_defaults import resolve_request_nutrition
 from services.profile_defaults import resolve_request_age
 from services.prediction.bundle import resolve_model_bundle

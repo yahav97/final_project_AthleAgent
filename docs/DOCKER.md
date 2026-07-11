@@ -97,7 +97,7 @@ volumes:
 |----------|---------|
 | [README.md](../README.md) | Project overview + getting started |
 | [backend/README.md](../backend/README.md) | API, tests, local Python run |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend architecture |
 | [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates, promotion, restart after retrain |
 | [docs/HLD_PROJECT.md](HLD_PROJECT.md) | Full project HLD |
+| [docs/LLD_PROJECT.md](LLD_PROJECT.md) | Full project LLD |
 | [docs/NFR.md](NFR.md) | NFR-MAINT-03 — modular deployment |

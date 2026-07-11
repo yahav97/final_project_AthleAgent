@@ -7,7 +7,7 @@
 | **Date** | 2026-07-11 |
 | **Authors** | Yahav Simon, Tzuf Feldon |
 | **Audience** | Developers, course evaluators, technical stakeholders |
-| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
+| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [NFR.md](NFR.md) |
 
 ---
 
@@ -254,7 +254,7 @@ erDiagram
 | Service | Direction | Usage | Code Location |
 |---------|-----------|-------|---------------|
 | **Firebase Auth** | Client → Google | Login, register, role routing | `LoginActivity.kt` |
-| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | All application data | Activities, `history/repository.py` |
+| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | All application data | Activities, `history/inference_bundle.py` + `persist.py` |
 | **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
 | **Gemini API** | Client → Google | Meal vision, coaching text (optional) | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
 | **FastAPI Backend** | Client → Server | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/` |
@@ -386,11 +386,9 @@ final_project_AthleAgent/
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
 | [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend HLD |
-| [backend/docs/LLD.md](../backend/docs/LLD.md) | Backend LLD |
-| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | Backend architecture |
+| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | Backend architecture notes |
 | [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production data contract |
-| [docs/NFR.md](NFR.md) | Non-functional requirements (metrics, gates, performance) |
-| [docs/LOGGING_HE.md](LOGGING_HE.md) | Unified logging + Android telemetry |
+| [NFR.md](NFR.md) | Non-functional requirements (metrics, gates, performance) |
+| [LOGGING_HE.md](LOGGING_HE.md) | Unified logging + Android telemetry |
 | [backend/docs/MODEL.md](../backend/docs/MODEL.md) | Production ML config (gates, bands) |
 | [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | End-to-end risk-score pipeline |

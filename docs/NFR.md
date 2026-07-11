@@ -6,7 +6,7 @@
 | **גרסה**          | 1.0                                                                                                                                                                                                       |
 | **תאריך**         | 2026-06-20                                                                                                                                                                                                |
 | **קהל יעד**       | בוחני פרויקט גמר, מפתחים, stakeholders                                                                                                                                                                    |
-| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) · [LOGGING_HE.md](LOGGING_HE.md) · [MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md) |
+| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [LLD_PROJECT.md](LLD_PROJECT.md) · [LOGGING_HE.md](LOGGING_HE.md) · [MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md) |
 
 
 ---
@@ -657,7 +657,7 @@ cd backend && pytest -q
 | [LOGGING_HE.md](LOGGING_HE.md)                                                           | observability, trace, PHI policy |
 | [PROJECT_BOOK_IMPROVEMENTS_HE.md](PROJECT_BOOK_IMPROVEMENTS_HE.md)                       | מדריך לשיפור ספר הפרויקט         |
 | [FRONTEND_CODE_REVIEW_HE.md](FRONTEND_CODE_REVIEW_HE.md)                                 | סקירת קוד Android                |
-| [HLD §13](../backend/docs/HLD.md)                                                        | SLOs מקוריים                     |
+| [HLD_PROJECT.md](HLD_PROJECT.md)                                                         | Project HLD / SLOs context       |
 | [model_improvement_journey.ipynb](../ML_model/notebooks/model_improvement_journey.ipynb) | ML narrative + graphs            |
 
 

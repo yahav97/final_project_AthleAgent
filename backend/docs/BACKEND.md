@@ -49,7 +49,7 @@ backend/
 │   └── observability.py            # client telemetry
 ├── services/
 │   ├── prediction/                 # orchestration, bundle, confidence, firestore mapping
-│   ├── history/                    # Firestore client, repository, rolling features
+│   ├── history/                    # Firestore I/O split: inference_bundle, history_window, persist, firestore_io
 │   ├── preprocessing/              # quality, validation, scales, request mapping
 │   ├── feature_engineering.py      # derived features (ACWR proxies)
 │   ├── field_transforms.py         # Firestore field helpers

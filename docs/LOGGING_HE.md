@@ -6,7 +6,7 @@
 | **גרסה**          | 1.1                                                        |
 | **תאריך**         | 2026-06-20                                                 |
 | **קהל יעד**       | מפתחי Backend, Android, בוחני פרויקט גמר                   |
-| **מסמכים קשורים** | [HLD §11](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
+| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) |
 
 
 ---
@@ -278,4 +278,4 @@ curl -X POST http://localhost:8000/api/v1/observability/client-events \
 
 ---
 
-*מסמך זה עוסק בלוגים בלבד. ML artifacts ו-Firestore — ראו [HLD](../backend/docs/HLD.md) ו-[MODEL.md](../backend/docs/MODEL.md).*
+*מסמך זה עוסק בלוגים בלבד. ML artifacts ו-Firestore — ראו [HLD_PROJECT.md](HLD_PROJECT.md) ו-[MODEL.md](../backend/docs/MODEL.md).*

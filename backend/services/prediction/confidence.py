@@ -9,7 +9,7 @@ import pandas as pd
 from config import settings
 from schemas.enums import HistoryConfidence
 from schemas.inference import InjuryPredictionRequest
-from services.history.repository import get_history_window_context
+from services.history.history_window import get_history_window_context
 from services.model_features import DEFAULT_FEATURE_VALUES
 
 # Rolling features filled from Firestore history or population defaults when history is thin.

@@ -6,7 +6,7 @@
 | **Version** | 1.1 |
 | **Date** | 2026-07-11 |
 | **Audience** | Developers |
-| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [backend/docs/LLD.md](../backend/docs/LLD.md) |
+| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) |
 
 ---
 
@@ -226,9 +226,7 @@ flowchart TD
 
 ---
 
-## 3. Backend — LLD (Summary)
-
-> Full detail: [backend/docs/LLD.md](../backend/docs/LLD.md)
+## 3. Backend — LLD
 
 ### 3.1 API Endpoints
 
@@ -246,8 +244,8 @@ flowchart TD
 ```
 POST /predict/daily {userId, date}
     │
-    ├─ fetch_daily_firestore_snapshot()
-    │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1}
+    ├─ fetch_inference_firestore_bundle()              [history/inference_bundle]
+    │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1} + history window
     │
     ├─ injury_prediction_request_from_firestore_snapshot()
     │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
@@ -490,14 +488,14 @@ cd backend && python -m pytest tests/ -v
 | Flow | Android | Backend |
 |------|---------|---------|
 | Login | `LoginActivity.kt` | — |
-| Sync | `WearableSyncActivity.kt` | `history/repository.py` |
+| Sync | `WearableSyncActivity.kt` | `history/inference_bundle.py` |
 | Check-in | `DailyCheckInActivity.kt` | — |
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
 | Inference | — | `prediction/service.py` |
 | Features | — | `preprocessing/`, `history/day_quality.py`, `feature_engineering.py`, `model_features.py` |
 | Confidence | — | `prediction/confidence.py`, `preprocessing/quality.py` |
-| Persist | — | `history/repository.save_daily_prediction_result` |
+| Persist | — | `history/persist.save_daily_prediction_result` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
 | Train | — | `ML_model/training/pipeline.py` (CLI: `train_model.py`) |
@@ -510,5 +508,7 @@ cd backend && python -m pytest tests/ -v
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
 | [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend HLD |
-| [backend/docs/LLD.md](../backend/docs/LLD.md) | Backend LLD |
+| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | Backend architecture notes |
+| [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production feature contract |
+| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates and promotion |
+| [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | Risk-score pipeline |

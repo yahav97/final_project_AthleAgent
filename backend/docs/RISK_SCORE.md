@@ -174,7 +174,7 @@ sequenceDiagram
 
 | שלב | פונקציה | קובץ |
 |-----|---------|------|
-| 1. שליפה | `fetch_daily_firestore_snapshot` | `history/repository.py` |
+| 1. שליפה | `fetch_inference_firestore_bundle` | `history/inference_bundle.py` |
 | 2. בניית בקשה | `injury_prediction_request_from_firestore_snapshot` | `prediction/firestore_mapping.py` |
 | 3. מיזוג תזונה | `apply_nutrition_population_defaults` | `nutrition_defaults.py` |
 | 4. DataFrame | `injury_request_to_model_dataframe` | `preprocessing/` |
@@ -182,7 +182,7 @@ sequenceDiagram
 | 6. איכות | `calculate_data_quality_score` | `preprocessing/quality.py` |
 | 7. ולידציה | `validate_feature_vector_for_model` | `preprocessing/` |
 | 8. חיזוי | `model.predict_proba` | `prediction/service.py` |
-| 9. שמירה | `save_daily_prediction_result` | `history/repository.py` |
+| 9. שמירה | `save_daily_prediction_result` | `history/persist.py` |
 
 ### מתי האפליקציה מפעילה חיזוי?
 
@@ -547,7 +547,7 @@ hrv_drop           = clamp(hrv_today − rolling_mean(hrv, 7), −15, 15)
   finalRiskScore = round(risk_score × 100, 2)     # 0 – 100
 ```
 
-קוד (`history/repository.save_daily_prediction_result`):
+קוד (`history/persist.save_daily_prediction_result`):
 
 ```python
 risk_score = float(result.get("risk_score") or 0.0)

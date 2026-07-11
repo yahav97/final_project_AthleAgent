@@ -86,7 +86,7 @@ class TestHistoryDayQuality:
             for i in range(1, 8)
         ]
         monkeypatch.setattr(
-            "services.history.repository.fetch_user_history",
+            "services.history.history_window.fetch_user_history",
             lambda *args, **kwargs: rows,
         )
         ctx = get_history_window_context("u1", "2026-05-07")
@@ -136,7 +136,7 @@ class TestHistoricalDerivedFeatures:
         ]
 
         monkeypatch.setattr(
-            "services.history.repository.fetch_user_history",
+            "services.history.history_window.fetch_user_history",
             lambda *args, **kwargs: rows,
         )
         ctx = get_history_window_context("u1", "2026-05-07")
@@ -163,7 +163,7 @@ class TestHistoricalDerivedFeatures:
         ]
 
         monkeypatch.setattr(
-            "services.history.repository.fetch_user_history",
+            "services.history.history_window.fetch_user_history",
             lambda *args, **kwargs: rows,
         )
         ctx = get_history_window_context("u1", "2026-05-09")
@@ -274,7 +274,7 @@ class TestFetchUserHistory:
 
                 return _Users()
 
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        monkeypatch.setattr("services.history.history_window.get_firestore_client", lambda: _Db())
         rows = fetch_user_history("u1", "2026-05-03", lookback_days=1, include_target_day=True)
 
         assert len(rows) == 1
@@ -331,7 +331,7 @@ class TestFetchUserHistory:
                 batch_get_all_calls.append(len(refs))
                 return [ref.get() for ref in refs]
 
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        monkeypatch.setattr("services.history.history_window.get_firestore_client", lambda: _Db())
         fetch_user_history("u1", "2026-05-07", lookback_days=7, include_target_day=False)
 
         # Wake-up days D-7..D-1 plus physical docs one day earlier.
@@ -387,7 +387,7 @@ class TestFetchInferenceFirestoreBundle:
                 field_paths_used.append(tuple(field_paths) if field_paths else None)
                 return [_Snapshot(False) for _ in refs]
 
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        monkeypatch.setattr("services.history.inference_bundle.get_firestore_client", lambda: _Db())
         bundle = fetch_inference_firestore_bundle("u1", "2026-05-07")
 
         # Snapshot (profile + D + D-1 + checkin + nutrition) + history window, deduped.
@@ -461,7 +461,7 @@ class TestRollingMa7Parity:
 
 class TestFirestoreResilience:
     def test_fetch_inference_bundle_returns_empty_when_client_unavailable(self, monkeypatch):
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: None)
+        monkeypatch.setattr("services.history.inference_bundle.get_firestore_client", lambda: None)
         assert fetch_inference_firestore_bundle("u1", "2026-05-09") == {}
 
 
@@ -489,9 +489,9 @@ class TestSaveDailyPredictionResult:
             def collection(self, name: str) -> _Users:
                 return _Users()
 
-        from services.history.repository import save_daily_prediction_result
+        from services.history.persist import save_daily_prediction_result
 
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: _Db())
+        monkeypatch.setattr("services.history.persist.get_firestore_client", lambda: _Db())
         ok = save_daily_prediction_result(
             "u1",
             "2026-05-09",
@@ -508,7 +508,7 @@ class TestSaveDailyPredictionResult:
         assert "predictionUpdatedAt" in written
 
     def test_returns_false_when_firestore_unavailable(self, monkeypatch):
-        from services.history.repository import save_daily_prediction_result
+        from services.history.persist import save_daily_prediction_result
 
-        monkeypatch.setattr("services.history.repository.get_firestore_client", lambda: None)
+        monkeypatch.setattr("services.history.persist.get_firestore_client", lambda: None)
         assert save_daily_prediction_result("u1", "2026-05-09", {"risk_score": 0.1}) is False

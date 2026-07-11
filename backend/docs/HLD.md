@@ -58,7 +58,7 @@ flowchart TB
 
     subgraph Services["Service Layer"]
         PS[prediction/service]
-        HS[history/repository]
+        HS[history/inference_bundle + persist]
         PP[preprocessing]
         FE[feature_engineering]
         MF[model_features]
@@ -161,19 +161,18 @@ sequenceDiagram
     participant Client as Android
     participant API as predict.py
     participant PS as prediction/service
-    participant HS as history/repository
+    participant HS as history package
     participant ML as XGBoost
     participant FS as Firestore
 
     Client->>API: POST /predict/daily
     API->>PS: predict_injury_risk_from_firestore()
-    PS->>HS: fetch_daily_firestore_snapshot()
-    HS->>FS: read profile, health, checkins, nutrition
-    FS-->>HS: snapshot dict
+    PS->>HS: fetch_inference_firestore_bundle()
+    HS->>FS: batch read profile, health, checkins, nutrition + history
+    FS-->>HS: snapshot + history_context
     PS->>PS: build InjuryPredictionRequest (merge policy)
     PS->>PS: preprocessing + feature engineering
-    PS->>HS: get_history_window_context(7 days)
-    HS->>FS: read historical daily_health
+    PS->>PS: apply_history_confidence_fallback (from bundle context)
     PS->>ML: predict_proba(X)
     ML-->>PS: probability
     PS->>PS: risk bands + confidence
