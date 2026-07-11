@@ -24,12 +24,6 @@ class ValidationError(AthleAgentException):
     status_code = 422
 
 
-class AuthorizationError(AthleAgentException):
-    """Authenticated principal cannot access the requested resource."""
-
-    status_code = 403
-
-
 class DatabaseError(AthleAgentException):
     """Firestore or persistence operation failed."""
 

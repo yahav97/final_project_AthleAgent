@@ -508,7 +508,8 @@ cd backend && python -m pytest tests/ -v
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
 | [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
-| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | Backend architecture notes |
+| [backend/README.md](../backend/README.md) | Backend run, API, tests |
+| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend architecture |
 | [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production feature contract |
 | [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates and promotion |
 | [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | Risk-score pipeline |

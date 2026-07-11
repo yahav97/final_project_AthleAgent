@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from utils.exceptions import (
     AthleAgentException,
-    AuthorizationError,
     DatabaseError,
     MLModelError,
     ValidationError,
@@ -49,7 +48,6 @@ class TestExceptionTypes:
         assert MLModelError("x").status_code == 503
         assert DatabaseError("x").status_code == 503
         assert ValidationError("x").status_code == 422
-        assert AuthorizationError("x").status_code == 403
 
 
 class TestExceptionHandlers:

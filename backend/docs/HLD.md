@@ -5,7 +5,7 @@
 | **Version** | 1.3 |
 | **Date** | 2026-07-11 |
 | **Audience** | Backend developers, DevOps, course evaluators |
-| **Related docs** | [LLD.md](LLD.md) · [BACKEND.md](BACKEND.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) · [docs/DOCKER.md](../../docs/DOCKER.md) |
+| **Related docs** | [FEATURES.md](FEATURES.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) · [docs/DOCKER.md](../../docs/DOCKER.md) · [../README.md](../README.md) |
 
 ---
 
@@ -522,9 +522,9 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 
 | Document | Content |
 |----------|---------|
-| [LLD.md](LLD.md) | Low-level design — modules, functions, schemas |
-| [BACKEND.md](BACKEND.md) | Architecture + API reference |
+| [../README.md](../README.md) | Run, config, API sketch, tests |
 | [FEATURES.md](FEATURES.md) | Production feature contract |
 | [RISK_SCORE.md](RISK_SCORE.md) | End-to-end risk pipeline |
 | [MODEL.md](MODEL.md) | ML ops configuration |
 | [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) | Full-project HLD |
+| [docs/LLD_PROJECT.md](../../docs/LLD_PROJECT.md) | Full-project LLD |
