@@ -17,11 +17,11 @@ AthleAgent is an Android + FastAPI system that turns daily athlete data (check-i
 
 No `.env` file is required. Defaults in `backend/config.py` are enough to run.
 
-Firestore connection uses the included Firebase Admin key:
+Firestore connection needs a local Firebase Admin key (not committed to GitHub):
 
 | File | Role | Included in this repo? |
 |------|------|------------------------|
-| `backend/firebase-key.json` | Backend → Firestore (read/write predictions) | **Yes** |
+| `backend/firebase-key.json` | Backend → Firestore (read/write predictions) | **No** — place locally (see teammates / course hand-off) |
 | `android_app/AthleAgent/app/google-services.json` | Android → Firebase Auth + Firestore | **Yes** |
 | `.env` | Optional overrides only | **Not needed** |
 | `GEMINI_API_KEY` in `local.properties` | Meal photo analysis only | Optional (see below) |
@@ -139,7 +139,8 @@ python -m pytest tests/ -v
 
 Include source, docs, promoted ML artifacts, and evaluation credentials:
 
-- Include: `backend/firebase-key.json`, `app/google-services.json`, `ML_model/artifacts/`
+- Include: `app/google-services.json`, `ML_model/artifacts/`
+- Provide separately: `backend/firebase-key.json` (Firebase Admin SDK; do not commit)
 - Exclude: `**/build/`, `.gradle/`, `.idea/`, `__pycache__/`, `.venv/`, `logs/`, personal `.env`, personal `local.properties`
 
 ---

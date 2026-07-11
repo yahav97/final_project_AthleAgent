@@ -10,14 +10,11 @@ __pycache__/
 backend/.env
 *.env
 
-# Other Firebase key filenames (keep ignored)
+# Firebase Admin service account (keep local only — GitHub push protection blocks secrets)
+backend/firebase-key.json
 serviceAccountKey.json
 *serviceAccount*.json
 firebase-adminsdk*.json
-
-# Academic evaluation: backend/firebase-key.json IS tracked so reviewers can
-# connect to the project Firestore without a separate credentials hand-off.
-# Keep the GitHub repository private. Do not reuse this key outside the course.
 
 # Logs
 logs/

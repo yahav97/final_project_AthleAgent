@@ -6,7 +6,7 @@ Run the FastAPI backend and promoted ML model in a single container. The Android
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Engine (Linux) — **installed and running**
 - Before `docker compose up`, confirm the daemon is up: `docker version` must show a **Server** section (not only Client)
-- `backend/firebase-key.json` — Firebase service account (included in this repository for course evaluation)
+- `backend/firebase-key.json` — Firebase service account (**local only**, not in git; required for Firestore)
 
 ## Quick start
 

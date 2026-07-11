@@ -290,7 +290,7 @@ flowchart LR
 | `CORS_ORIGINS` | env | `http://localhost:3000`, `http://localhost:8080` |
 | `VERSION` | config | `1.0.0` |
 
-**Course evaluation:** `backend/firebase-key.json` is included in the repository so evaluators can reach Firestore via the Firebase Admin SDK without creating secrets. For production deployments, use Secret Manager instead of committing service-account keys.
+**Local credentials:** place `backend/firebase-key.json` on disk (gitignored). For production deployments, use Secret Manager instead of committing service-account keys.
 
 ---
 
