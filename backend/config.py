@@ -1,10 +1,12 @@
-"""Backend configuration — defaults live here; edit for local dev."""
+"""Backend configuration — defaults here; override via env / `.env` / Docker."""
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Annotated, Any
+
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent
 
@@ -13,18 +15,24 @@ def _project_root() -> Path:
     return _BACKEND_DIR.parent
 
 
-def _default_firebase_key() -> Path | None:
-    """Service account path from env or backend/firebase-key.json if present."""
-    for env_name in ("FIREBASE_SERVICE_ACCOUNT_KEY", "GOOGLE_APPLICATION_CREDENTIALS"):
-        raw = os.environ.get(env_name, "").strip()
-        if raw:
-            return Path(raw)
-    bundled = _BACKEND_DIR / "firebase-key.json"
-    return bundled if bundled.is_file() else None
+def _default_log_dir() -> Path:
+    return _project_root() / "logs"
 
 
-@dataclass
-class Settings:
+class Settings(BaseSettings):
+    """Tunable backend settings. Environment variables and `.env` override defaults."""
+
+    model_config = SettingsConfigDict(
+        env_file=(
+            _BACKEND_DIR / ".env",
+            _project_root() / ".env",
+        ),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Allow tests / conftest to mutate flags like LOG_TO_FILE.
+        validate_assignment=True,
+    )
+
     # App
     APP_ENV: str = "development"
     ENABLE_TEST_PREDICT_ENDPOINT: bool = False
@@ -71,7 +79,7 @@ class Settings:
 
     # HTTP / dev helpers
     SLOW_REQUEST_MS: int = 2000
-    REQUEST_LOG_SKIP_PATHS: tuple[str, ...] = (
+    REQUEST_LOG_SKIP_PATHS: Annotated[tuple[str, ...], NoDecode] = (
         "/health",
         "/",
         "/docs",
@@ -82,11 +90,11 @@ class Settings:
     TEST_PREDICT_MOCK_RISK_PERCENTAGE: float = 72.5
 
     # Firebase
-    FIREBASE_SERVICE_ACCOUNT_KEY: Path | None = field(default_factory=_default_firebase_key)
+    FIREBASE_SERVICE_ACCOUNT_KEY: Path | None = None
     GOOGLE_APPLICATION_CREDENTIALS: Path | None = None
 
     # Logging
-    LOG_DIR: Path = field(default_factory=lambda: _project_root() / "logs")
+    LOG_DIR: Path = Field(default_factory=_default_log_dir)
     LOG_TO_FILE: bool = True
     LOG_FILE_NAME: str = "athleagent.log"
     LOG_LEVEL: str = "INFO"
@@ -101,10 +109,53 @@ class Settings:
     CLIENT_EVENT_MAX_TRACKED_KEYS: int = 10_000
     CLIENT_EVENT_STALE_ENTRY_SECONDS: int = 86_400
 
-    # CORS (web dev origins only)
-    CORS_ORIGINS: list[str] = field(
+    # CORS (web dev origins only) — env: comma-separated list
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8080"]
     )
+
+    @field_validator(
+        "MODEL_PATH",
+        "FIREBASE_SERVICE_ACCOUNT_KEY",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        mode="before",
+    )
+    @classmethod
+    def _empty_optional_path(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
+    @field_validator("REQUEST_LOG_SKIP_PATHS", mode="before")
+    @classmethod
+    def _parse_skip_paths(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+    @model_validator(mode="after")
+    def _resolve_firebase_key(self) -> Settings:
+        """Prefer explicit key path; else GOOGLE_APPLICATION_CREDENTIALS; else bundled file."""
+        if self.FIREBASE_SERVICE_ACCOUNT_KEY is not None:
+            return self
+        if self.GOOGLE_APPLICATION_CREDENTIALS is not None:
+            self.FIREBASE_SERVICE_ACCOUNT_KEY = self.GOOGLE_APPLICATION_CREDENTIALS
+            return self
+        bundled = _BACKEND_DIR / "firebase-key.json"
+        if bundled.is_file():
+            self.FIREBASE_SERVICE_ACCOUNT_KEY = bundled
+        return self
 
     @property
     def openapi_enabled(self) -> bool:
