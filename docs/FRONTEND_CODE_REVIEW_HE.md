@@ -3,8 +3,8 @@
 
 | שדה               | ערך                                                                 |
 | ----------------- | ------------------------------------------------------------------- |
-| **גרסה**          | 1.3                                                                 |
-| **תאריך**         | 2026-07-09                                                          |
+| **גרסה**          | 1.4                                                                 |
+| **תאריך**         | 2026-07-11                                                          |
 | **קהל יעד**       | מפתחי Android, בוחני פרויקט גמר, reviewers                          |
 | **היקף**          | `android_app/AthleAgent` בלבד — ללא Backend / ML                    |
 | **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [LLD_PROJECT.md](LLD_PROJECT.md) · [NFR.md](NFR.md) · [LOGGING_HE.md](LOGGING_HE.md) |
@@ -177,15 +177,15 @@
 | 7 | `RequestIdHolder.generateNewId()` לא נקרא בתחילת session | `RequestIdHolder.kt` | 13–16 |
 | 8 | `CreateTeamActivity` — אין ולידציה לפורמט קוד קבוצה; מאמן יכול ליצור כמה קבוצות | `CreateTeamActivity.kt` | 32–82 |
 | 9 | `JoinTeamActivity` — `.set()` עם UID כ-doc ID דורס בקשה קיימת | `JoinTeamActivity.kt` | 84–85 |
-| 10 | יעדי תזונה קשיחים ב-UI (2500 kcal, 150g חלבון, 300g פחמימות) — לא תואמים לשרת (2600/130/300 ב-`config.py`) | `MealAnalysisActivity.kt` | 23–25 |
-| 11 | Coach dashboard — "AI Doctor is offline" ללא retry | `CoachDashboardActivity.kt` | 114, 199–202 |
-| 12 | `PrivacyPolicyActivity` מוגדר `exported="true"` | `AndroidManifest.xml` | 94–100 |
-| 13 | אין ולידציה לחוזק סיסמה / פורמט אימייל | `RegisterActivity.kt`, `LoginManager.kt` | — |
-| 14 | `isMinifyEnabled = false` ב-release | `app/build.gradle.kts` | 37–38 |
-| 15 | `SignalManager.contextRef` נשמר אך לא בשימוש | `utilities/SignalManager.kt` | 16 |
-| 16 | **הערות בעברית בקוד** — 5 הערות ב-2 קבצים, סותרות מדיניות אנגלית בלבד | `MealAnalysisActivity.kt`, `WearableSyncActivity.kt` | 68, 77, 84, 89 / 104 |
-| 17 | **קבצים מורכבים ללא הערות** — `LoginActivity` (237 שורות, 0 הערות) | `LoginActivity.kt` | — |
-| 18 | הערות לא פורמליות / אישיות באנגלית | `ApiClient.kt`, `CorrelationIdInterceptor.kt`, `HomeCoachActivity.kt` | 28 / 11 / 63 |
+| 10 | Coach dashboard — "AI Doctor is offline" ללא retry | `CoachDashboardActivity.kt` | 114, 199–202 |
+| 11 | `PrivacyPolicyActivity` מוגדר `exported="true"` | `AndroidManifest.xml` | 94–100 |
+| 12 | אין ולידציה לחוזק סיסמה / פורמט אימייל | `RegisterActivity.kt`, `LoginManager.kt` | — |
+| 13 | `isMinifyEnabled = false` ב-release | `app/build.gradle.kts` | 37–38 |
+| 14 | `SignalManager.contextRef` נשמר אך לא בשימוש | `utilities/SignalManager.kt` | 16 |
+| 15 | **הערות בעברית בקוד** — 5 הערות ב-2 קבצים, סותרות מדיניות אנגלית בלבד | `MealAnalysisActivity.kt`, `WearableSyncActivity.kt` | 68, 77, 84, 89 / 104 |
+| 16 | **קבצים מורכבים ללא הערות** — `LoginActivity` (237 שורות, 0 הערות) | `LoginActivity.kt` | — |
+| 17 | הערות לא פורמליות / אישיות באנגלית | `ApiClient.kt`, `CorrelationIdInterceptor.kt`, `HomeCoachActivity.kt` | 28 / 11 / 63 |
+| 18 | **טיפוסי Firestore לא מותאמים לחוזה** — `mealsLoggedCount` נכתב עם `FieldValue.increment(1.0)` ונשמר כ-`double` במקום מונה שלם; אין ולידציה/מיפוי טיפוסים לפני כתיבה | `MealAnalysisActivity.kt` | 94 |
 
 ### 4.4 P3 — נמוך
 
@@ -315,7 +315,6 @@ onResume()
 | P1 | תוצאות תזונה 0/0/0 במקום שגיאה |
 | P2 | אין cancel/progress בזמן ניתוח ארוחה |
 | P2 | Coach dashboard — אין retry ל-AI recommendation |
-| P2 | יעדי תזונה לא מותאמים אישית |
 
 ---
 
@@ -335,9 +334,19 @@ onResume()
 
 ## 9. עקביות ותחזוקה
 
-### 9.1 שמות שדות Firestore
+### 9.1 שמות וטיפוסי שדות Firestore
 
-שימוש לא אחיד: `TeamName` מול `teamCode` מול `teamId` — מקשה על תחזוקה.
+שימוש לא אחיד בשמות: `TeamName` מול `teamCode` מול `teamId` — מקשה על תחזוקה.
+
+**גם טיפוסים:** אין שכבת מיפוי/ולידציה לפני כתיבה ל-Firestore. דוגמאות מהשטח:
+
+| שדה | נכתב היום | טיפוס רצוי | מקור |
+| --- | --------- | ---------- | ---- |
+| `daily_nutrition.mealsLoggedCount` | `double` (`increment(1.0)`) | מונה שלם (`long` / `int`) | `MealAnalysisActivity.kt` |
+| `daily_health.steps` / `sleepMinutes` | `long` ✓ | `long` | `WearableSyncActivity.kt` |
+| `teams/.../requests.timestamp` | `long` (epoch ms) ✓ | לא לבלבל עם Firestore `Timestamp` | `JoinTeamActivity.kt` |
+
+**המלצה:** להגדיר חוזה שדות (שם + טיפוס) ולוודא בכתיבה שהערכים תואמים — במיוחד מונים (`mealsLoggedCount`) שלא אמורים להיות עשרוניים. לדוגמה: `increment(1)` או קריאה→`+1`→כתיבת `Long`, במקום `increment(1.0)`.
 
 ### 9.2 לוגים
 
@@ -843,6 +852,7 @@ cd android_app/AthleAgent
 | 12 | חילוץ `checkAndTriggerPredictionInBackground` ל-shared class | P2 #1 |
 | 13 | מחיקת `CalculationUtils` + טסט (קוד מת) | §11, §15.2 |
 | 14 | מחיקת dead code ומשאבים מיותרים (פרק 15) | P2 |
+| 14b | תיקון `mealsLoggedCount` למונה שלם + חוזה טיפוסי Firestore לפני כתיבה | P2 #19, §9.1 |
 
 ### שלב 5 — בדיקות (מינימלי)
 
@@ -1090,3 +1100,4 @@ Font לא מקושר:
 | 1.1 | 2026-07-09 | הוספת פרק 10: מבנה קוד, אורך קבצים, חלוקה לקלאסים, כפילויות, packages |
 | 1.2 | 2026-07-09 | הוספת פרק 15: קוד מת, משאבים מיותרים, פריטים למחיקה, תוכנית ניקוי |
 | 1.3 | 2026-07-09 | הוספת פרק 9.5: סקירת הערות בקוד — עברית, כיסוי, KDoc, תוכנית תיקון |
+| 1.4 | 2026-07-11 | P2 #19 + הרחבת §9.1: חוזה טיפוסי Firestore (`mealsLoggedCount` כ-double במקום מונה שלם) |
