@@ -1,29 +1,29 @@
 # AthleAgent — Low Level Design (LLD)
-## מסמך עיצוב ברמה נמוכה — פרויקט מלא
+## Full-Project Low-Level Design Document
 
-| שדה | ערך |
-|-----|-----|
-| **גרסה** | 1.0 |
-| **תאריך** | 2026-06-19 |
-| **קהל יעד** | מפתחים |
-| **מסמכים קשורים** | [HLD_PROJECT.md](HLD_PROJECT.md) · [backend/docs/LLD.md](../backend/docs/LLD.md) |
+| Field | Value |
+|-------|-------|
+| **Version** | 1.1 |
+| **Date** | 2026-07-11 |
+| **Audience** | Developers |
+| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [backend/docs/LLD.md](../backend/docs/LLD.md) |
 
 ---
 
-## 1. מבנה מודולים
+## 1. Module Structure
 
 ```
 final_project_AthleAgent/
 │
 ├── android_app/AthleAgent/app/src/main/java/com/yahav/athleagent/
-│   ├── App.kt                          # Application; מאתחל SignalManager
+│   ├── App.kt                          # Application; initializes SignalManager
 │   ├── logic/
-│   │   └── LoginManager.kt             # עזר רישום email/password
+│   │   └── LoginManager.kt             # Email/password registration helper
 │   ├── model/                          # DTOs
 │   │   ├── AthleteItem.kt
 │   │   ├── AthleteRequest.kt
 │   │   ├── AlertItem.kt
-│   │   └── PredictionModels.kt         # legacy mock DTO (/test_predict) — לא בשימוש
+│   │   └── PredictionModels.kt         # Legacy mock DTO (/test_predict) — not used in production
 │   ├── network/
 │   │   ├── ApiClient.kt                # Retrofit singleton, base URL
 │   │   └── ApiService.kt               # POST /predict/daily
@@ -47,7 +47,7 @@ final_project_AthleAgent/
 │   ├── services/                       # prediction, history, preprocessing...
 │   ├── schemas/inference.py            # Pydantic contracts
 │   ├── ml/model_loader.py              # joblib + gates
-│   └── external/google_auth.py         # (לא מחובר)
+│   └── external/google_auth.py         # (not wired to routes)
 │
 └── ML_model/
     ├── generation/                 # simulator, config, postprocess
@@ -65,25 +65,25 @@ final_project_AthleAgent/
 
 ## 2. Android — LLD
 
-### 2.1 Activities ותפקידים
+### 2.1 Activities and Responsibilities
 
-| Activity | Package | אחריות | Firestore paths |
-|----------|---------|--------|-----------------|
+| Activity | Package | Responsibility | Firestore paths |
+|----------|---------|----------------|-----------------|
 | `LoginActivity` | auth | Firebase Auth UI, role routing | `users/{uid}` read |
-| `RegisterActivity` | auth | email/password signup | `users/{uid}` create |
-| `HomeAthleteActivity` | athlete | Hub, alerts, navigation | read today docs |
-| `DailyCheckInActivity` | athlete | survey 4 שדות | `daily_checkins/{today}` |
+| `RegisterActivity` | auth | Email/password signup | `users/{uid}` create |
+| `HomeAthleteActivity` | athlete | Hub, alerts, navigation | Read today docs |
+| `DailyCheckInActivity` | athlete | 4-field survey | `daily_checkins/{today}` |
 | `WearableSyncActivity` | athlete | Health Connect read/write | `daily_health/{today}` |
 | `AnalyzingMealActivity` | athlete | Gemini Vision | — |
-| `MealAnalysisActivity` | athlete | save meal + aggregates | `daily_nutrition/{today}` |
-| `AthleteDashboardActivity` | athlete | risk UI, chart, Gemini text | `daily_health/*` |
-| `JoinTeamActivity` | athlete | join by team code | `teams/*/requests/{uid}` |
-| `HomeCoachActivity` | coach | hub + pending badge | `teams`, `requests` |
-| `CreateTeamActivity` | coach | create team | `teams/{id}` |
-| `CoachRequestsActivity` | coach | approve/reject | `teams/*/requests`, `users.teamId` |
-| `CoachDashboardActivity` | coach | roster risk + charts | athletes' `daily_health` |
+| `MealAnalysisActivity` | athlete | Save meal + aggregates | `daily_nutrition/{today}` |
+| `AthleteDashboardActivity` | athlete | Risk UI, chart, Gemini text | `daily_health/*` |
+| `JoinTeamActivity` | athlete | Join by team code | `teams/*/requests/{uid}` |
+| `HomeCoachActivity` | coach | Hub + pending badge | `teams`, `requests` |
+| `CreateTeamActivity` | coach | Create team | `teams/{id}` |
+| `CoachRequestsActivity` | coach | Approve/reject | `teams/*/requests`, `users.teamId` |
+| `CoachDashboardActivity` | coach | Roster risk + charts | Athletes' `daily_health` |
 
-### 2.2 תבנית ארכיטקטונית (מצב נוכחי)
+### 2.2 Architectural Pattern (Current State)
 
 ```
 ┌─────────────────────────────────────┐
@@ -99,7 +99,7 @@ final_project_AthleAgent/
  Firestore  Retrofit   Gemini SDK
 ```
 
-> **הערה:** אין שכבת Repository/ViewModel. לוגיקה עסקית מפוזרת ב-Activities.
+> **Note:** There is no Repository/ViewModel layer. Business logic is distributed across Activities.
 
 ### 2.3 Network Layer
 
@@ -107,48 +107,48 @@ final_project_AthleAgent/
 - Base URL: `http://10.0.2.2:8000/` (emulator → localhost)
 - Gson converter, logging interceptor
 
-**`ApiService.kt`** (מקור אמת לחוזה HTTP):
+**`ApiService.kt`** (source of truth for the HTTP contract):
 ```kotlin
 @POST("/predict/daily")
 fun getDailyPrediction(@Body data: PredictionTriggerRequest): Call<PredictionResponse>
 
 data class PredictionResponse(
     val risk_level: String,
-    val risk_score: Float,              // 0.0–1.0 — לא נקרא לתצוגה
+    val risk_score: Float,              // 0.0–1.0 — not used for UI display
     val prediction_confidence: Float    // 0–100
 )
 ```
 
-> **`PredictionModels.kt`** — DTO legacy ל-`/test_predict` (mock); לא בשימוש בפרודקשן.  
-> **תצוגת ציון סיכון:** תמיד מ-`daily_health/{date}.finalRiskScore` (0–100) ב-Firestore, לא מ-body של POST.
+> **`PredictionModels.kt`** — Legacy DTO for `/test_predict` (mock); not used in production.  
+> **Risk score display:** Always from `daily_health/{date}.finalRiskScore` (0–100) in Firestore, not from the POST response body.
 
-### 2.4 Trigger לחיזוי — cross-trigger
+### 2.4 Prediction Trigger — Cross-Trigger
 
-Activities הבאות קוראות ל-`checkAndTriggerPredictionInBackground()` לאחר שמירה:
+The following Activities call `checkAndTriggerPredictionInBackground()` after saving data:
 
-| Activity | תנאי trigger |
-|----------|--------------|
-| `DailyCheckInActivity` | `daily_health/{today}` מכיל `sleepMinutes` |
-| `WearableSyncActivity` | `daily_checkins/{today}` מכיל `energyLevel` |
+| Activity | Trigger condition (complementary data must exist) |
+|----------|---------------------------------------------------|
+| `DailyCheckInActivity` | `daily_health/{today}` contains `sleepMinutes` |
+| `WearableSyncActivity` | `daily_checkins/{today}` contains `energyLevel` |
 
-`MealAnalysisActivity` **לא** מפעיל חיזוי.
+`MealAnalysisActivity` does **not** trigger prediction.
 
 ```mermaid
 flowchart TD
-    Save[שמירה ל-Firestore] --> Check{נתון משלים קיים?}
-    Check -->|כן| API[POST /predict/daily]
-    Check -->|לא| Wait[ממתין לנתון חסר]
-    API --> FS[Backend כותב ל-daily_health]
-    FS --> UI[דשבורד קורא finalRiskScore מ-Firestore]
+    Save[Save to Firestore] --> Check{Complementary data exists?}
+    Check -->|Yes| API[POST /predict/daily]
+    Check -->|No| Wait[Wait for missing data]
+    API --> FS[Backend writes to daily_health]
+    FS --> UI[Dashboard reads finalRiskScore from Firestore]
 ```
 
-> `POST /predict/daily` מחזיר `risk_score` (0–1) — האפליקציה בודקת רק הצלחה. התצוגה (מד, גרף) מ-`finalRiskScore` (0–100) ב-Firestore.
+> `POST /predict/daily` returns `risk_score` (0–1). The app checks only for HTTP success. Display (gauge, chart) uses `finalRiskScore` (0–100) from Firestore.
 
-### 2.5 Health Connect — שדות שנכתבים
+### 2.5 Health Connect — Fields Written
 
-| שדה Firestore | מקור Health Connect |
-|---------------|---------------------|
-| `sleepMinutes` | SleepSession (לילה אחרון) |
+| Firestore field | Health Connect source |
+|-----------------|----------------------|
+| `sleepMinutes` | SleepSession (previous night) |
 | `steps` | Steps |
 | `distanceMeters` | Distance |
 | `activeCalories` | ActiveCaloriesBurned |
@@ -162,15 +162,15 @@ flowchart TD
 
 ### 2.6 Gemini Integration
 
-| שימוש | Activity | Input | Output |
-|-------|----------|-------|--------|
+| Use case | Activity | Input | Output |
+|----------|----------|-------|--------|
 | Meal vision | `AnalyzingMealActivity` | Bitmap | JSON: calories, protein, carbs, description |
-| Coaching | `AthleteDashboardActivity` | risk score + context | טקסט המלצה |
+| Coaching | `AthleteDashboardActivity` | Risk score + context | Recommendation text |
 
-- API Key: `BuildConfig.GEMINI_API_KEY` ← `local.properties`
-- **רץ client-side בלבד** — לא דרך backend
+- API key: `BuildConfig.GEMINI_API_KEY` ← `local.properties` (see `local.properties.example`)
+- **Client-side only** — not routed through the backend
 
-### 2.7 Firestore — כתיבה מהאפליקציה
+### 2.7 Firestore — App Writes
 
 #### `users/{uid}`
 ```json
@@ -212,7 +212,7 @@ flowchart TD
 }
 ```
 
-> שדות `finalRiskScore`, `riskLevel`, `predictionConfidence` — **נכתבים על ידי Backend**.
+> Fields `finalRiskScore`, `riskLevel`, `predictionConfidence` are **written by the backend**.
 
 #### `teams/{teamId}`
 ```json
@@ -226,9 +226,9 @@ flowchart TD
 
 ---
 
-## 3. Backend — LLD (סיכום)
+## 3. Backend — LLD (Summary)
 
-> פירוט מלא: [backend/docs/LLD.md](../backend/docs/LLD.md)
+> Full detail: [backend/docs/LLD.md](../backend/docs/LLD.md)
 
 ### 3.1 API Endpoints
 
@@ -273,11 +273,11 @@ POST /predict/daily {userId, date}
 
 ### 3.3 Model Features (35 columns)
 
-מקור אמת: `backend/services/model_features.py`
+Source of truth: `backend/services/model_features.py`
 
-| קטגוריה | Features |
-|---------|----------|
-| Profile | bmi, age (מ-`birth_date`), body_fat_pct, vo2_max, history_injury_count |
+| Category | Features |
+|----------|----------|
+| Profile | bmi, age (from `birth_date`), body_fat_pct, vo2_max, history_injury_count |
 | Load | daily_distance_km, workout_intensity_minutes, avg_cadence, elevation, floors, speed, power, active_calories_burned |
 | Recovery | sleep_hours, hrv_score, resting_hr, respiratory_rate, spo2 |
 | Nutrition | nutrition_intake_calories, daily_calories, total_calories_burned, calorie_balance |
@@ -302,17 +302,19 @@ flowchart LR
     G --> I[model_loader.py at startup]
 ```
 
-> נקודות כניסה CLI: `data_generator.py` → `generation/`, `train_model.py` → `training/`.
+> CLI entry points: `data_generator.py` → `generation/`, `train_model.py` → `training/`.
 
 ### 4.2 Model Bundle Format (joblib)
 
+The `estimator` field holds the winning model from the promoted training run — commonly `XGBoostCalibratedTuned` (`CalibratedClassifierCV` wrapping `XGBClassifier`), not necessarily a raw `XGBClassifier`.
+
 ```python
 {
-    "estimator": XGBClassifier,
+    "estimator": <sklearn-compatible model from promoted run>,  # e.g. XGBoostCalibratedTuned
     "feature_columns": [...],  # 35 names
     "threshold": "<from run_manifest.json>",
     "medium_threshold": 0.11,
-    "winner": "<from run_manifest.json>"
+    "winner": "<from run_manifest.json>"  # e.g. "XGBoostCalibratedTuned"
 }
 ```
 
@@ -325,11 +327,21 @@ flowchart LR
 
 ### 4.4 Promotion
 
-After `run_pipeline.py`, `artifacts/promoted.json` points at the latest `injury_model.pkl`. Restart the backend to load it.
+After `run_pipeline.py`, `ML_model/artifacts/promoted.json` points at the latest `injury_model.pkl`. Restart the backend to load it.
+
+Example `promoted.json`:
+```json
+{
+  "model_path": "ML_model/artifacts/<run_id>/injury_model.pkl",
+  "run_id": "<run_id>",
+  "promoted_at_utc": "<ISO-8601>",
+  "manifest_path": "ML_model/artifacts/<run_id>/run_manifest.json"
+}
+```
 
 ---
 
-## 5. זרימות End-to-End — Sequence Diagrams
+## 5. End-to-End Flows — Sequence Diagrams
 
 ### 5.1 Check-in → Prediction
 
@@ -340,19 +352,40 @@ sequenceDiagram
     participant FS as Firestore
     participant BE as Backend
 
-    U->>DCI: ממלא survey
+    U->>DCI: Complete survey
     DCI->>FS: set daily_checkins/{today}
     DCI->>FS: get daily_health/{today}
-    alt steps exists
+    alt sleepMinutes exists
         DCI->>BE: POST /predict/daily
         BE->>FS: read + write prediction
         BE-->>DCI: response
-    else no steps
+    else no sleepMinutes
         DCI-->>U: "sync watch first"
     end
 ```
 
-### 5.2 Coach views athlete risk
+### 5.2 Wearable sync → Prediction
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant WS as WearableSyncActivity
+    participant FS as Firestore
+    participant BE as Backend
+
+    U->>WS: Sync Health Connect
+    WS->>FS: set daily_health/{today}
+    WS->>FS: get daily_checkins/{today}
+    alt energyLevel exists
+        WS->>BE: POST /predict/daily
+        BE->>FS: read + write prediction
+        BE-->>WS: response
+    else no energyLevel
+        WS-->>U: "complete check-in first"
+    end
+```
+
+### 5.3 Coach views athlete risk
 
 ```mermaid
 sequenceDiagram
@@ -371,16 +404,18 @@ sequenceDiagram
 ## 6. Error Handling
 
 ### 6.1 Android
-| מצב | התנהגות |
-|-----|---------|
+
+| Condition | Behavior |
+|-----------|----------|
 | Firestore offline | Snackbar / retry |
 | Backend 503 | Toast "prediction unavailable" |
-| Missing Health Connect | redirect to PrivacyPolicy / permissions |
-| Gemini failure | fallback message, manual entry option |
+| Missing Health Connect | Redirect to PrivacyPolicy / permissions |
+| Gemini failure | Fallback message, manual entry option |
 
 ### 6.2 Backend
-| מצב | HTTP | Detail |
-|-----|------|--------|
+
+| Condition | HTTP | Detail |
+|-----------|------|--------|
 | Model blocked | 503 | `model_not_live:*` |
 | Firestore unavailable | 503 | `firestore_snapshot_unavailable` |
 | Persist failed | 503 | `prediction_persist_failed` |
@@ -390,61 +425,70 @@ sequenceDiagram
 ## 7. Configuration
 
 ### 7.1 Android (`local.properties`)
+
+Copy from `android_app/AthleAgent/local.properties.example`. No `.env` file is required for the Android app.
+
 ```properties
 GEMINI_API_KEY=...
 ```
 
-### 7.2 Backend (`.env` / env vars)
+Risk scoring works without a Gemini key; meal photo analysis requires it.
+
+### 7.2 Backend (environment variables)
+
+No `.env` file is required. Defaults are defined in `backend/config.py` (pydantic-settings). Optional overrides can be set via environment variables or `backend/.env` (see `backend/.env.example`).
+
 | Variable | Default |
 |----------|---------|
-| `MODEL_PATH` | `None` → resolves via `promoted.json`, then `backend/injury_model.pkl` |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` |
+| `MODEL_PATH` | `None` → resolves via `ML_model/artifacts/promoted.json`, then `backend/injury_model.pkl` |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` (bundled; auto-resolved when present) |
 | `ENABLE_TEST_PREDICT_ENDPOINT` | `false` |
 | `CORS_ORIGINS` | localhost ports |
 
 ### 7.3 Emulator Networking
-- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `8000:8000`)
-- Physical device: IP של המחשב המארח
 
-### 7.4 Backend Deployment (local)
+- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `8000:8000`)
+- Physical device: host machine IP address
+
+### 7.4 Backend Deployment (Local)
 
 | Method | Command | Notes |
 |--------|---------|-------|
 | **Docker** | `docker compose up --build` (repo root) | Backend + promoted model in one container; see [DOCKER.md](DOCKER.md) |
 | **Python** | `cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000` | Requires `pip install -r backend/requirements.txt` |
 
-Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Android app requires no changes.
+Both paths load the model from `ML_model/artifacts/promoted.json` at startup. The Android app requires no changes.
 
 ---
 
 ## 8. Testing
 
-| שכבה | Framework | קבצים עיקריים |
-|------|-----------|---------------|
+| Layer | Framework | Key files |
+|-------|-----------|-----------|
 | Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
 | Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
 
-**הרצה:**
+**Run backend tests:**
 ```bash
 cd backend && python -m pytest tests/ -v
 ```
 
 ---
 
-## 9. פערים ידועים (LLD level)
+## 9. Known Gaps (LLD Level)
 
-| # | רכיב | פער | השפעה |
-|---|------|-----|--------|
-| 1 | Android trigger | אין gate על `daily_health/{D-1}` load > 0 | חיזוי עלול לרוץ בלי עומס אתמול |
-| 2 | google_auth.py | לא מחובר ל-routes | API פתוח |
-| 3 | Android | אין ViewModel/Repository | קושי בבדיקות unit |
+| # | Component | Gap | Impact |
+|---|-----------|-----|--------|
+| 1 | Android trigger | No gate on `daily_health/{D-1}` load > 0 | Prediction may run without yesterday's load |
+| 2 | `google_auth.py` | Not wired to routes | API is open |
+| 3 | Android | No ViewModel/Repository | Difficult to unit-test |
 
 ---
 
-## 10. מפת קבצים קריטיים
+## 10. Critical File Map
 
-| זרימה | Android | Backend |
-|-------|---------|---------|
+| Flow | Android | Backend |
+|------|---------|---------|
 | Login | `LoginActivity.kt` | — |
 | Sync | `WearableSyncActivity.kt` | `history/repository.py` |
 | Check-in | `DailyCheckInActivity.kt` | — |
@@ -460,11 +504,11 @@ cd backend && python -m pytest tests/ -v
 
 ---
 
-## 11. מפת מסמכים
+## 11. Document Map
 
-| מסמך | תוכן |
-|------|------|
+| Document | Content |
+|----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
-| [HLD_PROJECT.md](HLD_PROJECT.md) | HLD פרויקט מלא |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | HLD בקאנד |
-| [backend/docs/LLD.md](../backend/docs/LLD.md) | LLD בקאנד |
+| [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
+| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend HLD |
+| [backend/docs/LLD.md](../backend/docs/LLD.md) | Backend LLD |

@@ -1,68 +1,70 @@
-# AthleAgent — High Level Design (HLD)
-## מסמך עיצוב ברמה גבוהה — פרויקט מלא
+# AthleAgent — High-Level Design (HLD)
+## Full-Project High-Level Design Document
 
-| שדה | ערך |
-|-----|-----|
-| **גרסה** | 1.0 |
-| **תאריך** | 2026-06-19 |
-| **קהל יעד** | מפתחים, בוחנים, stakeholders טכניים |
-| **מסמכים קשורים** | [LLD_PROJECT.md](LLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
-
----
-
-## 1. תקציר מנהלים
-
-**AthleAgent** היא פלטפורמה למניעת פציעות בספורטאים. המערכת אוספת נתונים יומיים ממקורות מרובים — שאלון עצמי, שעון חכם (Health Connect), וניתוח תזונה מבוסס AI — ומחשבת **ציון סיכון יומי לפציעה** (Daily Injury Risk Score).
-
-המערכת משרתת שני סוגי משתמשים:
-- **ספורטאי** — מזין נתונים, רואה סיכון אישי והמלצות.
-- **מאמן** — מנהל קבוצה, מאשר בקשות הצטרפות, ועוקב אחר סיכון כלל הרשימה.
+| Field | Value |
+|-------|-------|
+| **Version** | 1.1 |
+| **Date** | 2026-07-11 |
+| **Authors** | Yahav Simon, Tzuf Feldon |
+| **Audience** | Developers, course evaluators, technical stakeholders |
+| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [backend/docs/HLD.md](../backend/docs/HLD.md) · [DOCKER.md](DOCKER.md) |
 
 ---
 
-## 2. מטרות ודרישות לא-פונקציונליות
+## 1. Executive Summary
 
-### 2.1 מטרות עסקיות
-| מטרה | מדד הצלחה |
-|------|-----------|
-| זיהוי מוקדם של סיכון פציעה | ציון יומי 0–100 + רמת Low/Medium/High |
-| הפחתת עומס ידני | סנכרון אוטומטי משעון + ניתוח ארוחות ב-AI |
-| שקיפות למאמן | דשבורד קבוצתי בזמן אמת |
-| שיפור מתמשך | `run_pipeline.py` — אימון מחדש על דאטה סינתטי + promote |
+**AthleAgent** is a sports-injury prevention platform. The system collects daily data from multiple sources — self-reported check-ins, a smartwatch (via Health Connect), and optional AI-powered meal analysis — and computes a **Daily Injury Risk Score**.
 
-### 2.2 דרישות לא-פונקציונליות
-
-> **מסמך מלא (מדדים, יעדים, ראיה):** [NFR.md](NFR.md)
-
-| דרישה | יישום נוכחי |
-|-------|-------------|
-| **זמינות** | Firestore (managed) + FastAPI stateless |
-| **ביצועים** | חיזוי < 2s (Firestore read + XGBoost inference) |
-| **אמינות** | defaults לנתונים חסרים; confidence score |
-| **אבטחה** | Firebase Auth בלקוח; **אין auth על API חיזוי** (ראו §8) |
-| **תחזוקה** | מודולריות: Android / Backend / ML_model |
-| **פרטיות** | Health Connect permissions; PrivacyPolicyActivity |
+The system serves two user roles:
+- **Athlete** — submits data, views personal risk, and receives recommendations.
+- **Coach** — manages a team, approves join requests, and monitors aggregate roster risk.
 
 ---
 
-## 3. הקשר מערכת (System Context)
+## 2. Goals and Non-Functional Requirements
+
+### 2.1 Business Goals
+
+| Goal | Success Metric |
+|------|----------------|
+| Early injury-risk detection | Daily score 0–100 + Low/Medium/High band |
+| Reduced manual data entry | Automatic watch sync + optional AI meal analysis |
+| Coach visibility | Real-time team dashboard |
+| Continuous improvement | `run_pipeline.py` — retrain on synthetic data + promote |
+
+### 2.2 Non-Functional Requirements
+
+> **Full specification (metrics, targets, evidence):** [NFR.md](NFR.md)
+
+| Requirement | Current Implementation |
+|-------------|------------------------|
+| **Availability** | Cloud Firestore (managed) + stateless FastAPI |
+| **Performance** | Prediction < 2 s (Firestore read + XGBoost inference) |
+| **Reliability** | Defaults for missing data; confidence score |
+| **Security** | Firebase Auth on client; **no auth on prediction API** (see §8) |
+| **Maintainability** | Modular layout: Android / Backend / ML_model |
+| **Privacy** | Health Connect permissions; `PrivacyPolicyActivity` |
+
+---
+
+## 3. System Context
 
 ```mermaid
 C4Context
     title AthleAgent — System Context
 
-    Person(athlete, "ספורטאי", "מזין נתונים וצופה בסיכון")
-    Person(coach, "מאמן", "מנהל קבוצה ועוקב אחר סיכון")
+    Person(athlete, "Athlete", "Submits data and views risk")
+    Person(coach, "Coach", "Manages team and monitors risk")
 
-    System(athleagent, "AthleAgent", "אפליקציית Android + Backend ML")
+    System(athleagent, "AthleAgent", "Android app + ML backend")
 
     System_Ext(firebase, "Firebase", "Auth + Firestore")
-    System_Ext(healthconnect, "Health Connect", "נתוני שעון/חיישנים")
+    System_Ext(healthconnect, "Health Connect", "Watch / sensor data")
     System_Ext(gemini, "Google Gemini", "Vision + Text AI")
     System_Ext(wearables, "Wearables", "Garmin, Samsung, Pixel Watch...")
 
-    Rel(athlete, athleagent, "משתמש")
-    Rel(coach, athleagent, "משתמש")
+    Rel(athlete, athleagent, "Uses")
+    Rel(coach, athleagent, "Uses")
     Rel(athleagent, firebase, "Auth, CRUD")
     Rel(athleagent, healthconnect, "Read health records")
     Rel(healthconnect, wearables, "Sync")
@@ -71,11 +73,11 @@ C4Context
 
 ---
 
-## 4. ארכיטקטורה לוגית — שלוש שכבות
+## 4. Logical Architecture — Three Layers
 
 ```mermaid
 flowchart TB
-    subgraph Client["שכבת לקוח — Android (Kotlin)"]
+    subgraph Client["Client Layer — Android (Kotlin)"]
         UI[Activities + View Binding]
         Auth[Firebase Auth UI]
         HC[Health Connect SDK]
@@ -84,14 +86,14 @@ flowchart TB
         Retro[Retrofit → Backend]
     end
 
-    subgraph Server["שכבת שירות — FastAPI (Python)"]
+    subgraph Server["Service Layer — FastAPI (Python)"]
         API["/predict/daily"]
         PredSvc[Prediction Service]
         HistSvc[History Service]
         ML[XGBoost Model]
     end
 
-    subgraph Data["שכבת נתונים"]
+    subgraph Data["Data Layer"]
         Firestore[(Cloud Firestore)]
     end
 
@@ -118,24 +120,27 @@ flowchart TB
     Artifacts --> ML
 ```
 
-### 4.1 עקרון מרכזי: Firestore כ-Source of Truth
-- האפליקציה **כותבת** נתונים יומיים ל-Firestore.
-- הבקאנד **קורא** מ-Firestore, מריץ ML, **כותב חזרה** תוצאות חיזוי.
-- האפליקציה **קוראת** תוצאות מ-Firestore (לא מה-response של API בלבד).
+### 4.1 Core Principle: Firestore as Source of Truth
 
-### 4.2 הפרדת אחריות
-| רכיב | אחריות | לא אחראי על |
-|------|--------|-------------|
-| **Android** | UX, איסוף נתונים, Gemini client-side, trigger חיזוי | inference ML |
+- The Android app **writes** daily data to Cloud Firestore.
+- The backend **reads** from Firestore, runs ML inference, and **writes back** prediction results.
+- The app **reads** results from Firestore — not primarily from the HTTP response body.
+- There is **no local SQL database**; all persistent application data lives in Cloud Firestore.
+
+### 4.2 Separation of Responsibilities
+
+| Component | Responsibility | Not Responsible For |
+|-----------|----------------|---------------------|
+| **Android** | UX, data collection, client-side Gemini, prediction trigger | ML inference |
 | **Backend** | Firestore read/write, feature engineering, ML inference | UI, meal vision |
-| **ML_model** | אימון, validation, promotion | serving runtime |
-| **Firestore** | אחסון persistent | חישובים |
+| **ML_model** | Training, validation, promotion | Runtime serving |
+| **Firestore** | Persistent storage | Computation |
 
 ---
 
-## 5. תפקידים וזרימות משתמש
+## 5. Roles and User Flows
 
-### 5.1 ספורטאי — זרימה יומית
+### 5.1 Athlete — Daily Flow
 
 ```mermaid
 sequenceDiagram
@@ -145,41 +150,43 @@ sequenceDiagram
     participant BE as Backend API
     participant G as Gemini
 
-    A->>HC: סנכרון בוקר (sleep + physical)
+    A->>HC: Morning sync (sleep + physical)
     HC-->>A: sleepMinutes, steps, HR, HRV...
-    A->>FS: daily_health/{today} (+ עומס אתמול ל-{D-1} לפי מדיניות)
+    A->>FS: daily_health/{today} (+ yesterday load to {D-1} per policy)
 
     A->>A: Check-in (energy, soreness, stress)
     A->>FS: daily_checkins/{today}
 
-    opt ארוחה
-        A->>G: תמונת ארוחה
+    opt Meal
+        A->>G: Meal photo
         G-->>A: calories, protein, carbs
         A->>FS: daily_nutrition/{today}
     end
 
-    Note over A,BE: cross-trigger: סקר מחכה ל-sleepMinutes / סנכרון מחכה ל-energyLevel
+    Note over A,BE: cross-trigger: check-in waits for sleepMinutes / sync waits for energyLevel
     A->>BE: POST /predict/daily {userId, date}
     BE->>FS: read snapshot + history
     BE->>BE: XGBoost predict_proba
     BE->>FS: merge finalRiskScore, riskLevel, predictionConfidence
-    BE-->>A: {risk_score, risk_level, prediction_confidence} (UI קורא מ-Firestore)
+    BE-->>A: {risk_score, risk_level, prediction_confidence} (UI reads from Firestore)
 
     A->>FS: read daily_health/{today}
-    A->>G: המלצות טקסט לפי סיכון
+    A->>G: Text recommendations by risk
     A->>A: AthleteDashboard
 ```
 
-**תנאי trigger (cross-trigger):**
+**Cross-trigger conditions:**
 
-| מסך | מפעיל חיזוי כאשר |
-|-----|------------------|
-| `DailyCheckInActivity` | `sleepMinutes` קיים ב-`daily_health/{today}` |
-| `WearableSyncActivity` | `energyLevel` קיים ב-`daily_checkins/{today}` |
+| Screen | Triggers prediction when |
+|--------|--------------------------|
+| `DailyCheckInActivity` | `sleepMinutes` exists in `daily_health/{today}` |
+| `WearableSyncActivity` | `energyLevel` exists in `daily_checkins/{today}` |
 
-`MealAnalysisActivity` שומר תזונה בלבד — לא קורא ל-`POST /predict/daily`.
+`MealAnalysisActivity` saves nutrition only — it does **not** call `POST /predict/daily`.
 
-### 5.2 מאמן — זרימה
+> **Gemini note:** Gemini runs client-side only and is optional for meal analysis. Daily injury-risk scoring works without Gemini.
+
+### 5.2 Coach — Flow
 
 ```mermaid
 flowchart LR
@@ -193,7 +200,7 @@ flowchart LR
 
 ---
 
-## 6. מודל נתונים (רמה גבוהה)
+## 6. Data Model (High Level)
 
 ```mermaid
 erDiagram
@@ -238,127 +245,152 @@ erDiagram
     }
 ```
 
-> פירוט שדות: [backend/docs/FEATURES.md](../backend/docs/FEATURES.md)
+> Field-level detail: [backend/docs/FEATURES.md](../backend/docs/FEATURES.md)
 
 ---
 
-## 7. אינטגרציות חיצוניות
+## 7. External Integrations
 
-| שירות | כיוון | שימוש | מיקום בקוד |
-|-------|-------|-------|------------|
-| **Firebase Auth** | Client → Google | Login, Register, role routing | `LoginActivity.kt` |
-| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | כל הנתונים | Activities, `history/repository.py` |
+| Service | Direction | Usage | Code Location |
+|---------|-----------|-------|---------------|
+| **Firebase Auth** | Client → Google | Login, register, role routing | `LoginActivity.kt` |
+| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | All application data | Activities, `history/repository.py` |
 | **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
-| **Gemini API** | Client → Google | meal vision, coaching text | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
+| **Gemini API** | Client → Google | Meal vision, coaching text (optional) | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
 | **FastAPI Backend** | Client → Server | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/` |
-| **XGBoost** | Server (in-process) | injury probability | `prediction/service.py` |
+| **XGBoost** | Server (in-process) | Injury probability | `prediction/service.py` |
 
-### 7.1 הרצה מקומית (Backend + ML)
+### 7.1 Local Execution (Backend + ML)
 
-| מסלול | פקודה | מתי |
-|-------|--------|-----|
-| **Docker** | `docker compose up --build` (שורש repo) | בוחנים, setup מהיר |
-| **Python** | `uvicorn main:app` מתוך `backend/` | פיתוח עם `--reload` |
+| Path | Command | When to Use |
+|------|---------|-------------|
+| **Docker** | `docker compose up --build` (repository root) | Evaluators, quick setup |
+| **Python** | `uvicorn main:app` from `backend/` | Development with `--reload` |
 
-> מדריך Docker: [DOCKER.md](DOCKER.md) · Android emulator → `10.0.2.2:8000` (ללא שינוי קוד)
+> Docker guide: [DOCKER.md](DOCKER.md) · Android emulator → `http://10.0.2.2:8000` (no code changes required)
+
+### 7.2 Configuration and Evaluation Credentials
+
+**No `.env` file is required to run the backend.** Sensible defaults are defined in `backend/config.py`; optional overrides are documented in `backend/.env.example`.
+
+For course evaluation, the repository includes:
+- `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore)
+- `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (Android app)
+
+> **Security:** These credential files are included for evaluator convenience. The repository must remain **private** and must not be published publicly.
 
 ---
 
-## 8. אבטחה — מצב נוכחי והמלצות
+## 8. Security — Current State and Recommendations
 
-### 8.1 מצב נוכחי
-| שכבה | מנגנון |
-|------|--------|
-| אימות משתמש | Firebase Auth (Google + email/password) |
-| הרשאות נתונים | Firestore Security Rules (מניחים קיום בפרויקט Firebase) |
-| API חיזוי | **ללא authentication** — `userId` בגוף הבקשה |
+### 8.1 Current State
+
+| Layer | Mechanism |
+|-------|-----------|
+| User authentication | Firebase Auth (Google + email/password) |
+| Data authorization | Firestore Security Rules (assumed in Firebase project) |
+| Prediction API | **No authentication** — `userId` supplied in request body |
 | Backend → Firestore | Firebase Admin SDK (service account) |
 
-### 8.2 סיכונים ידועים
-- קריאה ל-`/predict/daily` עם `userId` זר (IDOR).
-- אין rate limiting על API.
+### 8.2 Known Risks
 
-### 8.3 המלצות לייצור
-1. Firebase ID Token verification בבקאנד.
-2. Firestore Rules: athlete רואה רק את עצמו; coach רואה athletes בקבוצה.
-3. HTTPS + API Gateway / Cloud Run עם IAM.
+- Calling `/predict/daily` with an arbitrary `userId` (IDOR).
+- No rate limiting on the prediction API.
+
+### 8.3 Production Recommendations
+
+1. Firebase ID Token verification on the backend.
+2. Firestore Rules: athletes read only their own data; coaches read athletes in their team.
+3. HTTPS + API Gateway / Cloud Run with IAM.
 
 ---
 
-## 9. ML — סקירה ברמה גבוהה
+## 9. ML — High-Level Overview
 
-| שלב | כלי | פלט |
-|-----|-----|-----|
+| Stage | Tool | Output |
+|-------|------|--------|
 | Synthetic data | `ML_model/generation/simulator.py` (CLI: `data_generator.py`) | `athlete_injury_data.csv` |
 | Training | `ML_model/training/pipeline.py` (CLI: `train_model.py`) | `injury_model.pkl` + manifest |
-| Quality gates | `validate_metrics.py`, `model_loader.py` | Recall ≥ 0.80, AUC ≥ 0.68 |
+| Quality gates | `validate_metrics.py`, `model_loader.py` | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
 | Promotion | `run_pipeline.py` | `artifacts/promoted.json` |
-| Serving | `POST /predict/daily` | probability → risk bands |
+| Serving | `POST /predict/daily` | Probability → risk bands |
 
-> פירוט ML: [backend/docs/MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)
+### 9.1 Promoted Production Model (July 2026)
+
+| Property | Value |
+|----------|-------|
+| **Model** | `XGBoostCalibratedTuned` |
+| **Operating threshold** | ~0.10 |
+| **Feature count** | 35 (see `backend/data/model_feature_contract.json`) |
+| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
+| **Promotion pointer** | `ML_model/artifacts/promoted.json` → run `20260709_104916` |
+
+> ML detail: [backend/docs/MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)
 
 ---
 
-## 10. מבנה Repository
+## 10. Repository Structure
 
 ```
 final_project_AthleAgent/
-├── android_app/AthleAgent/     # אפליקציית Android
+├── android_app/AthleAgent/     # Android application
 ├── backend/                    # FastAPI inference service
 ├── ML_model/                   # Training pipeline + artifacts
-├── docs/                       # תיעוד פרויקט (HLD/LLD/NFR)
+├── docs/                       # Project documentation (HLD/LLD/NFR)
 ├── logs/                       # athleagent.log (gitignored, backend + Android telemetry)
 └── README.md
 ```
 
 ---
 
-## 11. תלויות וטכנולוגיות
+## 11. Dependencies and Technologies
 
-| שכבה | Stack |
-|------|-------|
+| Layer | Stack |
+|-------|-------|
 | Mobile | Kotlin, Android SDK, View Binding, Material, Retrofit, Gson, MPAndroidChart |
 | Backend | Python 3.x, FastAPI, Uvicorn, Pydantic, pandas, scikit-learn, XGBoost, firebase-admin |
 | Cloud | Firebase Auth, Cloud Firestore |
-| AI | Google Gemini (client-side) |
+| AI | Google Gemini (client-side only) |
 | Health | Google Health Connect SDK |
 | CI/Tests | pytest (backend), JUnit (Android placeholder) |
 
 ---
 
-## 12. מגבלות ופערים ידועים
+## 12. Known Limitations and Gaps
 
-| נושא | תיאור |
-|------|--------|
-| **ארכיטקטורת Android** | Activity-centric + View Binding; אין ViewModel/Repository (ראו README) |
-| **Date-split sync** | מיושם: שינה ב-`{D}`, עומס ב-`{D-1}`; **פער:** gate פרונט לא בודק עומס `{D-1}` > 0 |
-| **תזונה חסרה** | ממוצעים מ-`nutrition_defaults.py` (2600 kcal, 130g P, 300g C); `nutritionImputed` מוריד confidence |
-| **Backend auth** | לא מיושם ב-production routes |
-| **Gemini בבקאנד** | מפתח ב-config אך אין routes — Gemini רץ רק בלקוח |
-
----
-
-## 13. Roadmap ארכיטקטוני (המלצות)
-
-1. **Auth על API** — Firebase token middleware.
-2. **Repository layer ב-Android** — הפרדת Firestore מ-Activities.
-3. **Trigger gate בפרונט** — בדיקת `sleepMinutes>0` ועומס `{D-1}` לפני `/predict/daily`.
-4. **Cloud deployment** — Backend על Cloud Run / Render (image ניתן לבנות מ-`Dockerfile` הקיים).
-5. **Firestore Rules** — hardening לפני production.
+| Topic | Description |
+|-------|-------------|
+| **Android architecture** | Activity-centric + View Binding; no ViewModel/Repository layer (see README) |
+| **Date-split sync** | Implemented: sleep on `{D}`, load on `{D-1}`; **gap:** front-end gate does not verify `{D-1}` load > 0 |
+| **Missing nutrition** | Imputed from `nutrition_defaults.py` (2600 kcal, 130 g P, 300 g C); `nutritionImputed` lowers confidence |
+| **Backend auth** | Not implemented on production routes |
+| **Gemini on backend** | API key may exist in config but no routes — Gemini runs client-side only |
+| **Prediction API auth** | No authentication; `userId` in request body is a known limitation |
+| **UI data source** | Dashboard reads `finalRiskScore` from Firestore, not primarily from the HTTP response |
 
 ---
 
-## 14. מפת מסמכים
+## 13. Architectural Roadmap (Recommendations)
 
-| מסמך | תוכן |
-|------|------|
-| [DOCKER.md](DOCKER.md) | Backend + ML — Docker (בוחנים) |
-| [LLD_PROJECT.md](LLD_PROJECT.md) | עיצוב ברמה נמוכה — פרויקט מלא |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | HLD בקאנד |
-| [backend/docs/LLD.md](../backend/docs/LLD.md) | LLD בקאנד |
-| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | ארכיטקטורת בקאנד (קיים) |
-| [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | חוזה נתונים production |
-| [docs/NFR.md](NFR.md) | דרישות לא-פונקציונליות (מדדים, gates, ביצועים) |
-| [docs/LOGGING_HE.md](LOGGING_HE.md) | לוגים מאוחדים + Android telemetry |
-| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | קונפיג ML production (gates, bands) |
-| [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | pipeline ציון סיכון E2E |
+1. **API authentication** — Firebase token middleware.
+2. **Android Repository layer** — separate Firestore access from Activities.
+3. **Front-end trigger gate** — verify `sleepMinutes > 0` and `{D-1}` load before `/predict/daily`.
+4. **Cloud deployment** — backend on Cloud Run / Render (image buildable from existing `Dockerfile`).
+5. **Firestore Rules** — hardening before production.
+
+---
+
+## 14. Document Map
+
+| Document | Content |
+|----------|---------|
+| [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
+| [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
+| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend HLD |
+| [backend/docs/LLD.md](../backend/docs/LLD.md) | Backend LLD |
+| [backend/docs/BACKEND.md](../backend/docs/BACKEND.md) | Backend architecture |
+| [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production data contract |
+| [docs/NFR.md](NFR.md) | Non-functional requirements (metrics, gates, performance) |
+| [docs/LOGGING_HE.md](LOGGING_HE.md) | Unified logging + Android telemetry |
+| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | Production ML config (gates, bands) |
+| [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | End-to-end risk-score pipeline |
