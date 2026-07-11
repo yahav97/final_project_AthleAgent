@@ -58,6 +58,8 @@ If gate validation fails:
 
 ## Before You Run (for reviewers)
 
+**No `.env` file is required.** Firestore uses `backend/firebase-key.json` (included in the repository for course evaluation). Optional overrides: copy `.env.example` → `.env`.
+
 **Option A — Docker:** see [`docs/DOCKER.md`](../docs/DOCKER.md) (`docker compose up --build` from repo root).
 
 **Option B — Local Python:** install dependencies **once** from the **repository root** (not from `backend/`):

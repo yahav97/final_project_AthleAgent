@@ -6,17 +6,14 @@ Run the FastAPI backend and promoted ML model in a single container. The Android
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Engine (Linux) — **installed and running**
 - Before `docker compose up`, confirm the daemon is up: `docker version` must show a **Server** section (not only Client)
-- `backend/firebase-key.json` — Firebase service account (not in git; get from the team or Firebase Console)
+- `backend/firebase-key.json` — Firebase service account (included in this repository for course evaluation)
 
 ## Quick start
 
 From the repository root:
 
 ```powershell
-# 1. Place the Firebase key BEFORE first compose up (see warning below)
-copy path\to\your-key.json backend\firebase-key.json
-
-# 2. Build and run
+# From the repository root (firebase-key.json is already under backend/)
 docker compose up --build
 ```
 
@@ -34,19 +31,7 @@ From the Android emulator (unchanged): `http://10.0.2.2:8000/` — see `ApiClien
 
 ---
 
-> **Important — `firebase-key.json` must exist before `docker compose up`**
->
-> Copy `firebase-key.json` into `backend/` **before** the first run.
->
-> If you ran `docker compose up` without the file, Docker may create an **empty directory** named `backend/firebase-key.json` on the host. The backend will then fail to parse credentials.
->
-> **Fix:**
-> 1. Stop containers: `docker compose down`
-> 2. Remove the wrong path:
->    - Windows: `Remove-Item -Recurse -Force backend\firebase-key.json`
->    - Mac/Linux: `rm -rf backend/firebase-key.json`
-> 3. Copy the real JSON file to `backend/firebase-key.json`
-> 4. Run again: `docker compose up --build`
+> **Note:** If `backend/firebase-key.json` was missing on a first run, Docker may have created an empty **directory** with that name. Remove it (`Remove-Item -Recurse -Force backend\firebase-key.json` on Windows) and restore the JSON file from the repo before `docker compose up --build` again.
 
 ---
 
@@ -65,10 +50,10 @@ The model loads **in-process** at startup (same as local `uvicorn`). No separate
 
 No code changes required. With `127.0.0.1:8000:8000` published on the host, the emulator still reaches the API at `10.0.2.2:8000`.
 
-You still need on the app side (as today):
+On the app side:
 
-- `google-services.json` in `android_app/AthleAgent/app/`
-- `GEMINI_API_KEY` in `local.properties`
+- `google-services.json` is already under `android_app/AthleAgent/app/`
+- `GEMINI_API_KEY` in `local.properties` is optional (meal analysis only) — see `local.properties.example`
 
 ## Local development (without Docker)
 

@@ -1,166 +1,164 @@
-# 🏃‍♂️ AthleAgent
+# AthleAgent
 
-> **Shifting Athlete Care from Reaction to Prevention.**
+**Shifting athlete care from reaction to prevention.**
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-Android-blue.svg)](https://kotlinlang.org/)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
-[![XGBoost](https://img.shields.io/badge/ML-XGBoost_%2B_scikit--learn-red.svg)](https://xgboost.readthedocs.io/)
-[![Health Connect](https://img.shields.io/badge/Integration-Health_Connect-green.svg)](https://developer.android.com/health-and-fitness/guides/health-connect)
-[![Gemini](https://img.shields.io/badge/AI-Gemini_Vision-orange.svg)](https://ai.google.dev/)
+AthleAgent is an Android + FastAPI system that turns daily athlete data (check-ins, Health Connect metrics, meal photos) into a single **Injury Risk Score** (0–100%) for athletes and coaches.
 
-## 📖 Overview
+| Layer | Stack |
+|-------|--------|
+| Android | Kotlin, Activities, View Binding, Retrofit, Firebase Auth, Firestore, Health Connect, Gemini Vision |
+| Backend | Python 3.11+, FastAPI, Uvicorn, firebase-admin |
+| Data store | **Cloud Firestore** (no local SQL database) |
+| ML | XGBoost + scikit-learn (promoted model included under `ML_model/artifacts/`) |
 
-Athlete injuries often follow from a mix of load, recovery, nutrition, and stress — usually tracked in separate tools. **AthleAgent** unifies those inputs into one daily **Injury Risk Score** (0–100%) for athletes and coaches.
+---
 
-The Android app collects data (check-ins, Health Connect, meal photos). A **FastAPI** backend reads from **Firestore**, runs **XGBoost** inference, and writes results back. The app displays scores and Gemini-generated recommendations.
+## Quick start for evaluators
 
-## ✨ Core Features
+No `.env` file is required. Defaults in `backend/config.py` are enough to run.
 
-* **📊 Daily Check-ins:** Short surveys for energy, muscle soreness, and stress.
-* **🥗 AI Meal Analysis:** Gemini Vision extracts calories and macros from meal photos (client-side).
-* **⌚ Health Connect Sync:** Sleep, steps, heart rate, HRV, and related metrics from wearables.
-* **🤖 Predictive Risk Modeling:** Backend ML pipeline produces a daily injury-risk probability, risk level (Low/Medium/High), and confidence score.
+Firestore connection uses the included Firebase Admin key:
 
-## 🛠️ Tech Stack
+| File | Role | Included in this repo? |
+|------|------|------------------------|
+| `backend/firebase-key.json` | Backend → Firestore (read/write predictions) | **Yes** |
+| `android_app/AthleAgent/app/google-services.json` | Android → Firebase Auth + Firestore | **Yes** |
+| `.env` | Optional overrides only | **Not needed** |
+| `GEMINI_API_KEY` in `local.properties` | Meal photo analysis only | Optional (see below) |
 
-| Layer | Technologies |
-|-------|----------------|
-| **Android** | Kotlin, Activities, View Binding, XML, Material, Retrofit, Gson |
-| **Cloud** | Firebase Authentication, Cloud Firestore |
-| **Backend** | Python, FastAPI, Uvicorn, Pydantic, firebase-admin |
-| **ML (training & serving)** | XGBoost, scikit-learn, pandas, joblib — see `ML_model/` and `backend/` |
-| **External APIs** | Google Health Connect, Google Gemini (Vision + text) |
+### Step 1 — Start the backend
 
-### Android architecture (as implemented)
+From the **repository root** (folder that contains `docker-compose.yml`).
 
-**Activity-centric** — not MVVM. There is no `ViewModel` or Repository layer in the codebase.
+**Option A — Docker (recommended)**
 
-* Each screen is an `AppCompatActivity` with **View Binding**.
-* Activities call **Firestore** and **Retrofit** directly for reads, writes, and `POST /predict/daily`.
-* UI state and business logic live in the Activity classes under `android_app/AthleAgent/app/src/main/java/com/yahav/athleagent/ui/`.
-
-### Backend & ML (as implemented)
-
-* Inference runs on the **server** (`backend/ml/model_loader.py`, `POST /predict/daily`) — not on-device.
-* Promoted model: **`XGBoostCalibratedTuned`** @ threshold **0.10** — 35 features, Recall **80.8%**, ROC-AUC **78.3%** (see `ML_model/artifacts/promoted.json` → run `20260709_104916`).
-* Training pipeline: `ML_model/train_model.py`, `ML_model/run_pipeline.py`.
-
-## 🏗️ System Architecture & Workflow
-
-Two roles, routed after **Firebase Authentication**:
-
-### Athlete app
-
-* Register → request to join a coach's team.
-* Log data: Health Connect sync, daily check-in, optional meal photo.
-* Trigger prediction via backend → read `finalRiskScore` and `riskLevel` from Firestore.
-* Dashboard: risk gauge, history chart (MPAndroidChart), Gemini recommendation text.
-
-### Coach app
-
-* Create a team, approve join requests.
-* Team dashboard: athlete list, per-athlete risk score and trend chart.
-
-```
-Android (Activities) → Firestore (write daily data)
-                    → FastAPI POST /predict/daily (trigger)
-Backend             → Firestore (read snapshot, write prediction)
-Android             → Firestore (read finalRiskScore for UI)
-```
-
-## 🧠 Design Philosophy
-
-* **Usability:** Minimal manual entry; wearable sync and photo-based nutrition.
-* **Reliability:** Missing-data defaults; ML **manifest gates** block serving if Recall/AUC thresholds fail (HTTP 503).
-* **Supportability:** Separate repos/folders for Android, backend, and ML pipeline.
-* **Performance:** Stateless backend inference; Firestore as source of truth for UI.
-
-## 📱 Screenshots
-
-| Architecture | Workflow | Screens | Athlete View | Coach View |
-| :---: | :---: | :---: | :---: | :---: |
-| <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/archi.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/workflow.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/screens.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/Athlete.png?raw=true" width="200"/> | <img src="https://github.com/yahav97/AthleAgent-App/blob/main/assets/coach.png?raw=true" width="200"/> |
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-* Android Studio (recent version)
-* Physical Android device (recommended) with [Health Connect](https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata)
-* Firebase project (`google-services.json`)
-* Gemini API key (`local.properties`)
-* Backend — **either** Docker (Option A) **or** Python 3.11+ venv (Option B):
-  * **Docker:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed **and running** before `docker compose up` (see below)
-  * **Python:** venv + `pip install` — see [`backend/README.md`](backend/README.md)
-* `backend/firebase-key.json` — Firebase Admin service account (required for backend; not in git)
-
-### Android app
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yahav97/AthleAgent-App.git
-   cd AthleAgent-App/android_app/AthleAgent
-   ```
-2. Open `android_app/AthleAgent` in Android Studio.
-3. In `local.properties`:
-   ```properties
-   GEMINI_API_KEY=your_api_key_here
-   ```
-4. Place `google-services.json` in `android_app/AthleAgent/app/`.
-5. Sync Gradle and run on a device.
-
-### Backend (required for live predictions)
-
-**Option A — Docker (recommended for reviewers)**
-
-1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) if not already installed.
-2. **Start Docker Desktop** and wait until it shows **Running** (whale icon in the system tray — not "Starting").
-3. Verify the engine is up:
-   ```powershell
-   docker version
-   ```
-   You should see both **Client** and **Server** sections. If you get `dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker is not running yet — open Docker Desktop and try again.
-4. Place `backend/firebase-key.json` **before** the first run (see [`docs/DOCKER.md`](docs/DOCKER.md) if the file was missing on first attempt).
-5. From the repository root:
+1. Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Confirm the engine is up (`docker version` must show **Client** and **Server**).
+3. Run:
 
 ```powershell
 docker compose up --build
 ```
 
-Full guide: [`docs/DOCKER.md`](docs/DOCKER.md)
+**Option B — Local Python 3.11+**
 
-Verify: `GET http://localhost:8000/status/ml` → `"status": "Live"`.
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-**Option B — Local Python**
+(macOS/Linux: `source .venv/bin/activate` instead of the PowerShell activate line.)
 
-From the repository root:
+### Step 2 — Verify backend + Firestore
+
+| Check | URL | Expected |
+|-------|-----|----------|
+| Health | http://localhost:8000/health | HTTP 200 |
+| ML model | http://localhost:8000/status/ml | `"status": "Live"` |
+
+If ML is `"Live"`, the promoted model loaded. Firestore uses `backend/firebase-key.json` automatically (no `.env`).
+
+### Step 3 — Run the Android app
+
+1. Open `android_app/AthleAgent` in **Android Studio**.
+2. Let Gradle sync (creates `local.properties` with `sdk.dir` on your machine).
+3. Run on an **emulator** (default API base URL `http://10.0.2.2:8000/` already points at the host backend).
+4. Register / sign in with Firebase Auth, then use athlete or coach flows.
+
+**Optional — meal photo analysis:** copy `local.properties.example` → `local.properties` (keep the `sdk.dir` Android Studio created) and set `GEMINI_API_KEY`. Free key: [Google AI Studio](https://aistudio.google.com/apikey). Injury risk scoring works **without** Gemini.
+
+**Physical device:** change `BASE_URL` in `ApiClient.kt` to your PC’s LAN IP (e.g. `http://192.168.x.x:8000/`).
+
+### Step 4 — Demo flow
+
+1. Backend running, `/status/ml` → `"Live"`.
+2. Sign in on the app.
+3. **Athlete:** wearable sync / daily check-in → trigger prediction → read risk from Firestore.
+4. **Coach:** team dashboard with athlete risk scores.
+
+---
+
+## Repository layout
+
+```
+AthleAgent/
+├── android_app/AthleAgent/   # Android application
+├── backend/                  # FastAPI inference API + firebase-key.json
+├── ML_model/                 # Training pipeline + promoted artifacts
+├── docs/                     # Design and ops documentation
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## Prerequisites
+
+| Component | Requirement |
+|-----------|-------------|
+| **Android** | [Android Studio](https://developer.android.com/studio) (recent stable), JDK 17 |
+| **Device** | Emulator or physical device (API 26+). Health Connect works best on a real device. |
+| **Backend** | [Docker Desktop](https://www.docker.com/products/docker-desktop/) **or** Python **3.11+** |
+
+---
+
+## Configuration notes
+
+- **No `.env` required.** Copy `backend/.env.example` → `backend/.env` only if you want to override defaults (ports, risk thresholds, etc.).
+- **Firestore** is the database. Credentials are in `backend/firebase-key.json` and `app/google-services.json`.
+- **Promoted ML model** is already under `ML_model/artifacts/` — no retraining needed to run.
+
+Full Docker notes: [`docs/DOCKER.md`](docs/DOCKER.md) · Backend details: [`backend/README.md`](backend/README.md)
+
+---
+
+## Optional — retrain the ML model
 
 ```bash
 pip install -r backend/requirements.txt
-cd backend
-uvicorn main:app --reload
+python ML_model/run_pipeline.py
 ```
 
-Verify: `GET http://localhost:8000/status/ml` → `"status": "Live"`.
+Restart the backend afterward. See [`ML_model/README.md`](ML_model/README.md).
 
-Point the app Retrofit base URL at your backend host (see `ApiClient.kt` — emulator default `10.0.2.2:8000`).
+---
 
-## 📚 Documentation
+## Backend tests (optional)
+
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+---
+
+## ZIP / submission contents
+
+Include source, docs, promoted ML artifacts, and evaluation credentials:
+
+- Include: `backend/firebase-key.json`, `app/google-services.json`, `ML_model/artifacts/`
+- Exclude: `**/build/`, `.gradle/`, `.idea/`, `__pycache__/`, `.venv/`, `logs/`, personal `.env`, personal `local.properties`
+
+---
+
+## Documentation index
 
 | Document | Content |
 |----------|---------|
 | [`docs/HLD_PROJECT.md`](docs/HLD_PROJECT.md) | High-level design |
-| [`docs/DOCKER.md`](docs/DOCKER.md) | Backend + ML via Docker |
 | [`docs/LLD_PROJECT.md`](docs/LLD_PROJECT.md) | Low-level design |
+| [`docs/DOCKER.md`](docs/DOCKER.md) | Docker setup |
 | [`docs/NFR.md`](docs/NFR.md) | Non-functional requirements |
-| [`docs/LOGGING_HE.md`](docs/LOGGING_HE.md) | Unified logging + telemetry |
-| [`docs/PROJECT_BOOK_IMPROVEMENTS_HE.md`](docs/PROJECT_BOOK_IMPROVEMENTS_HE.md) | Project book improvement guide (Hebrew) |
-| [`docs/FRONTEND_CODE_REVIEW_HE.md`](docs/FRONTEND_CODE_REVIEW_HE.md) | Android code review (Hebrew) |
-| [`ML_model/README.md`](ML_model/README.md) | Training pipeline + artifacts |
-| [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline end-to-end |
-| [`backend/README.md`](backend/README.md) | Backend setup and API |
+| [`backend/README.md`](backend/README.md) | Backend API, config, tests |
+| [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline |
+| [`ML_model/README.md`](ML_model/README.md) | Training pipeline and artifacts |
 
-## 👨‍💻 Authors
+---
 
-* **Yahav Simon** — [GitHub](https://github.com/yahav97)
-* **Tzuf Feldon**
+## Authors
+
+- **Yahav Simon**
+- **Tzuf Feldon**

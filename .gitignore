@@ -5,14 +5,19 @@ __pycache__/
 #*.pkl
 #backend/*.pkl
 
-# Environment variables (contains secrets!)
+# Environment variables (optional overrides — not required to run)
 .env
 backend/.env
 *.env
+
+# Other Firebase key filenames (keep ignored)
 serviceAccountKey.json
 *serviceAccount*.json
 firebase-adminsdk*.json
-firebase-key.json
+
+# Academic evaluation: backend/firebase-key.json IS tracked so reviewers can
+# connect to the project Firestore without a separate credentials hand-off.
+# Keep the GitHub repository private. Do not reuse this key outside the course.
 
 # Logs
 logs/
