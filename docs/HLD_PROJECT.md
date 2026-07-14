@@ -186,7 +186,122 @@ sequenceDiagram
 
 > **Gemini note:** Gemini runs client-side only and is optional for meal analysis. Daily injury-risk scoring works without Gemini.
 
-### 5.2 Coach — Flow
+### 5.2 Athlete — Daily Risk Activity Diagram (UC-01 + UC-05)
+
+**Diagram type:** UML Activity Diagram (flowchart) · **Direction:** top → bottom · **UC:** 01 + 05
+
+Cross-trigger: either path may run first; prediction fires only when both sleep and check-in exist.
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": true, "curve": "linear", "nodeSpacing": 40, "rankSpacing": 45}, "theme": "base"}}%%
+flowchart TB
+    %% ===== UML Activity Diagram — Daily Injury Risk =====
+    Start((▶ START<br/>Morning day D)) --> Fork{Which action<br/>first?}
+
+    %% --- Path UC-05 ---
+    Fork -->|left: UC-05 Wearable sync| Sync[① Read Health Connect]
+    Sync --> WriteH[② Write daily_health<br/>sleep → D · load → D-1]
+    WriteH --> Q1{③ Check-in already done?<br/>energyLevel in daily_checkins/D}
+    Q1 -->|YES →| Predict
+    Q1 -->|NO →| Prompt1[/Prompt: complete morning survey/]
+    Prompt1 --> Survey
+
+    %% --- Path UC-01 ---
+    Fork -->|right: UC-01 Morning survey| Survey[① Fill survey<br/>energy · soreness · stress · injuredYesterday]
+    Survey --> WriteC[② Write daily_checkins/D]
+    WriteC --> Q2{③ Watch already synced?<br/>sleepMinutes in daily_health/D}
+    Q2 -->|YES →| Predict
+    Q2 -->|NO →| Prompt2[/Prompt: sync wearable/]
+    Prompt2 --> Sync
+
+    %% --- Shared prediction pipeline ---
+    Predict[[④ POST /predict/daily]]
+    Predict --> BE[⑤ Backend: load snapshot + history<br/>XGBoost → score + confidence]
+    BE --> Save[⑥ Merge into daily_health/D<br/>finalRiskScore · riskLevel · confidence]
+    Save --> Dash[⑦ Show AthleteDashboard]
+    Dash --> Q3{⑧ Gemini recommendation?}
+    Q3 -->|YES optional →| Gem[Generate tip by risk level]
+    Q3 -->|NO skip →| EndNode
+    Gem --> EndNode((⏹ END))
+
+    %% --- Legend styles ---
+    classDef startEnd fill:#1B5E20,stroke:#0D3B12,color:#fff,stroke-width:2px
+    classDef process fill:#E3F2FD,stroke:#1565C0,color:#0D47A1,stroke-width:1.5px
+    classDef decision fill:#FFF8E1,stroke:#F9A825,color:#E65100,stroke-width:2px
+    classDef system fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C,stroke-width:1.5px
+    classDef prompt fill:#FFF3E0,stroke:#EF6C00,color:#E65100,stroke-width:1.5px,stroke-dasharray: 5 3
+
+    class Start,EndNode startEnd
+    class Sync,WriteH,Survey,WriteC,Dash process
+    class Fork,Q1,Q2,Q3 decision
+    class Predict,BE,Save,Gem system
+    class Prompt1,Prompt2 prompt
+```
+
+### 5.3 Coach — Team Join Activity Diagram (UC-04 + UC-07)
+
+**Diagram type:** UML Activity Diagram with swimlanes · **Direction:** top → bottom · **UC:** 04 + 07
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": true, "curve": "linear", "nodeSpacing": 35, "rankSpacing": 40}, "theme": "base"}}%%
+flowchart TB
+    %% ===== UML Activity Diagram — Join Team =====
+    Start((▶ START)) --> Enter[Athlete enters teamCode]
+
+    subgraph Athlete["🏊 Swimlane: Athlete  ·  UC-04"]
+        direction TB
+        Enter --> Query[Query Firestore:<br/>teams where teamCode == code]
+        Query --> Found{Team found?}
+        Found -->|NO →| Err[/Error: team not found/]
+        Err --> Enter
+        Found -->|YES →| Send[Create requests/{uid}<br/>status = pending]
+        Send --> Wait((⏸ Wait for coach))
+    end
+
+    Wait --> Open
+
+    subgraph Coach["🏊 Swimlane: Coach  ·  UC-07"]
+        direction TB
+        Open[Open CoachRequests] --> Load[Load pending requests]
+        Load --> Any{Any pending?}
+        Any -->|NO →| Empty[/Empty state/]
+        Empty --> EndIdle((⏹ END — nothing to do))
+        Any -->|YES →| Decide{Approve or reject?}
+        Decide -->|REJECT →| Rej[Set status = rejected]
+        Rej --> EndRej((⏹ END — rejected))
+        Decide -->|APPROVE →| Batch
+    end
+
+    subgraph Firestore["🗄️ Swimlane: Firestore batch"]
+        direction TB
+        Batch[[Atomic batch]]
+        Batch --> A1[status = approved]
+        Batch --> A2[athletes arrayUnion uid]
+        Batch --> A3[users.teamId = teamId]
+        A1 --> Linked
+        A2 --> Linked
+        A3 --> Linked[Athlete linked to team]
+    end
+
+    Linked --> Dash[CoachDashboard reads<br/>daily_health per athlete]
+    Dash --> EndOk((⏹ END — on roster))
+
+    classDef startEnd fill:#1B5E20,stroke:#0D3B12,color:#fff,stroke-width:2px
+    classDef wait fill:#455A64,stroke:#263238,color:#fff,stroke-width:2px
+    classDef process fill:#E3F2FD,stroke:#1565C0,color:#0D47A1,stroke-width:1.5px
+    classDef decision fill:#FFF8E1,stroke:#F9A825,color:#E65100,stroke-width:2px
+    classDef system fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C,stroke-width:1.5px
+    classDef error fill:#FFEBEE,stroke:#C62828,color:#B71C1C,stroke-width:1.5px,stroke-dasharray: 5 3
+
+    class Start,EndIdle,EndRej,EndOk startEnd
+    class Wait wait
+    class Enter,Query,Send,Open,Load,Dash,A1,A2,A3,Linked,Rej process
+    class Found,Any,Decide decision
+    class Batch system
+    class Err,Empty error
+```
+
+### 5.4 Coach — Screen Flow
 
 ```mermaid
 flowchart LR

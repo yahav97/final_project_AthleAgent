@@ -21,8 +21,9 @@
 7. [מה לשמר — נקודות חוזק](#7-מה-לשמר--נקודות-חוזק)
 8. [תוכן מוכן להדבקה — סעיף המודל](#8-תוכן-מוכן-להדבקה--סעיף-המודל)
 9. [תוכן מוכן להדבקה — סכמת Firestore מלאה](#9-תוכן-מוכן-להדבקה--סכמת-firestore-מלאה)
-10. [לוח זמנים מומלץ לסגירה](#10-לוח-זמנים-מומלץ-לסגירה)
-11. [צ'קליסט סופי לפני הגשה](#11-צקליסט-סופי-לפני-הגשה)
+10. [תוכן מוכן להדבקה — זרימות Activity](#10-תוכן-מוכן-להדבקה--זרימות-activity)
+11. [לוח זמנים מומלץ לסגירה](#11-לוח-זמנים-מומלץ-לסגירה)
+12. [צ'קליסט סופי לפני הגשה](#12-צקליסט-סופי-לפני-הגשה)
 
 ---
 
@@ -214,8 +215,10 @@
 | 2 | **ארכיטקטורה כללית** | 3 שכבות: Android / FastAPI / ML Pipeline + Firestore |
 | 3 | **Sequence — חיזוי יומי** | סנכרון → Firestore → POST `/predict/daily` → כתיבה → קריאה ל-UI |
 | 4 | **זרימת נתונים D / D-1** | שינה@D, עומס@D-1, סקר@D, תזונה@D-1 |
+| 5 | **Activity — חיזוי יומי** | UC-01 + UC-05: סקר + סנכרון + cross-trigger ([§10](#10-תוכן-מוכן-להדבקה--זרימות-activity)) |
+| 6 | **Activity — הצטרפות לקבוצה** | UC-04 + UC-07: בקשה → אישור/דחייה מאמן ([§10](#10-תוכן-מוכן-להדבקה--זרימות-activity)) |
 
-> דיאגרמות Mermaid מוכנות ב-`docs/HLD_PROJECT.md` — ניתן לייצא כתמונה.
+> דיאגרמות Mermaid מוכנות ב-`docs/HLD_PROJECT.md` וב-[§10](#10-תוכן-מוכן-להדבקה--זרימות-activity) — לייצא כתמונה מ-[mermaid.live](https://mermaid.live).
 
 ### 5.2 גרפים ויזואליים — ML
 
@@ -409,21 +412,177 @@
 
 ---
 
-## 10. לוח זמנים מומלץ לסגירה
+## 10. תוכן מוכן להדבקה — זרימות Activity
+
+> להדביק אחרי טבלת מקרי השימוש (UC-01…UC-08).  
+> **שתי זרימות בלבד** — ליבת המוצר (חיזוי) + אינטראקציה ספורטאי↔מאמן.  
+> לייצוא תמונה: להדביק את בלוק ה-Mermaid ב-[mermaid.live](https://mermaid.live) → Export PNG/SVG.
+
+### 10.1 זרימת Activity — חיזוי סיכון יומי (UC-01 + UC-05)
+
+**כותרת מומלצת בספר:** Activity Diagram — Daily Injury Risk Prediction (UC-01 + UC-05)
+
+| מטא | ערך |
+|-----|-----|
+| **סוג דיאגרמה** | UML Activity Diagram |
+| **כיוון** | מלמעלה למטה (TB) |
+| **מקרא** | ירוק = התחלה/סיום · כחול = פעולה · צהוב = החלטה · סגול = Backend/מערכת · כתום מקווקו = הנחיה למשתמש |
+
+**טקסט מלווה (להדבקה):**
+
+הזרימה המרכזית של AthleAgent היא הפקת **ציון סיכון פציעה יומי** בבוקר יום D. הספורטאי משלים שני מקורות חובה — **סנכרון שעון** (UC-05) ו**סקר בוקר** (UC-01) — בסדר חופשי. המערכת מפעילה `POST /predict/daily` רק כששני המקורות קיימים (**cross-trigger**): אחרי סקר — אם קיים `sleepMinutes`; אחרי סנכרון — אם קיים `energyLevel`. ניתוח ארוחה (UC-02) אינו מפעיל חיזוי. התוצאה נשמרת ב-Firestore ומוצגת בדשבורד, עם המלצת Gemini אופציונלית.
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": true, "curve": "linear", "nodeSpacing": 40, "rankSpacing": 45}, "theme": "base"}}%%
+flowchart TB
+    Start((▶ START<br/>Morning day D)) --> Fork{Which action<br/>first?}
+
+    Fork -->|left: UC-05 Wearable sync| Sync[① Read Health Connect]
+    Sync --> WriteH[② Write daily_health<br/>sleep → D · load → D-1]
+    WriteH --> Q1{③ Check-in already done?<br/>energyLevel in daily_checkins/D}
+    Q1 -->|YES →| Predict
+    Q1 -->|NO →| Prompt1[/Prompt: complete morning survey/]
+    Prompt1 --> Survey
+
+    Fork -->|right: UC-01 Morning survey| Survey[① Fill survey<br/>energy · soreness · stress · injuredYesterday]
+    Survey --> WriteC[② Write daily_checkins/D]
+    WriteC --> Q2{③ Watch already synced?<br/>sleepMinutes in daily_health/D}
+    Q2 -->|YES →| Predict
+    Q2 -->|NO →| Prompt2[/Prompt: sync wearable/]
+    Prompt2 --> Sync
+
+    Predict[[④ POST /predict/daily]]
+    Predict --> BE[⑤ Backend: load snapshot + history<br/>XGBoost → score + confidence]
+    BE --> Save[⑥ Merge into daily_health/D<br/>finalRiskScore · riskLevel · confidence]
+    Save --> Dash[⑦ Show AthleteDashboard]
+    Dash --> Q3{⑧ Gemini recommendation?}
+    Q3 -->|YES optional →| Gem[Generate tip by risk level]
+    Q3 -->|NO skip →| EndNode
+    Gem --> EndNode((⏹ END))
+
+    classDef startEnd fill:#1B5E20,stroke:#0D3B12,color:#fff,stroke-width:2px
+    classDef process fill:#E3F2FD,stroke:#1565C0,color:#0D47A1,stroke-width:1.5px
+    classDef decision fill:#FFF8E1,stroke:#F9A825,color:#E65100,stroke-width:2px
+    classDef system fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C,stroke-width:1.5px
+    classDef prompt fill:#FFF3E0,stroke:#EF6C00,color:#E65100,stroke-width:1.5px,stroke-dasharray: 5 3
+
+    class Start,EndNode startEnd
+    class Sync,WriteH,Survey,WriteC,Dash process
+    class Fork,Q1,Q2,Q3 decision
+    class Predict,BE,Save,Gem system
+    class Prompt1,Prompt2 prompt
+```
+
+**נקודות להדגשה ליד הדיאגרמה:**
+
+| נקודה | פירוט |
+|-------|--------|
+| Cross-trigger | שני מסכים; חיזוי רק כששני המקורות קיימים |
+| D / D-1 | שינה וסקר ב-D; עומס ותזונה ממודל ב-D-1 |
+| Confidence | מידע חסר מוריד `predictionConfidence` — לא חוסם את ה-API |
+| UC-02 | תזונה נשמרת בנפרד ואינה טריגר לחיזוי |
+
+---
+
+### 10.2 זרימת Activity — הצטרפות לקבוצה (UC-04 + UC-07)
+
+**כותרת מומלצת בספר:** Activity Diagram — Join Team Request & Coach Approval (UC-04 + UC-07)
+
+| מטא | ערך |
+|-----|-----|
+| **סוג דיאגרמה** | UML Activity Diagram + Swimlanes |
+| **כיוון** | מלמעלה למטה (TB) |
+| **מסלולים** | Athlete → Coach → Firestore batch |
+| **מקרא** | ירוק = התחלה/סיום · אפור = המתנה · כחול = פעולה · צהוב = החלטה · סגול = batch · אדום מקווקו = שגיאה/ריק |
+
+**טקסט מלווה (להדבקה):**
+
+ספורטאי מצטרף לקבוצה באמצעות **קוד קבוצה** (UC-04). הבקשה נשמרת ב-`teams/{teamId}/requests` במצב `pending`. המאמן רואה בקשות ממתינות (UC-07) ויכול לאשר או לדחות. באישור מתבצע **Firestore batch אטומי**: עדכון סטטוס ל-`approved`, הוספת ה-uid לרשימת `athletes`, ועדכון `teamId` בפרופיל הספורטאי. לאחר מכן המאמן יכול לעקוב אחרי ציון הסיכון בדשבורד הקבוצתי (UC-08).
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": true, "curve": "linear", "nodeSpacing": 35, "rankSpacing": 40}, "theme": "base"}}%%
+flowchart TB
+    Start((▶ START)) --> Enter[Athlete enters teamCode]
+
+    subgraph Athlete["Swimlane: Athlete  ·  UC-04"]
+        direction TB
+        Enter --> Query[Query Firestore:<br/>teams where teamCode == code]
+        Query --> Found{Team found?}
+        Found -->|NO →| Err[/Error: team not found/]
+        Err --> Enter
+        Found -->|YES →| Send[Create requests/{uid}<br/>status = pending]
+        Send --> Wait((⏸ Wait for coach))
+    end
+
+    Wait --> Open
+
+    subgraph Coach["Swimlane: Coach  ·  UC-07"]
+        direction TB
+        Open[Open CoachRequests] --> Load[Load pending requests]
+        Load --> Any{Any pending?}
+        Any -->|NO →| Empty[/Empty state/]
+        Empty --> EndIdle((⏹ END — nothing to do))
+        Any -->|YES →| Decide{Approve or reject?}
+        Decide -->|REJECT →| Rej[Set status = rejected]
+        Rej --> EndRej((⏹ END — rejected))
+        Decide -->|APPROVE →| Batch
+    end
+
+    subgraph Firestore["Swimlane: Firestore batch"]
+        direction TB
+        Batch[[Atomic batch]]
+        Batch --> A1[status = approved]
+        Batch --> A2[athletes arrayUnion uid]
+        Batch --> A3[users.teamId = teamId]
+        A1 --> Linked
+        A2 --> Linked
+        A3 --> Linked[Athlete linked to team]
+    end
+
+    Linked --> Dash[CoachDashboard reads<br/>daily_health per athlete]
+    Dash --> EndOk((⏹ END — on roster))
+
+    classDef startEnd fill:#1B5E20,stroke:#0D3B12,color:#fff,stroke-width:2px
+    classDef wait fill:#455A64,stroke:#263238,color:#fff,stroke-width:2px
+    classDef process fill:#E3F2FD,stroke:#1565C0,color:#0D47A1,stroke-width:1.5px
+    classDef decision fill:#FFF8E1,stroke:#F9A825,color:#E65100,stroke-width:2px
+    classDef system fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C,stroke-width:1.5px
+    classDef error fill:#FFEBEE,stroke:#C62828,color:#B71C1C,stroke-width:1.5px,stroke-dasharray: 5 3
+
+    class Start,EndIdle,EndRej,EndOk startEnd
+    class Wait wait
+    class Enter,Query,Send,Open,Load,Dash,A1,A2,A3,Linked,Rej process
+    class Found,Any,Decide decision
+    class Batch system
+    class Err,Empty error
+```
+
+**נקודות להדגשה ליד הדיאגרמה:**
+
+| נקודה | פירוט |
+|-------|--------|
+| שני שחקנים | ספורטאי שולח; מאמן מאשר/דוחה |
+| Source of Truth | Firestore בלבד — בלי Backend לזרימה זו |
+| אטומיות | אישור ב-batch כדי למנוע מצב חלקי |
+| המשך | אחרי אישור — ניטור סיכון ב-UC-08 |
+
+---
+
+## 11. לוח זמנים מומלץ לסגירה
 
 | יום | משימות | עדיפות |
 |-----|--------|--------|
 | **1** | השלמת סעיף המודל (§8), מחיקת placeholders, תיקון מספרי דאטה | P0 |
-| **2** | דיאגרמת Use Case + ארכיטקטורה + Sequence | P0–P1 |
+| **2** | דיאגרמת Use Case + ארכיטקטורה + Sequence + Activity (§10) | P0–P1 |
 | **3** | עדכון סכמת Firestore (§9), הרחבת NFR | P0–P1 |
 | **4** | 4–6 צילומי מסך + walkthrough הדגמה | P1 |
 | **5** | סקירת מוצרים + מתודולוגיה + חלוקת עבודה | P1 |
 | **6** | תקציר מורחב, סיכום משופר, עדכון תוכן עניינים | P2 |
-| **7** | קריאה סופית, צ'קליסט (§11), הדפסה/PDF | — |
+| **7** | קריאה סופית, צ'קליסט (§12), הדפסה/PDF | — |
 
 ---
 
-## 11. צ'קליסט סופי לפני הגשה
+## 12. צ'קליסט סופי לפני הגשה
 
 ### שלמות
 
@@ -446,6 +605,8 @@
 - [ ] דיאגרמת Use Case
 - [ ] דיאגרמת ארכיטקטורה
 - [ ] דיאגרמת Sequence (חיזוי יומי)
+- [ ] דיאגרמת Activity — חיזוי יומי (UC-01 + UC-05)
+- [ ] דיאגרמת Activity — הצטרפות לקבוצה (UC-04 + UC-07)
 - [ ] 4+ צילומי מסך
 - [ ] גרף Feature Importance או Risk Bins
 
@@ -469,7 +630,7 @@
 
 | מסמך | שימוש לספר הפרויקט |
 |------|---------------------|
-| [`docs/HLD_PROJECT.md`](HLD_PROJECT.md) | דיאגרמות Mermaid, ארכיטקטורה |
+| [`docs/HLD_PROJECT.md`](HLD_PROJECT.md) | דיאגרמות Mermaid, ארכיטקטורה, Activity flows |
 | [`docs/LLD_PROJECT.md`](LLD_PROJECT.md) | סכמות Firestore, API, Activities |
 | [`docs/NFR.md`](NFR.md) | הרחבת דרישות לא-פונקציונליות |
 | [`docs/LOGGING_HE.md`](LOGGING_HE.md) | פירוט איסוף לוגים |
