@@ -73,6 +73,7 @@ def _simulate_raw_rows(
     days_per_athlete: int,
     seed: int,
 ) -> list[dict]:
+    """Day-by-day synthetic trajectories: lifestyle signals → hazard logit → injury label."""
     rng = np.random.default_rng(seed)
     all_data: list[dict] = []
     print(
@@ -81,6 +82,7 @@ def _simulate_raw_rows(
     )
 
     for athlete_id in range(1, num_athletes + 1):
+        # Per-athlete stable traits (BMI, VO2, HRV baseline, etc.) sampled once.
         height = float(rng.normal(1.75, 0.10))
         weight = float(rng.normal(75, 10))
         bmi = round(weight / (height ** 2), 2)
@@ -311,6 +313,8 @@ def _simulate_raw_rows(
             speed_burst = max(0.0, max_speed - avg_speed * 1.3) / 5.0 if avg_speed > 1.0 else 0.0
             load_recovery_imbalance_day = acwr_ratio * sleep_debt_3d
 
+            # Injury hazard: logistic of load / sleep / HRV / demographics (positive = higher risk).
+            # Domains: ACWR excess, sleep debt, HRV drop, stress, and synergistic overload.
             hazard_logit = (
                 -4.25
                 + 3.75 * acwr_excess
@@ -341,6 +345,7 @@ def _simulate_raw_rows(
             injury_probability = _bounded(_sigmoid(hazard_logit), 0.004, 0.80)
             injury_today = int(rng.random() < injury_probability)
 
+            # Rare post-hoc flips: resilient athletes survive overload; tiny surprise injuries.
             if (
                 injury_today == 1
                 and acwr_ratio > 1.35

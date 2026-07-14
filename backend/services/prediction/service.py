@@ -123,6 +123,7 @@ def persist_prediction_result_or_raise(
     date_key: str,
     result: dict[str, Any],
 ) -> None:
+    """Write inference output to Firestore; fail the request if persistence returns false."""
     saved = save_daily_prediction_result(user_id, date_key, result)
     if not saved:
         raise DatabaseError("Prediction persist failed", code="prediction_persist_failed")

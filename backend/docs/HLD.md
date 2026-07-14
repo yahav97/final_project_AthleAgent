@@ -5,7 +5,7 @@
 | **Version** | 1.3 |
 | **Date** | 2026-07-11 |
 | **Audience** | Backend developers, DevOps, course evaluators |
-| **Related docs** | [FEATURES.md](FEATURES.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) · [docs/DOCKER.md](../../docs/DOCKER.md) · [../README.md](../README.md) |
+| **Related docs** | [FEATURES.md](FEATURES.md) · [docs/HLD_PROJECT.md](../../docs/HLD_PROJECT.md) · [docs/DOCKER.md](../../docs/DOCKER.md) · [root README](../../README.md) |
 
 ---
 
@@ -362,7 +362,7 @@ The Android emulator reaches the host API at `10.0.2.2:8000`.
 | Component | Location | Description |
 |-----------|----------|-------------|
 | **Unified log file** | `logs/athleagent.log` (repo root) | Backend HTTP + domain events + Android telemetry |
-| Logger | `utils/logging.py` | `RotatingFileHandler` (10 MB × 5), stdout mirror |
+| Logger | `utils/logging.py` | `TimedRotatingFileHandler` (7 days), stdout mirror |
 | Request context | `utils/request_context.py` | `contextvars`: `request_id`, `user_id` |
 | HTTP middleware | `middleware/request_logging.py` | Smart filtering, `X-Request-ID` echo, `duration_ms` |
 | Client events API | `POST /api/v1/observability/client-events` | Android errors + navigation + key actions |
@@ -378,8 +378,7 @@ The Android emulator reaches the host API at `10.0.2.2:8000`.
 | `LOG_DIR` | `<repo>/logs` | Unified log directory |
 | `LOG_FILE_NAME` | `athleagent.log` | Active log filename |
 | `LOG_LEVEL` | `INFO` | Python log level |
-| `LOG_MAX_BYTES` | `10000000` | Rotating file size |
-| `LOG_BACKUP_COUNT` | `5` | Rotated file retention |
+| `LOG_RETENTION_DAYS` | `7` | Daily rotation, keep 7 backups |
 | `CLIENT_EVENT_RATE_LIMIT_*_SEC` | 30/10/15/5 | screen / action / sync / ml_trigger |
 
 **Structured log metadata** — domain events attach fields via Python `extra`:
@@ -522,7 +521,7 @@ Predictions and daily snapshots = **state**. Unified log = **events** (no raw he
 
 | Document | Content |
 |----------|---------|
-| [../README.md](../README.md) | Run, config, API sketch, tests |
+| [../../README.md](../../README.md) | Run, config, API sketch, tests |
 | [FEATURES.md](FEATURES.md) | Production feature contract |
 | [RISK_SCORE.md](RISK_SCORE.md) | End-to-end risk pipeline |
 | [MODEL.md](MODEL.md) | ML ops configuration |

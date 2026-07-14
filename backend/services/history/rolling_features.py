@@ -62,6 +62,7 @@ def compute_historical_derived_features(
     if not rows:
         return None
 
+    # Align windows with ML_model/generation/postprocess.py (7d ACWR, 3d sleep debt).
     frame = pd.DataFrame(rows).sort_values("date_key")
     frame["acute_load_7d"] = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
     weekly_mean = frame["daily_distance_km"].rolling(7, min_periods=1).mean()

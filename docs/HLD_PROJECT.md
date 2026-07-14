@@ -501,7 +501,7 @@ final_project_AthleAgent/
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
 | [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
-| [backend/README.md](../backend/README.md) | Backend run, API, tests |
+| [README.md](../README.md) | Run locally / Docker, API, tests |
 | [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend architecture |
 | [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production data contract |
 | [NFR.md](NFR.md) | Non-functional requirements (metrics, gates, performance) |

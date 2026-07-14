@@ -35,11 +35,17 @@ backend/uploads/
 *.swp
 *.swo
 
+# Local scratch / caches (never ship)
+tmp_book_extract/
+.pytest_cache/
+**/pytest-cache-files-*/
+**/.artifacts/
+
 # OS
 .DS_Store
 Thumbs.db
 
 # ML synthetic outputs (regenerate: ML_model/run_pipeline.py or data_generator.py + create_benchmark_set.py)
 ML_model/athlete_injury_data.csv
-ML_model/benchmark_holdout.csv
+# benchmark_holdout.csv is intentionally tracked for offline validation without regenerating
 # Demo CSV for notebook (tracked): ML_model/fixtures/athlete_injury_demo.csv

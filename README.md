@@ -2,45 +2,40 @@
 
 **Shifting athlete care from reaction to prevention.**
 
-AthleAgent is an Android + FastAPI system that turns daily athlete data (check-ins, Health Connect metrics, meal photos) into a single **Injury Risk Score** (0–100%) for athletes and coaches.
+Android + FastAPI system that turns daily athlete signals — check-ins, Health Connect metrics, meal photos — into a single **Injury Risk Score (0–100%)** for athletes and coaches.
 
 | Layer | Stack |
 |-------|--------|
-| Android | Kotlin, Activities, View Binding, Retrofit, Firebase Auth, Firestore, Health Connect, Gemini Vision |
-| Backend | Python 3.11+, FastAPI, Uvicorn, firebase-admin |
-| Data store | **Cloud Firestore** (no local SQL database) |
-| ML | XGBoost + scikit-learn (promoted model included under `ML_model/artifacts/`) |
+| **Android** | Kotlin, Activities, View Binding, Retrofit, Firebase Auth, Firestore, Health Connect, Gemini Vision |
+| **Backend** | Python 3.11+, FastAPI, Uvicorn, firebase-admin |
+| **Data** | Cloud Firestore (no local SQL) |
+| **ML** | XGBoost + scikit-learn — promoted model under `ML_model/artifacts/` |
 
 ---
 
-## Quick start for evaluators
+## Quick start (evaluators)
 
-No `.env` file is required. Defaults in `backend/config.py` are enough to run.
+No `.env` file is required. Defaults in `backend/config.py` are enough.
 
-Firestore connection needs a local Firebase Admin key (not committed to GitHub):
+| Credential | Role | In repo? |
+|------------|------|----------|
+| `backend/firebase-key.json` | Backend ↔ Firestore | **No** — place locally (course hand-off) |
+| `android_app/.../google-services.json` | Android ↔ Firebase | **Yes** |
+| `GEMINI_API_KEY` in `local.properties` | Meal photo analysis only | Optional |
 
-| File | Role | Included in this repo? |
-|------|------|------------------------|
-| `backend/firebase-key.json` | Backend → Firestore (read/write predictions) | **No** — place locally (see teammates / course hand-off) |
-| `android_app/AthleAgent/app/google-services.json` | Android → Firebase Auth + Firestore | **Yes** |
-| `.env` | Optional overrides only | **Not needed** |
-| `GEMINI_API_KEY` in `local.properties` | Meal photo analysis only | Optional (see below) |
+### 1 — Start the backend
 
-### Step 1 — Start the backend
+From the **repository root** (folder with `docker-compose.yml`).
 
-From the **repository root** (folder that contains `docker-compose.yml`).
-
-**Option A — Docker (recommended)**
-
-1. Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-2. Confirm the engine is up (`docker version` must show **Client** and **Server**).
-3. Run:
+**Docker (recommended)**
 
 ```powershell
 docker compose up --build
 ```
 
-**Option B — Local Python 3.11+**
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) running (`docker version` must show **Server**).
+
+**Local Python 3.11+**
 
 ```powershell
 python -m venv .venv
@@ -50,34 +45,63 @@ cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-(macOS/Linux: `source .venv/bin/activate` instead of the PowerShell activate line.)
+(macOS/Linux: `source .venv/bin/activate`)
 
-### Step 2 — Verify backend + Firestore
+### 2 — Verify
 
 | Check | URL | Expected |
 |-------|-----|----------|
 | Health | http://localhost:8000/health | HTTP 200 |
 | ML model | http://localhost:8000/status/ml | `"status": "Live"` |
+| API docs | http://localhost:8000/docs | Swagger UI |
 
-If ML is `"Live"`, the promoted model loaded. Firestore uses `backend/firebase-key.json` automatically (no `.env`).
+Firestore uses `backend/firebase-key.json` automatically when present.
 
-### Step 3 — Run the Android app
+### 3 — Run the Android app
 
-1. Open `android_app/AthleAgent` in **Android Studio**.
-2. Let Gradle sync (creates `local.properties` with `sdk.dir` on your machine).
-3. Run on an **emulator** (default API base URL `http://10.0.2.2:8000/` already points at the host backend).
-4. Register / sign in with Firebase Auth, then use athlete or coach flows.
+1. Open `android_app/AthleAgent` in **Android Studio** (JDK 17).
+2. Sync Gradle, run on an **emulator** (API 26+).
+3. Emulator API base URL is already `http://10.0.2.2:8000/` in `ApiClient.kt`.
+4. Register / sign in → athlete or coach flows.
 
-**Optional — meal photo analysis:** copy `local.properties.example` → `local.properties` (keep the `sdk.dir` Android Studio created) and set `GEMINI_API_KEY`. Free key: [Google AI Studio](https://aistudio.google.com/apikey). Injury risk scoring works **without** Gemini.
+**Optional — meal photos:** copy `local.properties.example` → `local.properties` (keep `sdk.dir`) and set `GEMINI_API_KEY`. Injury risk works **without** Gemini.
 
-**Physical device:** change `BASE_URL` in `ApiClient.kt` to your PC’s LAN IP (e.g. `http://192.168.x.x:8000/`).
+**Physical device:** set `BASE_URL` in `ApiClient.kt` to your PC LAN IP (e.g. `http://192.168.x.x:8000/`).
 
-### Step 4 — Demo flow
+### 4 — Demo flow
 
-1. Backend running, `/status/ml` → `"Live"`.
+1. Backend up, `/status/ml` → `"Live"`.
 2. Sign in on the app.
-3. **Athlete:** wearable sync / daily check-in → trigger prediction → read risk from Firestore.
+3. **Athlete:** watch sync + daily check-in → prediction runs → read risk from Firestore.
 4. **Coach:** team dashboard with athlete risk scores.
+
+---
+
+## How it works
+
+```
+Android (Auth + Health Connect + check-in)
+        │  POST /predict/daily  { userId, date }
+        ▼
+FastAPI  → load Firestore day/history → features → XGBoost
+        │  write finalRiskScore, riskLevel, predictionConfidence
+        ▼
+Firestore daily_health/{date}  ←  Android UI reads score from here
+```
+
+- **Risk bands** (must match Android): Low &lt; 20%, Medium 20–70%, High ≥ 70% of probability × 100.
+- **ML live gate:** Recall@Threshold ≥ 0.80 and ROC-AUC ≥ 0.68, or `/status/ml` is `Blocked` and predict returns **503**.
+- **Confidence (0–100):** blend of history window quality (~60%) and same-day input completeness (~40%).
+
+### Main API
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /predict/daily` | Production inference (`userId` + `date`) |
+| `GET /status/ml` | `Live` / `Blocked`, winner, gates |
+| `GET /health` | Liveness |
+
+The app **triggers** inference over HTTP, then displays **`finalRiskScore`** from Firestore — not the raw HTTP body.
 
 ---
 
@@ -85,77 +109,70 @@ If ML is `"Live"`, the promoted model loaded. Firestore uses `backend/firebase-k
 
 ```
 AthleAgent/
-├── android_app/AthleAgent/   # Android application
-├── backend/                  # FastAPI inference API + firebase-key.json
-├── ML_model/                 # Training pipeline + promoted artifacts
-├── docs/                     # Design and ops documentation
+├── android_app/AthleAgent/    # Android client
+├── backend/                   # FastAPI serving + tests
+├── ML_model/                  # Training + promoted artifacts
+├── docs/                      # Design docs (optional deep dive)
 ├── docker-compose.yml
-└── README.md
+└── README.md                  # ← you are here
 ```
 
 ---
 
-## Prerequisites
+## Configuration
 
-| Component | Requirement |
-|-----------|-------------|
-| **Android** | [Android Studio](https://developer.android.com/studio) (recent stable), JDK 17 |
-| **Device** | Emulator or physical device (API 26+). Health Connect works best on a real device. |
-| **Backend** | [Docker Desktop](https://www.docker.com/products/docker-desktop/) **or** Python **3.11+** |
+- **No `.env` required.** Override only if needed: copy `backend/.env.example` → `backend/.env`.
+- Tunables live in `backend/config.py` (risk bands, history window, confidence weights, logging).
+- Promoted model pointer: `ML_model/artifacts/promoted.json` (no retrain needed to demo).
 
----
-
-## Configuration notes
-
-- **No `.env` required.** Copy `backend/.env.example` → `backend/.env` only if you want to override defaults (ports, risk thresholds, etc.).
-- **Firestore** is the database. Credentials are in `backend/firebase-key.json` and `app/google-services.json`.
-- **Promoted ML model** is already under `ML_model/artifacts/` — no retraining needed to run.
-
-Full Docker notes: [`docs/DOCKER.md`](docs/DOCKER.md) · Backend details: [`backend/README.md`](backend/README.md)
+Pinned ML runtime deps (also in `backend/requirements.txt`): `joblib`, `scikit-learn`, `xgboost`.
 
 ---
 
-## Optional — retrain the ML model
+## Optional — retrain ML
 
 ```bash
 pip install -r backend/requirements.txt
 python ML_model/run_pipeline.py
 ```
 
-Restart the backend afterward. See [`ML_model/README.md`](ML_model/README.md).
+Then **restart** the backend so it reloads `promoted.json`.
+
+Pipeline in short: athlete CV → fixed holdout compare (5 candidates) → pick winner by operating-point tiers → refit on full data → `validate_metrics.py` → promote. Demo notebook: `ML_model/notebooks/model_improvement_journey.ipynb`.
 
 ---
 
-## Backend tests (optional)
+## Tests
 
 ```bash
 cd backend
 python -m pytest tests/ -v
+# unit only:   python -m pytest tests/unit/ -v -m unit
+# integration: python -m pytest tests/ -v -m integration
 ```
 
----
-
-## ZIP / submission contents
-
-Include source, docs, promoted ML artifacts, and evaluation credentials:
-
-- Include: `app/google-services.json`, `ML_model/artifacts/`
-- Provide separately: `backend/firebase-key.json` (Firebase Admin SDK; do not commit)
-- Exclude: `**/build/`, `.gradle/`, `.idea/`, `__pycache__/`, `.venv/`, `logs/`, personal `.env`, personal `local.properties`
+CI: `.github/workflows/backend-tests.yml` on changes under `backend/` or promoted artifacts.
 
 ---
 
-## Documentation index
+## Submission / ZIP
 
-| Document | Content |
-|----------|---------|
-| [`docs/HLD_PROJECT.md`](docs/HLD_PROJECT.md) | High-level design |
-| [`docs/LLD_PROJECT.md`](docs/LLD_PROJECT.md) | Low-level design |
-| [`docs/DOCKER.md`](docs/DOCKER.md) | Docker setup |
+**Include:** source, `docs/`, `ML_model/artifacts/`, `google-services.json`  
+**Provide separately:** `backend/firebase-key.json` (never commit / never zip for public hand-in)  
+**Exclude:** `**/build/`, `.gradle/`, `.idea/`, `__pycache__/`, `.venv/`, `logs/`, personal `.env`, personal `local.properties`, large regenerated CSVs (`athlete_injury_data.csv`)
+
+---
+
+## Further reading (optional)
+
+| Doc | When you need it |
+|-----|------------------|
+| [`docs/DOCKER.md`](docs/DOCKER.md) | Docker troubleshooting |
+| [`docs/HLD_PROJECT.md`](docs/HLD_PROJECT.md) | System architecture |
+| [`docs/LLD_PROJECT.md`](docs/LLD_PROJECT.md) | Module-level design |
 | [`docs/NFR.md`](docs/NFR.md) | Non-functional requirements |
-| [`backend/README.md`](backend/README.md) | Backend API, config, tests |
-| [`backend/docs/RISK_SCORE.md`](backend/docs/RISK_SCORE.md) | Risk score pipeline |
-| [`ML_model/README.md`](ML_model/README.md) | Training pipeline and artifacts |
+| [`ML_model/docs/MODEL_SELECTION.md`](ML_model/docs/MODEL_SELECTION.md) | Full selection protocol |
+| [`backend/docs/FEATURES.md`](backend/docs/FEATURES.md) | Feature / Firestore contract |
 
 ---
 

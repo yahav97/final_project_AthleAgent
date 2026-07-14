@@ -65,6 +65,7 @@ def _unwrap_sklearn_estimator(model: object) -> object:
 
 
 def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add 7-day moving averages of ACWR and sleep (used at serve for history enrichment)."""
     out = df.sort_values(["athlete_id", "date"]).copy()
     grouped = out.groupby("athlete_id", group_keys=False)
     out["acwr_ratio_ma7"] = grouped["acwr_ratio"].transform(
@@ -123,6 +124,7 @@ def prepare_model_frames(
     apply_serve_parity: bool = True,
     serve_parity_seed: int = RANDOM_STATE,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, list[str], dict[str, object]]:
+    """Label vector + feature matrix after sequential features and train–serve parity masking."""
     if LABEL_COLUMN not in df.columns:
         raise ValueError(f"Dataset must include '{LABEL_COLUMN}' column.")
     df = add_sequential_features(df)
@@ -146,6 +148,7 @@ def make_train_split(
     apply_serve_parity: bool = True,
     serve_parity_seed: int = RANDOM_STATE,
 ) -> TrainSplit:
+    """Athlete-level holdout split (prefer fixed benchmark CSV athletes when provided)."""
     df, y, model_df, feature_columns, parity_stats = prepare_model_frames(
         df,
         apply_serve_parity=apply_serve_parity,
@@ -286,6 +289,7 @@ def train_and_compare(
     cv_result: AthleteCvResult | None = None,
     verbose: bool = True,
 ) -> TrainResult:
+    """Train each catalog model, sweep thresholds, attach operating points + optional CV."""
     catalog = model_catalog()
     if model_names is not None:
         missing = [name for name in model_names if name not in catalog]
@@ -401,6 +405,7 @@ def save_training_artifacts(
     cv_agreement: dict[str, str | bool] | None = None,
     serve_parity_stats: dict[str, object] | None = None,
 ) -> Path:
+    """Write CSV metrics, run_manifest.json, and injury_model.pkl for this training run."""
     artifacts_dir = Path(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     run_id = artifacts_dir.name

@@ -98,8 +98,7 @@ class Settings(BaseSettings):
     LOG_TO_FILE: bool = True
     LOG_FILE_NAME: str = "athleagent.log"
     LOG_LEVEL: str = "INFO"
-    LOG_MAX_BYTES: int = 10_000_000
-    LOG_BACKUP_COUNT: int = 5
+    LOG_RETENTION_DAYS: int = 7
 
     # Client telemetry rate limits (seconds between duplicate events)
     CLIENT_EVENT_RATE_LIMIT_SCREEN_SEC: int = 30

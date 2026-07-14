@@ -57,7 +57,7 @@ On the app side:
 
 ## Local development (without Docker)
 
-Still supported — see [backend/README.md](../backend/README.md):
+Still supported — see the root [README.md](../README.md) (local Python section):
 
 ```bash
 pip install -r backend/requirements.txt
@@ -95,8 +95,7 @@ volumes:
 
 | Document | Content |
 |----------|---------|
-| [README.md](../README.md) | Project overview + getting started |
-| [backend/README.md](../backend/README.md) | API, tests, local Python run |
+| [README.md](../README.md) | Project overview, run, API, tests |
 | [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates, promotion, restart after retrain |
 | [docs/HLD_PROJECT.md](HLD_PROJECT.md) | Full project HLD |
 | [docs/LLD_PROJECT.md](LLD_PROJECT.md) | Full project LLD |

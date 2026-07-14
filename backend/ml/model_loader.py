@@ -45,10 +45,8 @@ def _resolve_under_project_root(path: PathLike) -> Path:
 
 
 def _manifest_path_from_model_path(model_path: Path) -> Path:
-    """Return manifest path candidate relative to model path/project layout."""
-    model_dir_manifest = model_path.parent / "run_manifest.json"
-    default_manifest = _project_root() / "ML_model" / "run_manifest.json"
-    return model_dir_manifest if model_dir_manifest.is_file() else default_manifest
+    """Return sibling run_manifest.json next to the model artifact."""
+    return model_path.parent / "run_manifest.json"
 
 
 def _read_promoted_metadata() -> dict[str, Any]:

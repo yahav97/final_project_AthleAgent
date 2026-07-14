@@ -21,7 +21,16 @@ MODEL_CANDIDATE_NAMES: tuple[str, ...] = (
 
 
 def model_catalog() -> dict[str, Pipeline | RandomForestClassifier | CalibratedClassifierCV | XGBClassifier]:
-    """Return the fixed candidate set used by training, notebook, and pipeline."""
+    """
+    Fixed candidate set for training / notebook comparison.
+
+    Design notes (class imbalance ~ few % injury days):
+    - LogisticRegression: scaled, class_weight=balanced — linear baseline.
+    - RandomForest / GradientBoosting: non-linear baselines with depth caps.
+    - XGBoostCalibratedTuned: primary production candidate — moderate depth,
+      scale_pos_weight ~2.5–2.6, Platt calibration for better probability bins.
+    - XGBoostDeep: richer trees for comparison; usually loses on FPR/gates.
+    """
     all_candidates: dict[str, Pipeline | RandomForestClassifier | CalibratedClassifierCV | XGBClassifier] = {
         "LogisticRegression": Pipeline(
             steps=[

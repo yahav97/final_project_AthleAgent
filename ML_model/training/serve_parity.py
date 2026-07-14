@@ -59,7 +59,12 @@ def build_cold_start_mask(
     target_fraction: float,
     seed: int,
 ) -> pd.Series:
-    """Mark rows that simulate cold-start / thin-history serving."""
+    """
+    Mark rows that mimic thin history at serve time.
+
+    Always flags the first ``first_n_days`` per athlete, then samples more days
+    until roughly ``target_fraction`` of rows (default ~15–20%) are cold-start.
+    """
     cold_start = pd.Series(False, index=df.index)
     rng = np.random.default_rng(seed)
 
@@ -101,7 +106,10 @@ def apply_train_serve_parity_augmentation(
     seed: int = 42,
     enabled: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Apply serve-time feature masking on a post-``add_sequential_features`` frame."""
+    """
+    Mirror backend defaults: replace rolling features on cold-start rows and
+    occasionally impute nutrition columns (meals often missing in the app).
+    """
     if not enabled or df.empty:
         return df, {"enabled": False, "rows": len(df)}
 

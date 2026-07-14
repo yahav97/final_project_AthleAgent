@@ -24,6 +24,7 @@ ModelFeatureValues = dict[str, float]
 
 
 def sleep_hours_from_minutes(sleep_minutes: object | None) -> float:
+    """Convert Wearable/Firestore sleep minutes to model ``sleep_hours``."""
     if sleep_minutes is None:
         return 0.0
     return safe_float(sleep_minutes) / 60.0
@@ -34,6 +35,7 @@ def total_calories_burned(
     health_total_calories: float,
     bmr_calories: float,
 ) -> float:
+    """Prefer Health Connect total; else BMR + active (same priority as training)."""
     if health_total_calories > 0:
         return health_total_calories
     if bmr_calories > 0 or active_calories > 0:
@@ -68,6 +70,7 @@ def estimate_avg_cadence(
     daily_distance_km: float,
     workout_minutes: float,
 ) -> float:
+    """Use sensor cadence when present; otherwise steps per workout-minute proxy."""
     if sensor_cadence > 0:
         return sensor_cadence
     if steps > 0 and daily_distance_km > 0:
@@ -81,6 +84,7 @@ def estimate_speed_kmh(
     daily_distance_km: float,
     workout_minutes: float,
 ) -> tuple[float, float]:
+    """Return (avg_speed, max_speed); max falls back to ~1.3× avg when missing."""
     if sensor_avg_speed > 0:
         avg_speed = sensor_avg_speed
     elif daily_distance_km > 0 and workout_minutes > 0:
@@ -92,6 +96,7 @@ def estimate_speed_kmh(
 
 
 def bmi_from_body_metrics(weight_kg: float, height_cm: float) -> float:
+    """BMI from kg/cm; population default when profile metrics are incomplete."""
     if weight_kg > 0 and height_cm > 0:
         height_m = height_cm / 100.0
         return weight_kg / (height_m**2)
@@ -99,6 +104,7 @@ def bmi_from_body_metrics(weight_kg: float, height_cm: float) -> float:
 
 
 def history_injury_count_from_payload(raw: object | None) -> float:
+    """Career injury count from Firestore; invalid values become 0."""
     if raw is None:
         return 0.0
     try:

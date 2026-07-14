@@ -18,6 +18,7 @@ OPERATING_TIER_LABELS: dict[int, str] = {
 
 
 def evaluate_with_threshold(y_true: pd.Series, y_proba: np.ndarray, threshold: float) -> dict[str, float]:
+    """Binary metrics at a chosen probability cut (Recall/Precision/F1/FPR)."""
     y_pred = (y_proba >= threshold).astype(int)
     negatives = int((y_true == 0).sum())
     false_positives = int(((y_pred == 1) & (y_true == 0)).sum())
@@ -108,6 +109,14 @@ def _best_operating_row_for_model(
     threshold_rows: list[dict[str, float | str]],
     model_name: str,
 ) -> tuple[pd.Series, int] | None:
+    """
+    Tier cascade for one model (lower tier wins in ``pick_best_model``):
+
+    0 — all gates (Recall, FPR, Precision, F1)
+    1 — Recall + FPR only
+    2 — Recall floor only
+    3 — best remaining row (no recall floor)
+    """
     df = pd.DataFrame(threshold_rows)
     policy = get_policy()
     model_df = df[df["Model"] == model_name].copy()

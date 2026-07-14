@@ -76,6 +76,7 @@ def apply_history_confidence_fallback(
 
 
 def history_score_from_confidence(confidence: HistoryConfidence | str) -> float:
+    """Map high/medium/low history bands to the numeric weights in ``settings``."""
     level = parse_history_confidence(confidence)
     if level == HistoryConfidence.HIGH:
         return settings.CONFIDENCE_SCORE_HIGH

@@ -1102,7 +1102,7 @@ risk_score = 0.2341
 | [`FEATURES.md`](FEATURES.md) | חוזה Firestore מלא, Health Connect, שדות |
 | [`MODEL.md`](MODEL.md) | קונפיג מודל, gate, סף אימון (manifest) |
 | [`HLD.md`](HLD.md) | ארכיטקטורת בקאנד וזרימת prediction |
-| [`../README.md`](../README.md) | הרצה, config, API, טסטים |
+| [`../../README.md`](../../README.md) | Run, config, API, tests |
 | [`ML_model/notebooks/model_improvement_journey.ipynb`](../../ML_model/notebooks/model_improvement_journey.ipynb) | מסע שיפור המודל, גרפים, השוואות |
 | `backend/data/model_feature_contract.json` | 35 פיצ'רים + `integer_feature_columns` + defaults |
 | `backend/services/model_features.py` | Loader — `MODEL_FEATURE_COLUMNS`, `INTEGER_FEATURE_COLUMNS`, `coerce_whole_number_features()` |

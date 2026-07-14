@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from config import settings
@@ -49,10 +49,11 @@ def setup_logging(
 
     if write_to_file:
         resolved_dir.mkdir(parents=True, exist_ok=True)
-        file_handler = RotatingFileHandler(
+        file_handler = TimedRotatingFileHandler(
             resolved_dir / settings.LOG_FILE_NAME,
-            maxBytes=settings.LOG_MAX_BYTES,
-            backupCount=settings.LOG_BACKUP_COUNT,
+            when="midnight",
+            interval=1,
+            backupCount=settings.LOG_RETENTION_DAYS,
             encoding="utf-8",
         )
         file_handler.setFormatter(formatter)
