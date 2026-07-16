@@ -78,6 +78,3 @@ MODEL_FEATURE_COLUMNS: list[str] = list(feature_column_names_from_contract())
 DEFAULT_FEATURE_VALUES: dict[str, float] = default_feature_values_from_contract()
 TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = training_csv_exclude_columns_from_contract()
 INTEGER_FEATURE_COLUMNS: tuple[str, ...] = integer_feature_columns_from_contract()
-TRAINING_BASE_FEATURE_COLUMNS: tuple[str, ...] = tuple(
-    column for column in MODEL_FEATURE_COLUMNS if column not in TRAINING_CSV_EXCLUDE_COLUMNS
-)

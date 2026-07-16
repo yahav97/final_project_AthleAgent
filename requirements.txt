@@ -1,3 +1,4 @@
-# Root entry point — backend dependencies live in backend/requirements.txt
-# Docker: same file is used in Dockerfile build — see docs/DOCKER.md
+# Root alias for local install: pip install -r requirements.txt
+# Canonical dependency list: backend/requirements.txt
+# Docker / CI install from backend/requirements.txt directly — see docs/DOCKER.md
 -r backend/requirements.txt

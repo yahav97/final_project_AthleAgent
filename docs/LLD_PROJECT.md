@@ -6,7 +6,7 @@
 | **Version** | 1.1 |
 | **Date** | 2026-07-11 |
 | **Audience** | Developers |
-| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) |
+| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -22,8 +22,7 @@ final_project_AthleAgent/
 │   ├── model/                          # DTOs
 │   │   ├── AthleteItem.kt
 │   │   ├── AthleteRequest.kt
-│   │   ├── AlertItem.kt
-│   │   └── PredictionModels.kt         # Legacy mock DTO (/test_predict) — not used in production
+│   │   └── AlertItem.kt
 │   ├── network/
 │   │   ├── ApiClient.kt                # Retrofit singleton, base URL
 │   │   └── ApiService.kt               # POST /predict/daily
@@ -43,15 +42,16 @@ final_project_AthleAgent/
 ├── backend/
 │   ├── main.py                         # FastAPI entry
 │   ├── config.py                       # Settings
-│   ├── api/routes/                     # health.py, predict.py
+│   ├── api/routes/                     # health.py, predict.py, observability.py
 │   ├── services/                       # prediction, history, preprocessing...
 │   ├── schemas/inference.py            # Pydantic contracts
 │   ├── ml/model_loader.py              # joblib + gates
-│   └── external/google_auth.py         # (not wired to routes)
 │
 └── ML_model/
     ├── generation/                 # simulator, config, postprocess
     ├── training/                   # pipeline, policy, models
+    ├── data/                       # demo CSV + fixed holdout
+    ├── notebooks/                  # presentation notebook + its requirements
     ├── data_generator.py           # CLI → generation/
     ├── train_model.py              # CLI → training/
     ├── validate_metrics.py
@@ -119,7 +119,6 @@ data class PredictionResponse(
 )
 ```
 
-> **`PredictionModels.kt`** — Legacy DTO for `/test_predict` (mock); not used in production.  
 > **Risk score display:** Always from `daily_health/{date}.finalRiskScore` (0–100) in Firestore, not from the POST response body.
 
 ### 2.4 Prediction Trigger — Cross-Trigger
@@ -237,7 +236,6 @@ flowchart TD
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
 | POST | `/api/v1/observability/client-events` | `observability.py` | 202 Accepted |
-| POST | `/test_predict` | `predict.py` | mock (behind `ENABLE_TEST_PREDICT_ENDPOINT`) |
 
 ### 3.2 Prediction Pipeline (Backend)
 
@@ -439,8 +437,7 @@ No `.env` file is required. Defaults are defined in `backend/config.py` (pydanti
 | Variable | Default |
 |----------|---------|
 | `MODEL_PATH` | `None` → resolves via `ML_model/artifacts/promoted.json`, then `backend/injury_model.pkl` |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` (bundled; auto-resolved when present) |
-| `ENABLE_TEST_PREDICT_ENDPOINT` | `false` |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` (local only; auto-resolved when present) |
 | `CORS_ORIGINS` | localhost ports |
 
 ### 7.3 Emulator Networking
@@ -508,8 +505,4 @@ cd backend && python -m pytest tests/ -v
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
 | [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
-| [backend/README.md](../backend/README.md) | Backend run, API, tests |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend architecture |
-| [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production feature contract |
-| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates and promotion |
-| [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | Risk-score pipeline |
+| [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

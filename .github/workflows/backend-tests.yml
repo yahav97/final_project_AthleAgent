@@ -35,6 +35,4 @@ jobs:
 
       - name: Run pytest
         working-directory: backend
-        env:
-          ATHLEAGENT_DISABLE_FILE_LOGGING: "1"
         run: python -m pytest tests/ -v --tb=short

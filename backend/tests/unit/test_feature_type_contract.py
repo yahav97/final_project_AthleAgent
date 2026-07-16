@@ -21,7 +21,7 @@ from services.preprocessing import injury_request_to_model_dataframe
 pytestmark = pytest.mark.unit
 
 _FIXTURE_CSV = (
-    Path(__file__).resolve().parents[3] / "ML_model" / "fixtures" / "athlete_injury_demo.csv"
+    Path(__file__).resolve().parents[3] / "ML_model" / "data" / "athlete_injury_demo.csv"
 )
 
 

@@ -24,7 +24,7 @@ from sklearn.pipeline import Pipeline
 from policy_config import get_policy, policy_as_dict
 from training.constants import (
     ATHLETE_CV_SPLITS,
-    BENCHMARK_FILENAME,
+    BENCHMARK_RELPATH,
     DATASET_FILENAME,
     LABEL_COLUMN,
     RANDOM_STATE,
@@ -500,7 +500,7 @@ def run_training_pipeline(
     ml_dir = Path(ml_dir or Path(__file__).resolve().parent.parent)
     project_root = ml_dir.parent
     dataset_path = ml_dir / DATASET_FILENAME
-    benchmark_path = ml_dir / BENCHMARK_FILENAME
+    benchmark_path = ml_dir / BENCHMARK_RELPATH
     if not dataset_path.is_file():
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")
     benchmark_file = benchmark_path if benchmark_path.is_file() else None

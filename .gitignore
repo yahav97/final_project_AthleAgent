@@ -2,8 +2,6 @@
 backend/venv/
 __pycache__/
 *.pyc
-#*.pkl
-#backend/*.pkl
 
 # Environment variables (optional overrides — not required to run)
 .env
@@ -42,5 +40,4 @@ Thumbs.db
 
 # ML synthetic outputs (regenerate: ML_model/run_pipeline.py or data_generator.py + create_benchmark_set.py)
 ML_model/athlete_injury_data.csv
-# benchmark_holdout.csv is intentionally tracked for offline validation without regenerating
-# Demo CSV for notebook (tracked): ML_model/fixtures/athlete_injury_demo.csv
+# Holdout + notebook demo CSVs under ML_model/data/ are intentionally tracked

@@ -46,7 +46,7 @@ On a physical device, point `BASE_URL` in `ApiClient.kt` at your PC’s LAN IP.
 android_app/AthleAgent/   Android client
 backend/                  FastAPI + tests
 ML_model/                 Training + promoted artifacts
-docs/                     Extra documentation
+docs/                     HLD / LLD / Docker / ML selection
 ```
 
 ## Extra

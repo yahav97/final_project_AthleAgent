@@ -96,7 +96,6 @@ volumes:
 | Document | Content |
 |----------|---------|
 | [README.md](../README.md) | Project overview, run, API, tests |
-| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | ML gates, promotion, restart after retrain |
 | [docs/HLD_PROJECT.md](HLD_PROJECT.md) | Full project HLD |
 | [docs/LLD_PROJECT.md](LLD_PROJECT.md) | Full project LLD |
-| [docs/NFR.md](NFR.md) | NFR-MAINT-03 — modular deployment |
+| [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

@@ -32,15 +32,11 @@ def acwr_ratio_bounded(acute_load_7d: float, baseline: float) -> float:
 
 
 def _active_calories_from_row(row: Mapping[str, Any]) -> float:
-    return float(
-        row.get("active_calories_burned")
-        or row.get("_active_calories")  # legacy test key
-        or 0.0
-    )
+    return float(row.get("active_calories_burned") or 0.0)
 
 
 def _bmr_calories_from_row(row: Mapping[str, Any]) -> float:
-    return float(row.get("bmr_calories") or row.get("_bmr_calories") or 0.0)
+    return float(row.get("bmr_calories") or 0.0)
 
 
 def compute_derived_features(row: Mapping[str, Any]) -> DerivedFeatures:

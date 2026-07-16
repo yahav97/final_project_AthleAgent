@@ -1,7 +1,7 @@
 # Model selection protocol
 
 Single source of truth for how AthleAgent picks and ships an injury model.  
-**Code:** `train_model.py` · **Demo:** `notebooks/model_improvement_journey.ipynb` · **Ops:** `backend/docs/MODEL.md`
+**Code:** `ML_model/train_model.py` · **Demo:** `ML_model/notebooks/model_improvement_journey.ipynb` · **Gates:** `backend/config.py` / `ML_model/policy_config.py`
 
 ## Pipeline (production = notebook = `run_pipeline.py`)
 
@@ -9,7 +9,7 @@ Single source of truth for how AthleAgent picks and ships an injury model.
 flowchart TD
     A[Load dataset] --> B["Athlete CV ×2<br/>seeds 42, 43"]
     B --> C[athlete_cv_summary.csv]
-    A --> D["Fixed holdout<br/>benchmark_holdout.csv"]
+    A --> D["Fixed holdout<br/>data/benchmark_holdout.csv"]
     D --> E["Train 5 candidates<br/>on train athletes"]
     E --> F[Threshold sweep + tiered policy]
     F --> G[pick_best_model]
@@ -55,7 +55,7 @@ Edit the tuple in `train_model.py` to change candidates project-wide.
 
 - Holdout is **by `athlete_id`** — all days of an athlete stay in train **or** holdout.
 - Rolling features (`acwr_ratio_ma7`, `sleep_hours_ma7`) are computed per athlete before split.
-- Production holdout is **fixed** in `benchmark_holdout.csv` (seed 42 at creation).
+- Production holdout is **fixed** in `ML_model/data/benchmark_holdout.csv` (seed 42 at creation).
 - Notebook demo uses the same functions; holdout seed 42 on the demo subset instead of the benchmark file.
 
 ## Policy selection (`pick_best_model`)
@@ -124,4 +124,4 @@ ML_model/artifacts/<run_id>/
 python ML_model/run_pipeline.py
 ```
 
-Fixed inputs: `athlete_injury_data.csv` (from `data_generator.py`) and `benchmark_holdout.csv` (from `create_benchmark_set.py`).
+Fixed inputs: `athlete_injury_data.csv` (from `data_generator.py`) and `data/benchmark_holdout.csv` (from `create_benchmark_set.py`).

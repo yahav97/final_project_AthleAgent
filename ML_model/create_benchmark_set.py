@@ -12,7 +12,7 @@ if _ml_dir not in sys.path:
     sys.path.insert(0, _ml_dir)
 
 from training.constants import (  # noqa: E402
-    BENCHMARK_FILENAME,
+    BENCHMARK_RELPATH,
     DATASET_FILENAME,
     RANDOM_STATE,
 )
@@ -23,7 +23,8 @@ HOLDOUT_RATIO = 0.2
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     dataset_path = script_dir / DATASET_FILENAME
-    benchmark_path = script_dir / BENCHMARK_FILENAME
+    benchmark_path = script_dir / BENCHMARK_RELPATH
+    benchmark_path.parent.mkdir(parents=True, exist_ok=True)
 
     if benchmark_path.exists():
         print(f"Benchmark already exists: {benchmark_path}")

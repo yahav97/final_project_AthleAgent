@@ -7,7 +7,7 @@
 | **Date** | 2026-07-11 |
 | **Authors** | Yahav Simon, Tzuf Feldon |
 | **Audience** | Developers, course evaluators, technical stakeholders |
-| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [NFR.md](NFR.md) |
+| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -33,8 +33,6 @@ The system serves two user roles:
 | Continuous improvement | `run_pipeline.py` — retrain on synthetic data + promote |
 
 ### 2.2 Non-Functional Requirements
-
-> **Full specification (metrics, targets, evidence):** [NFR.md](NFR.md)
 
 | Requirement | Current Implementation |
 |-------------|------------------------|
@@ -360,7 +358,7 @@ erDiagram
     }
 ```
 
-> Field-level detail: [backend/docs/FEATURES.md](../backend/docs/FEATURES.md)
+> Field-level contract: `backend/data/model_feature_contract.json`
 
 ---
 
@@ -388,11 +386,11 @@ erDiagram
 
 **No `.env` file is required to run the backend.** Sensible defaults are defined in `backend/config.py`; optional overrides are documented in `backend/.env.example`.
 
-For course evaluation, the repository includes:
-- `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore)
-- `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (Android app)
+For course evaluation, place credentials locally (do **not** commit or zip the Admin key):
+- `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore); provide separately to evaluators
+- `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (already in the repo)
 
-> **Security:** These credential files are included for evaluator convenience. The repository must remain **private** and must not be published publicly.
+> **Security:** Keep the Admin service-account key out of public archives. Prefer a private hand-off for that file only.
 
 ---
 
@@ -440,7 +438,7 @@ For course evaluation, the repository includes:
 | **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
 | **Promotion pointer** | `ML_model/artifacts/promoted.json` → run `20260709_104916` |
 
-> ML detail: [backend/docs/MODEL.md](../backend/docs/MODEL.md) · [RISK_SCORE.md](../backend/docs/RISK_SCORE.md)
+> ML detail: [MODEL_SELECTION.md](MODEL_SELECTION.md)
 
 ---
 
@@ -451,7 +449,7 @@ final_project_AthleAgent/
 ├── android_app/AthleAgent/     # Android application
 ├── backend/                    # FastAPI inference service
 ├── ML_model/                   # Training pipeline + artifacts
-├── docs/                       # Project documentation (HLD/LLD/NFR)
+├── docs/                       # Project documentation (HLD/LLD/Docker)
 ├── logs/                       # athleagent.log (gitignored, backend + Android telemetry)
 └── README.md
 ```
@@ -502,9 +500,4 @@ final_project_AthleAgent/
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
 | [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
 | [README.md](../README.md) | Run locally / Docker, API, tests |
-| [backend/docs/HLD.md](../backend/docs/HLD.md) | Backend architecture |
-| [backend/docs/FEATURES.md](../backend/docs/FEATURES.md) | Production data contract |
-| [NFR.md](NFR.md) | Non-functional requirements (metrics, gates, performance) |
-| [LOGGING_HE.md](LOGGING_HE.md) | Unified logging + Android telemetry |
-| [backend/docs/MODEL.md](../backend/docs/MODEL.md) | Production ML config (gates, bands) |
-| [backend/docs/RISK_SCORE.md](../backend/docs/RISK_SCORE.md) | End-to-end risk-score pipeline |
+| [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

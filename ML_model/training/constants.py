@@ -11,7 +11,7 @@ import pandas as pd
 # Backend serving gate defaults: backend/config.py → ML_MIN_RECALL_HARD, ML_MIN_AUC_FOR_LIVE.
 RANDOM_STATE = 42
 DATASET_FILENAME = "athlete_injury_data.csv"
-BENCHMARK_FILENAME = "benchmark_holdout.csv"
+BENCHMARK_RELPATH = Path("data") / "benchmark_holdout.csv"
 ATHLETE_CV_SPLITS = 2
 
 # Injury probability cutoffs swept during training (0.10–0.21 step 0.01, then 0.22–0.60 step 0.02).
