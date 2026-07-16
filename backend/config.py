@@ -35,7 +35,6 @@ class Settings(BaseSettings):
 
     # App
     APP_ENV: str = "development"
-    ENABLE_TEST_PREDICT_ENDPOINT: bool = False
     PROJECT_NAME: str = "AthleAgent API"
     VERSION: str = "1.0.0"
     HOST: str = "0.0.0.0"
@@ -87,7 +86,6 @@ class Settings(BaseSettings):
         "/redoc",
         "/status/ml",
     )
-    TEST_PREDICT_MOCK_RISK_PERCENTAGE: float = 72.5
 
     # Firebase
     FIREBASE_SERVICE_ACCOUNT_KEY: Path | None = None

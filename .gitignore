@@ -19,11 +19,6 @@ firebase-adminsdk*.json
 # Logs
 logs/
 *.log
-backend/logs/
-
-# Uploads
-uploads/
-backend/uploads/
 
 # Database
 *.db

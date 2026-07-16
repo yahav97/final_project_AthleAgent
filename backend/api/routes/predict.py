@@ -1,13 +1,11 @@
 """Injury risk prediction HTTP routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from config import settings
 from ml.model_loader import get_model_status
 from schemas.inference import (
     DailyPredictionTriggerRequest,
     InjuryPredictionResponse,
-    SimpleData,
 )
 from services.prediction.service import (
     persist_prediction_result_or_raise,
@@ -16,26 +14,6 @@ from services.prediction.service import (
 from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
-
-
-@router.post("/test_predict")
-def test_predict_injury(data: SimpleData):
-    """Return a fixed mock payload for UI/API smoke usage.
-
-    Args:
-        data: Minimal request containing a user identifier.
-
-    Returns:
-        dict: Stable mock inference payload.
-    """
-    if not settings.ENABLE_TEST_PREDICT_ENDPOINT:
-        raise HTTPException(status_code=404, detail="Test endpoint disabled.")
-    return {
-        "user_id": data.user_id,
-        "risk_percentage": settings.TEST_PREDICT_MOCK_RISK_PERCENTAGE,
-        "risk_level": "High",
-        "message": "This is a mock response for Android UI testing",
-    }
 
 
 @router.post("/predict/daily", response_model=InjuryPredictionResponse)

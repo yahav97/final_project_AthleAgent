@@ -5,13 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from schemas.types import RiskLevel, validate_date_key
 
 
-# --- Test mock payload (/test_predict) ---
-
-
-class SimpleData(BaseModel):
-    user_id: str
-
-
 # --- Production contract (field names aligned with Android / Firestore) ---
 
 
