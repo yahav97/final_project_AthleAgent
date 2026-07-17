@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from services.history.firestore_client import get_firestore_client
+from services.history.firestore_io import get_firestore_client
 from utils.logging import logger
 
 

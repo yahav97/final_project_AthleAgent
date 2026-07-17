@@ -1,4 +1,4 @@
-"""Wake-up-day history window, rolling context, and confidence bands."""
+"""Wake-up-day history window, quality checks, rolling context, and confidence bands."""
 
 from __future__ import annotations
 
@@ -7,14 +7,100 @@ from typing import Any
 
 from config import settings
 from schemas.enums import HistoryConfidence
-from services.history.date_utils import date_keys_in_range, to_date_key
-from services.history.day_quality import count_quality_history_days
-from services.history.firestore_client import get_firestore_client
-from services.history.firestore_field_paths import INFERENCE_FIELD_PATHS
-from services.history.firestore_io import doc_to_dict, read_firestore_documents
-from services.history.history_merge import merge_wake_up_day_row
+from services.history.firestore_io import (
+    INFERENCE_FIELD_PATHS,
+    doc_to_dict,
+    get_firestore_client,
+    read_firestore_documents,
+)
 from services.history.rolling_features import compute_historical_derived_features
+from services.preprocessing.helpers import is_absent_or_weak
 from utils.logging import logger
+
+WatchSyncFieldNames = tuple[str, ...]
+
+# Evaluated on merged wake-up-day rows (physical@W-1, sleep@W).
+LOAD_FIELD_NAMES: WatchSyncFieldNames = ("distanceMeters", "steps")
+SLEEP_FIELD_NAMES: WatchSyncFieldNames = ("sleepMinutes",)
+HEART_FIELD_NAMES: WatchSyncFieldNames = (
+    "heartRateAvg",
+    "restingHeartRate",
+    "hrvRmssd",
+)
+ENERGY_FIELD_NAMES: WatchSyncFieldNames = (
+    "activeCalories",
+    "totalCalories",
+    "bmrCalories",
+)
+
+WATCH_SYNC_SIGNAL_GROUPS: dict[str, WatchSyncFieldNames] = {
+    "load": LOAD_FIELD_NAMES,
+    "sleep": SLEEP_FIELD_NAMES,
+    "heart": HEART_FIELD_NAMES,
+    "energy": ENERGY_FIELD_NAMES,
+}
+
+
+def to_date_key(value: str) -> datetime:
+    return datetime.strptime(value, "%Y-%m-%d")
+
+
+def date_keys_in_range(start_day: datetime, end_day: datetime) -> list[str]:
+    keys: list[str] = []
+    day = start_day
+    while day <= end_day:
+        keys.append(day.strftime("%Y-%m-%d"))
+        day += timedelta(days=1)
+    return keys
+
+
+def _row_has_any_usable_field(row: dict[str, Any], field_names: WatchSyncFieldNames) -> bool:
+    return any(not is_absent_or_weak(row.get(name)) for name in field_names)
+
+
+def count_watch_sync_signal_groups(row: dict[str, Any]) -> int:
+    """How many watch-sync categories (load, sleep, heart, energy) have usable values."""
+    return sum(
+        1
+        for field_names in WATCH_SYNC_SIGNAL_GROUPS.values()
+        if _row_has_any_usable_field(row, field_names)
+    )
+
+
+def is_quality_history_day(row: dict[str, Any]) -> bool:
+    """Day counts toward history confidence when it looks like a real wearable sync."""
+    return count_watch_sync_signal_groups(row) >= settings.HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS
+
+
+def count_quality_history_days(rows: list[dict[str, Any]]) -> int:
+    return sum(1 for row in rows if is_quality_history_day(row))
+
+
+def merge_wake_up_day_row(
+    wake_up_key: str,
+    physical_doc: dict[str, Any] | None,
+    wake_doc: dict[str, Any] | None,
+    checkin_doc: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """
+    Build one logical wake-up day (same policy as ``firestore_mapping``).
+
+    - Physical / wearable load: ``daily_health/{wake_up - 1 day}``
+    - Sleep: ``daily_health/{wake_up}``
+    - Survey: ``daily_checkins/{wake_up}``
+    """
+    physical = dict(physical_doc or {})
+    wake = dict(wake_doc or {})
+    checkin = dict(checkin_doc or {})
+    if not physical and not wake and not checkin:
+        return None
+
+    row = dict(physical)
+    if "sleepMinutes" in wake:
+        row["sleepMinutes"] = wake["sleepMinutes"]
+    row.update(checkin)
+    row["date_key"] = wake_up_key
+    return row
 
 
 def history_date_window(

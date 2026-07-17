@@ -53,20 +53,17 @@ class TestResolveModelBundle:
         assert bundle.estimator is None
         assert bundle.gate_status == "invalid_threshold"
 
-    def test_derives_medium_threshold_when_absent(self, mock_model_bundle):
+    def test_accepts_bundle_without_medium_threshold(self, mock_model_bundle):
         del mock_model_bundle["medium_threshold"]
         mock_model_bundle["threshold"] = 0.40
         bundle = resolve_model_bundle(mock_model_bundle)
         assert bundle.gate_status == "none"
-        assert bundle.injury_threshold == pytest.approx(0.40)
-        assert bundle.medium_risk_threshold == pytest.approx(max(0.15, 0.40 * 0.6))
+        assert bundle.estimator is mock_model_bundle["estimator"]
 
     def test_valid_bundle_returns_all_fields(self, mock_model_bundle):
         bundle = resolve_model_bundle(mock_model_bundle)
         assert bundle.estimator is mock_model_bundle["estimator"]
         assert bundle.feature_columns == MODEL_FEATURE_COLUMNS
-        assert bundle.injury_threshold == pytest.approx(0.35)
-        assert bundle.medium_risk_threshold == pytest.approx(0.20)
         assert bundle.model_name == "ExtraTrees"
         assert bundle.gate_status == "none"
 

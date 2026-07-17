@@ -1,4 +1,4 @@
-"""Unit tests for history repository and rolling features."""
+"""Unit tests for history window, Firestore IO, and rolling features."""
 
 from __future__ import annotations
 
@@ -6,18 +6,16 @@ import pytest
 import pandas as pd
 
 from services.feature_engineering import compute_derived_features
-from services.history.day_quality import (
+from services.history.firestore_io import read_firestore_documents
+from services.history.history_window import (
     count_watch_sync_signal_groups,
-    is_quality_history_day,
-)
-from services.history.history_merge import merge_wake_up_day_row
-from services.history.repository import (
-    fetch_inference_firestore_bundle,
     fetch_user_history,
     get_history_window_context,
     history_confidence_from_quality_days,
-    read_firestore_documents,
+    is_quality_history_day,
+    merge_wake_up_day_row,
 )
+from services.history.inference_bundle import fetch_inference_firestore_bundle
 from services.history.rolling_features import (
     compute_historical_derived_features,
     sleep_hours_from_doc,

@@ -45,7 +45,7 @@ from training.policy import (
 from training.serve_parity import apply_train_serve_parity_augmentation
 
 
-# Medium risk band uses 60% of the injury threshold (floor 0.15) — matches backend bundle defaults.
+# Stored on the joblib bundle for training metadata; API risk bands use backend RISK_*_CUTOFF.
 MEDIUM_RISK_THRESHOLD_FRACTION = 0.6
 MEDIUM_RISK_THRESHOLD_FLOOR = 0.15
 

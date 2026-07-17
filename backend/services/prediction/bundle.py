@@ -8,12 +8,14 @@ from schemas.enums import BundleResolutionMode, ModelGateReason
 
 
 class ResolvedModelBundle(NamedTuple):
-    """Result of parsing the joblib artifact for live inference."""
+    """Result of parsing the joblib artifact for live inference.
+
+    Training ``threshold`` must be present (contract gate) but risk bands at serve
+    time come from ``config.settings`` / ``risk_levels`` (Android UI alignment).
+    """
 
     estimator: Any | None
     feature_columns: list[str] | None
-    injury_threshold: float | None
-    medium_risk_threshold: float | None
     model_name: str
     gate_status: str
 
@@ -21,8 +23,6 @@ class ResolvedModelBundle(NamedTuple):
 def _blocked_bundle(gate: ModelGateReason) -> ResolvedModelBundle:
     """Return a bundle that cannot serve predictions."""
     return ResolvedModelBundle(
-        None,
-        None,
         None,
         None,
         BundleResolutionMode.FALLBACK_DEMO.value,
@@ -50,7 +50,6 @@ def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
     estimator = loaded_model.get("estimator")
     feature_columns = loaded_model.get("feature_columns")
     threshold_raw = loaded_model.get("threshold")
-    medium_threshold_raw = loaded_model.get("medium_threshold")
     model_name = str(loaded_model.get("winner") or "live_model")
 
     if estimator is None:
@@ -60,23 +59,13 @@ def resolve_model_bundle(loaded_model: Any) -> ResolvedModelBundle:
     if threshold_raw is None:
         return _blocked_bundle(ModelGateReason.INVALID_THRESHOLD)
     try:
-        injury_threshold = float(threshold_raw)
+        float(threshold_raw)
     except (TypeError, ValueError):
         return _blocked_bundle(ModelGateReason.INVALID_THRESHOLD)
-    try:
-        medium_risk_threshold = (
-            float(medium_threshold_raw)
-            if medium_threshold_raw is not None
-            else max(0.15, injury_threshold * 0.6)  # same formula as ML_model/training/pipeline.py
-        )
-    except (TypeError, ValueError):
-        return _blocked_bundle(ModelGateReason.INVALID_MEDIUM_THRESHOLD)
 
     return ResolvedModelBundle(
         estimator,
         [str(column) for column in feature_columns],
-        injury_threshold,
-        medium_risk_threshold,
         model_name,
         ModelGateReason.NONE.value,
     )

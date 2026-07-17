@@ -30,7 +30,7 @@ def _prev_day(date_key: str) -> str:
 
 
 def _get_db():
-    from services.history.firestore_client import get_firestore_client
+    from services.history.firestore_io import get_firestore_client
 
     return get_firestore_client()
 

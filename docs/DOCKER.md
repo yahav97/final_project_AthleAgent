@@ -13,7 +13,7 @@ Run the FastAPI backend and promoted ML model in a single container. The Android
 From the repository root:
 
 ```powershell
-# From the repository root (firebase-key.json is already under backend/)
+# From the repository root (place backend/firebase-key.json first — local only, not in git)
 docker compose up --build
 ```
 
@@ -23,7 +23,7 @@ Verify:
 |-------|-----|----------|
 | Liveness | http://localhost:8000/health | 200 OK |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
-| Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedArtifactReadiness -q` | `1 passed` |
+| Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q` | `3 passed` |
 
 > **Security (demo):** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=demo`.
 
@@ -31,7 +31,7 @@ From the Android emulator (unchanged): `http://10.0.2.2:8000/` — see `ApiClien
 
 ---
 
-> **Note:** If `backend/firebase-key.json` was missing on a first run, Docker may have created an empty **directory** with that name. Remove it (`Remove-Item -Recurse -Force backend\firebase-key.json` on Windows) and restore the JSON file from the repo before `docker compose up --build` again.
+> **Note:** If `backend/firebase-key.json` was missing on a first run, Docker may have created an empty **directory** with that name. Remove it (`Remove-Item -Recurse -Force backend\firebase-key.json` on Windows) and put your Firebase service-account JSON back at `backend/firebase-key.json` before `docker compose up --build` again.
 
 ---
 

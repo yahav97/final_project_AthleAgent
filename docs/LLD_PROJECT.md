@@ -261,9 +261,10 @@ POST /predict/daily {userId, date}
     ├─ compute_prediction_confidence_percent()         [prediction/confidence]
     │
     ├─ model.predict_proba() → proba                     [prediction/bundle]
-    │     classify_risk_level: Low ≤ 20%, Medium 21–70%, High > 70%
+    │     classify_risk_level via risk_levels + RISK_*_CUTOFF (not bundle thresholds)
+    │     Low ≤ 20%, Medium 21–70%, High > 70%
     │
-    └─ save_daily_prediction_result()
+    └─ save_daily_prediction_result()                    [history/persist]
           merge → daily_health/{date}
 ```
 
@@ -308,11 +309,13 @@ The `estimator` field holds the winning model from the promoted training run —
 {
     "estimator": <sklearn-compatible model from promoted run>,  # e.g. XGBoostCalibratedTuned
     "feature_columns": [...],  # 35 names
-    "threshold": "<from run_manifest.json>",
-    "medium_threshold": 0.11,
+    "threshold": "<from run_manifest.json>",  # required contract gate at serve
+    "medium_threshold": 0.11,  # written by training; ignored for API risk bands
     "winner": "<from run_manifest.json>"  # e.g. "XGBoostCalibratedTuned"
 }
 ```
+
+Serve (`prediction/bundle.resolve_model_bundle`) validates that `threshold` is present and numeric, then classifies risk with `services/risk_levels.py` + `RISK_HIGH_CUTOFF` / `RISK_MEDIUM_CUTOFF` so Android UI bands stay aligned.
 
 ### 4.3 Live Gates (`model_loader.py`)
 
@@ -442,7 +445,7 @@ No `.env` file is required. Defaults are defined in `backend/config.py` (pydanti
 
 ### 7.3 Emulator Networking
 
-- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `8000:8000`)
+- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `127.0.0.1:8000:8000`)
 - Physical device: host machine IP address
 
 ### 7.4 Backend Deployment (Local)
@@ -490,9 +493,10 @@ cd backend && python -m pytest tests/ -v
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
 | Inference | — | `prediction/service.py` |
-| Features | — | `preprocessing/`, `history/day_quality.py`, `feature_engineering.py`, `model_features.py` |
+| Features | — | `preprocessing/`, `history/history_window.py`, `feature_engineering.py`, `model_features.py` |
 | Confidence | — | `prediction/confidence.py`, `preprocessing/quality.py` |
 | Persist | — | `history/persist.save_daily_prediction_result` |
+| Firestore IO | — | `history/firestore_io.py` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
 | Train | — | `ML_model/training/pipeline.py` (CLI: `train_model.py`) |
