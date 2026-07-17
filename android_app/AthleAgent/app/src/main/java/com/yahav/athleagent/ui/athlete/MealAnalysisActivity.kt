@@ -65,7 +65,7 @@ class MealAnalysisActivity : AppCompatActivity() {
         val userId = user?.uid ?: "test_user_123"
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = dateFormat.format(Date()) // שומרים להיום בשביל ה-UI!
+        val todayStr = dateFormat.format(Date()) // Use today's date for UI consistency
 
         val mealData = hashMapOf(
             "calories" to calories,
@@ -74,19 +74,19 @@ class MealAnalysisActivity : AppCompatActivity() {
             "timestamp" to FieldValue.serverTimestamp()
         )
 
-        // שומרים את הארוחה במסמך של היום
+        // Persist the meal record in today's nutrition document
         db.collection("users").document(userId)
             .collection("daily_nutrition").document(todayStr)
             .collection("meals").add(mealData)
             .addOnSuccessListener {
 
                 val dailyNutritionUpdates = hashMapOf(
-                    // שדות מקוריים בשביל ה-UI שלך
+                    // Original fields for UI components
                     "totalCalories" to FieldValue.increment(calories.toDouble()),
                     "totalProtein" to FieldValue.increment(protein.toDouble()),
                     "totalCarbs" to FieldValue.increment(carbs.toDouble()),
 
-                    // שדות למודל
+                    // ML model inference features
                     "calories" to FieldValue.increment(calories.toDouble()),
                     "protein" to FieldValue.increment(protein.toDouble()),
                     "carbs" to FieldValue.increment(carbs.toDouble()),

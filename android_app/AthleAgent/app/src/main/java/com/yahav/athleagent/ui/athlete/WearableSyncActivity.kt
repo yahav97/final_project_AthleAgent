@@ -101,7 +101,7 @@ class WearableSyncActivity : AppCompatActivity() {
                 val db = FirebaseFirestore.getInstance()
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-                // השארנו את הזרקת הגובה כדי למנוע שגיאת heightCm במודל
+                // Inject height to prevent missing 'heightCm' errors in the ML model
                 db.collection("users").document(userId).set(
                     mapOf("heightCm" to 180.0),
                     SetOptions.merge()
