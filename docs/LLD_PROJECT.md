@@ -310,8 +310,8 @@ The `estimator` field holds the winning model from the promoted training run —
     "estimator": <sklearn-compatible model from promoted run>,  # e.g. XGBoostCalibratedTuned
     "feature_columns": [...],  # 35 names
     "threshold": "<from run_manifest.json>",  # required contract gate at serve
-    "medium_threshold": 0.11,  # written by training; ignored for API risk bands
-    "winner": "<from run_manifest.json>"  # e.g. "XGBoostCalibratedTuned"
+    "winner": "<from run_manifest.json>",  # e.g. "XGBoostCalibratedTuned"
+    "policy": {...},  # selection gates snapshot
 }
 ```
 

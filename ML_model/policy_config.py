@@ -1,6 +1,7 @@
 """ML selection gates and feature-engineering defaults.
 
-Used by training, validation, the demo notebook, and backend/config.py defaults.
+Used by training, validation, and the demo notebook.
+Backend gate defaults live in ``backend/config.py`` (kept in sync by hand).
 """
 
 from __future__ import annotations
@@ -8,7 +9,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-# Selection gates — backend/config.py imports DEFAULT_MIN_* for Settings defaults.
 DEFAULT_THRESHOLD: float = 0.18
 DEFAULT_MIN_RECALL_HARD: float = 0.80
 DEFAULT_MIN_AUC_FOR_LIVE: float = 0.68
@@ -25,9 +25,7 @@ TARGET_RECALL = DEFAULT_TARGET_RECALL
 TARGET_PRECISION = DEFAULT_TARGET_PRECISION
 TARGET_F1 = DEFAULT_TARGET_F1
 
-# Feature-engineering defaults — backend/config.py imports these.
 DEFAULT_SLEEP_TARGET_HOURS: float = 8.0
-DEFAULT_SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = 1.25
 
 # Train-serve parity augmentation (training/serve_parity.py).
 DEFAULT_COLD_START_AUGMENT_FRACTION: float = 0.25
@@ -48,7 +46,8 @@ def get_policy() -> SimpleNamespace:
     )
 
 
-def policy_thresholds() -> dict[str, float]:
+def policy_as_dict() -> dict[str, Any]:
+    """Serialize policy for manifests, notebooks, and gate displays."""
     return {
         "recall_hard_min": MIN_RECALL_HARD,
         "recall_target": TARGET_RECALL,
@@ -60,23 +59,14 @@ def policy_thresholds() -> dict[str, float]:
     }
 
 
+# Back-compat alias used by the demo notebook.
+policy_thresholds = policy_as_dict
+
+
 def evaluate_policy_gates(recall: float, precision: float, f1: float, fpr: float) -> dict[str, bool]:
     return {
         "recall_hard": recall >= MIN_RECALL_HARD,
         "fpr": fpr <= MAX_FPR_OPERATING,
         "precision": precision >= TARGET_PRECISION,
         "f1": f1 >= TARGET_F1,
-    }
-
-
-def policy_as_dict() -> dict[str, Any]:
-    """Serialize policy for run manifests."""
-    return {
-        "recall_hard_min": MIN_RECALL_HARD,
-        "recall_min": TARGET_RECALL,
-        "fpr_max_operating": MAX_FPR_OPERATING,
-        "precision_min": TARGET_PRECISION,
-        "f1_min": TARGET_F1,
-        "auc_min_for_live": MIN_AUC_FOR_LIVE,
-        "fixed_comparison_threshold": THRESHOLD,
     }

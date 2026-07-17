@@ -5,4 +5,3 @@ DAYS_PER_ATHLETE = 340      # ~11 months per athlete (round dataset size for tra
 ANNUAL_CYCLE_DAYS = 365     # Calendar seasonality period (independent of simulation length)
 START_DATE = "2025-01-01"   # Starting date for data generation
 DEFAULT_SEED = 42
-EXPECTED_DATASET_ROWS = NUM_ATHLETES * DAYS_PER_ATHLETE

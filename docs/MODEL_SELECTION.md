@@ -1,7 +1,7 @@
 # Model selection protocol
 
 Single source of truth for how AthleAgent picks and ships an injury model.  
-**Code:** `ML_model/train_model.py` · **Demo:** `ML_model/notebooks/model_improvement_journey.ipynb` · **Gates:** `backend/config.py` / `ML_model/policy_config.py`
+**Code:** `ML_model/training/pipeline.py` (CLI: `train_model.py`) · **Demo notebook:** [`model_improvement_journey.ipynb`](../ML_model/notebooks/model_improvement_journey.ipynb) (see below) · **Gates:** `backend/config.py` / `ML_model/policy_config.py`
 
 ## Pipeline (production = notebook = `run_pipeline.py`)
 
@@ -34,10 +34,11 @@ Constants (change in one place):
 
 | Constant | Default | Location |
 |----------|---------|----------|
-| `ATHLETE_CV_SPLITS` | `2` | `train_model.py` |
-| `RANDOM_STATE` | `42` | `train_model.py` |
+| `ATHLETE_CV_SPLITS` | `2` | `training/constants.py` |
+| `RANDOM_STATE` | `42` | `training/constants.py` |
 | Holdout ratio | `0.20` | `create_benchmark_set.py`, notebook `DEMO_CONFIG` |
 | Policy gates | Recall, FPR, F1, … | `policy_config.py` |
+| Model candidates | 5 names | `training/models.py` |
 
 ## Model candidates (`MODEL_CANDIDATE_NAMES`)
 
@@ -49,7 +50,7 @@ Constants (change in one place):
 | `XGBoostCalibratedTuned` | XGB + sigmoid calibration (`CalibratedClassifierCV`) |
 | `XGBoostDeep` | Deeper XGB — high-recall alternative |
 
-Edit the tuple in `train_model.py` to change candidates project-wide.
+Edit the tuple in `training/models.py` to change candidates project-wide.
 
 ## Split rules (no leakage)
 
@@ -88,10 +89,10 @@ ML_model/artifacts/<run_id>/
 ├── athlete_cv_folds.csv
 ├── athlete_cv_summary.csv
 ├── threshold_sweep.csv
+├── best_operating_points.csv     # tiered policy per model
 ├── calibration_curve_data.csv    # holdout-based
 ├── risk_bins_summary.csv
-├── feature_importance.csv        # holdout-trained winner
-└── feature_importance_serving.csv  # full-data refit (optional)
+└── feature_importance.csv        # full-data refit (falls back to holdout winner)
 ```
 
 ## What we already do (ML checklist)
@@ -118,10 +119,25 @@ ML_model/artifacts/<run_id>/
 | Auto feature selection | Contract is fixed 35 features (+ 15 integer columns) for train-serve parity |
 | Neural nets | Tabular data; boosting is standard |
 
+## Demo notebook (`model_improvement_journey.ipynb`)
+
+Live presentation that **simulates** the same selection protocol — it does **not** re-implement training.
+It imports `training.pipeline` / `training.policy` / `policy_config.py` and walks through CV → holdout → `pick_best_model` on a small slice, then loads the **promoted** full-run artifacts in Part 7.
+
+| Layer | Role |
+|-------|------|
+| Parts 1–6 | Fast demo on `data/athlete_injury_demo.csv` → subset (~50 athletes × 120 days) |
+| Part 7 | Reads `artifacts/promoted.json` + run folder (winner metrics, feature importance, calibration) |
+| `run_pipeline.py` | Real training on the full CSV + fixed `benchmark_holdout.csv` |
+
+**Data size note:** the production file `ML_model/athlete_injury_data.csv` is **large** (~340k rows; ~1,000 athletes × 340 days) and is **gitignored**. Regenerate locally with `python ML_model/data_generator.py` before a full retrain. The notebook only needs the small `athlete_injury_demo.csv` in git; scoring the promoted model on the benchmark holdout (Part 7.5) also needs the full CSV if you want those plots.
+
+Demo `DEMO_CONFIG` / `PRODUCTION_REF` must stay aligned with the shipped run (currently **`XGBoostCalibratedTuned`**, run `20260709_104916`, operating threshold **0.10**). The demo slice may pick a different winner; the app always loads whatever `promoted.json` points to.
+
 ## Retrain (synthetic pipeline)
 
 ```bash
 python ML_model/run_pipeline.py
 ```
 
-Fixed inputs: `athlete_injury_data.csv` (from `data_generator.py`) and `data/benchmark_holdout.csv` (from `create_benchmark_set.py`).
+Fixed inputs: `athlete_injury_data.csv` (from `data_generator.py` — large, not in git) and `data/benchmark_holdout.csv` (from `create_benchmark_set.py`).

@@ -65,4 +65,9 @@ class TestPolicySerialization:
         data = policy_as_dict()
         assert data["recall_hard_min"] == pytest.approx(DEFAULT_MIN_RECALL_HARD)
         assert data["auc_min_for_live"] == pytest.approx(DEFAULT_MIN_AUC_FOR_LIVE)
+        assert data["recall_target"] == pytest.approx(0.80)
         assert "fixed_comparison_threshold" in data
+
+    def test_policy_thresholds_is_alias_of_policy_as_dict(self):
+        assert policy_thresholds() == policy_as_dict()
+        assert policy_thresholds is policy_as_dict

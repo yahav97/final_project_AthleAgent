@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from feature_contract import CONTRACT_PATH, load_feature_contract
 from policy_config import (
     DEFAULT_COLD_START_AUGMENT_FRACTION,
     DEFAULT_COLD_START_FIRST_N_DAYS,
@@ -30,14 +29,10 @@ NUTRITION_FEATURE_COLUMNS: tuple[str, ...] = (
     "daily_calories",
 )
 
-CONTRACT_PATH = Path(__file__).resolve().parents[2] / "backend" / "data" / "model_feature_contract.json"
-
 
 def load_contract_defaults() -> dict[str, float]:
     """Population defaults from backend/data/model_feature_contract.json."""
-    with CONTRACT_PATH.open(encoding="utf-8") as handle:
-        data = json.load(handle)
-    defaults = data["default_values"]
+    defaults = load_feature_contract().get("default_values")
     if not isinstance(defaults, dict):
         raise ValueError("model_feature_contract.json: default_values must be an object")
     return {str(key): float(value) for key, value in defaults.items()}
