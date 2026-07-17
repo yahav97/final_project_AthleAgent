@@ -9,7 +9,10 @@ import pandas as pd
 from config import settings
 from schemas.enums import HistoryConfidence
 from schemas.inference import InjuryPredictionRequest
-from services.history.history_window import get_history_window_context
+from services.history.history_window import (
+    DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
+    get_history_window_context,
+)
 from services.model_features import DEFAULT_FEATURE_VALUES
 
 # Rolling features filled from Firestore history or population defaults when history is thin.
@@ -33,6 +36,14 @@ def parse_history_confidence(confidence: HistoryConfidence | str) -> HistoryConf
         return HistoryConfidence.LOW
 
 
+def sync_load_recovery_imbalance(feature_frame: pd.DataFrame) -> None:
+    """Recompute composite from final acwr_ratio and sleep_debt_3d (after history fallback)."""
+    idx = feature_frame.index[0]
+    acwr = float(feature_frame.at[idx, "acwr_ratio"])
+    sleep_debt = float(feature_frame.at[idx, "sleep_debt_3d"])
+    feature_frame.at[idx, "load_recovery_imbalance"] = acwr * sleep_debt
+
+
 def apply_history_confidence_fallback(
     feature_frame: pd.DataFrame,
     payload: InjuryPredictionRequest,
@@ -54,7 +65,7 @@ def apply_history_confidence_fallback(
             payload.userId,
             payload.date,
             lookback_days=settings.HISTORY_LOOKBACK_DAYS,
-            include_target_day=False,
+            include_target_day=DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
         )
     elif not (payload.userId and payload.date):
         return feature_frame, confidence
@@ -67,11 +78,16 @@ def apply_history_confidence_fallback(
         for column, value in features.items():
             if column in feature_frame.columns:
                 feature_frame.at[feature_frame.index[0], column] = float(value)
+        sync_load_recovery_imbalance(feature_frame)
         return feature_frame, confidence
+
+    if confidence in (HistoryConfidence.HIGH, HistoryConfidence.MEDIUM):
+        confidence = HistoryConfidence.LOW
 
     for column in HISTORY_ROLLING_FEATURES:
         if column in feature_frame.columns:
             feature_frame.at[feature_frame.index[0], column] = float(DEFAULT_FEATURE_VALUES[column])
+    sync_load_recovery_imbalance(feature_frame)
     return feature_frame, confidence
 
 

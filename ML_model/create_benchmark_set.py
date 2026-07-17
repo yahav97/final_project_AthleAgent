@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -21,13 +22,21 @@ HOLDOUT_RATIO = 0.2
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Create fixed athlete holdout benchmark CSV.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate even when benchmark file already exists.",
+    )
+    args = parser.parse_args()
+
     script_dir = Path(__file__).resolve().parent
     dataset_path = script_dir / DATASET_FILENAME
     benchmark_path = script_dir / BENCHMARK_RELPATH
     benchmark_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if benchmark_path.exists():
-        print(f"Benchmark already exists: {benchmark_path}")
+    if benchmark_path.exists() and not args.force:
+        print(f"Benchmark already exists: {benchmark_path} (use --force to regenerate)")
         return 0
     if not dataset_path.exists():
         raise FileNotFoundError(f"{dataset_path} not found. Run data_generator.py first.")

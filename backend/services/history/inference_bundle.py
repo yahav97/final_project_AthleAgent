@@ -6,14 +6,19 @@ from datetime import timedelta
 from typing import Any
 
 from config import settings
-from services.history.date_utils import date_keys_in_range, to_date_key
-from services.history.firestore_client import get_firestore_client
-from services.history.firestore_field_paths import INFERENCE_FIELD_PATHS
-from services.history.firestore_io import doc_to_dict, read_firestore_documents
+from services.history.firestore_io import (
+    INFERENCE_FIELD_PATHS,
+    doc_to_dict,
+    get_firestore_client,
+    read_firestore_documents,
+)
 from services.history.history_window import (
+    DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
     build_history_window_context,
+    date_keys_in_range,
     history_date_window,
     history_rows_from_snapshots,
+    to_date_key,
 )
 from utils.logging import logger
 
@@ -90,7 +95,7 @@ def fetch_inference_firestore_bundle(
     date_key: str,
     *,
     lookback_days: int | None = None,
-    include_target_day: bool = False,
+    include_target_day: bool = DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
 ) -> dict[str, Any]:
     """
     Single batch read for production inference: snapshot inputs + history window.

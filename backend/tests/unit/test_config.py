@@ -7,11 +7,21 @@ from pathlib import Path
 import pytest
 
 from config import Settings, settings
+from services.ml_policy import load_ml_policy, ml_gate_defaults
 
 pytestmark = pytest.mark.unit
 
 
 class TestDomainDefaults:
+    def test_ml_gates_match_shared_policy_json(self):
+        gates = ml_gate_defaults()
+        s = Settings()
+        assert s.ML_MIN_RECALL_HARD == pytest.approx(gates["min_recall_hard"])
+        assert s.ML_MIN_AUC_FOR_LIVE == pytest.approx(gates["min_auc_for_live"])
+        assert s.SLEEP_TARGET_HOURS == pytest.approx(
+            float(load_ml_policy()["feature_defaults"]["sleep_target_hours"])
+        )
+
     def test_profile_default_age(self):
         assert settings.PROFILE_DEFAULT_AGE == 22
         assert settings.PROFILE_DEFAULT_AGE == int(

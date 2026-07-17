@@ -45,24 +45,20 @@ def mock_daily_prediction_pipeline(monkeypatch) -> Callable[..., dict[str, bool]
         *,
         prediction_result: dict[str, Any] | None = None,
         predict_raises: Exception | None = None,
-        persist_raises: Exception | None = None,
+        persist_succeeds: bool = True,
     ) -> dict[str, bool]:
         called = {"predicted": False, "persisted": False}
         result = prediction_result or dict(SUCCESSFUL_PREDICTION)
 
-        def _predict(user_id: str, date_key: str) -> dict[str, Any]:
+        def _run_daily(user_id: str, date_key: str) -> dict[str, Any]:
             called["predicted"] = True
             if predict_raises is not None:
                 raise predict_raises
+            if persist_succeeds:
+                called["persisted"] = True
             return dict(result)
 
-        def _persist(user_id: str, date_key: str, prediction: dict[str, Any]) -> None:
-            called["persisted"] = True
-            if persist_raises is not None:
-                raise persist_raises
-
-        monkeypatch.setattr(predict_routes, "predict_injury_risk_from_firestore", _predict)
-        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist)
+        monkeypatch.setattr(predict_routes, "run_daily_prediction", _run_daily)
         return called
 
     return apply

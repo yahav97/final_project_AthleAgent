@@ -1,9 +1,11 @@
 import pytest
 
 from services.feature_engineering import (
-    acwr_baseline_from_acute_proxy,
+    acwr_features_from_distance_history,
     acwr_ratio_bounded,
     compute_derived_features,
+    daily_sleep_deficit_hours,
+    sleep_debt_3d_from_sleep_hours,
 )
 
 pytestmark = pytest.mark.unit
@@ -20,9 +22,34 @@ def test_acwr_ratio_bounded():
     out = compute_derived_features(row)
     assert 0.35 <= out["acwr_ratio"] <= 2.8
     assert out["acute_load_7d"] > 0
-    baseline = acwr_baseline_from_acute_proxy(out["acute_load_7d"])
-    assert out["acwr_ratio"] == pytest.approx(acwr_ratio_bounded(out["acute_load_7d"], baseline))
+    expected_acute, expected_ratio = acwr_features_from_distance_history([12.0])
+    assert out["acute_load_7d"] == pytest.approx(expected_acute)
+    assert out["acwr_ratio"] == pytest.approx(expected_ratio)
     assert "chronic_load_7d" not in out
+
+
+def test_single_day_acwr_ignores_active_calories():
+    base = {
+        "daily_distance_km": 12.0,
+        "sleep_hours": 6.0,
+        "hrv_score": 55.0,
+        "resting_hr": 58.0,
+    }
+    high_cal = {**base, "active_calories_burned": 800.0}
+    low_cal = {**base, "active_calories_burned": 0.0}
+    assert compute_derived_features(high_cal)["acwr_ratio"] == pytest.approx(
+        compute_derived_features(low_cal)["acwr_ratio"]
+    )
+    assert compute_derived_features(high_cal)["acute_load_7d"] == pytest.approx(
+        compute_derived_features(low_cal)["acute_load_7d"]
+    )
+
+
+def test_acwr_features_from_distance_history_matches_training_window():
+    distances = [3.5, 4.0, 5.5, 6.0, 4.5, 7.0, 8.0]
+    acute, ratio = acwr_features_from_distance_history(distances)
+    assert acute == pytest.approx(sum(distances) / len(distances))
+    assert 0.35 <= ratio <= 2.8
 
 
 def test_rest_day_low_acute():
@@ -52,7 +79,37 @@ def test_zero_sleep_increases_sleep_debt_proxy():
         "resting_hr": 58.0,
     }
     out = compute_derived_features(row)
-    assert out["sleep_debt_3d"] > 0.0
+    # Missing sleep is treated as 7h default before debt calc → 1h deficit vs 8h target.
+    assert out["sleep_debt_3d"] == pytest.approx(1.0)
+
+
+def test_sleep_debt_3d_matches_training_rolling_formula():
+    from config import settings
+
+    target = settings.SLEEP_TARGET_HOURS
+    # 3 nights: 6h, 7h, 9h → deficits 2 + 1 + 0 = 3
+    assert sleep_debt_3d_from_sleep_hours([6.0, 7.0, 9.0], sleep_target=target) == pytest.approx(3.0)
+    # Oversleep does not create negative debt.
+    assert sleep_debt_3d_from_sleep_hours([9.0, 9.0, 9.0], sleep_target=target) == pytest.approx(0.0)
+    # min_periods=1 with a single day.
+    assert sleep_debt_3d_from_sleep_hours([6.0], sleep_target=target) == pytest.approx(2.0)
+
+
+def test_daily_sleep_deficit_clips_oversleep():
+    assert daily_sleep_deficit_hours(9.0, sleep_target=8.0) == pytest.approx(0.0)
+    assert daily_sleep_deficit_hours(6.0, sleep_target=8.0) == pytest.approx(2.0)
+
+
+def test_single_day_sleep_debt_uses_training_formula_not_scaled_proxy():
+    row = {
+        "daily_distance_km": 5.0,
+        "active_calories_burned": 300.0,
+        "sleep_hours": 6.0,
+        "hrv_score": 60.0,
+        "resting_hr": 54.0,
+    }
+    out = compute_derived_features(row)
+    assert out["sleep_debt_3d"] == pytest.approx(2.0)
 
 
 def test_acwr_ratio_returns_one_when_baseline_non_positive():

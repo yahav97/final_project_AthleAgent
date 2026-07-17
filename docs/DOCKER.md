@@ -13,7 +13,7 @@ Run the FastAPI backend and promoted ML model in a single container. The Android
 From the repository root:
 
 ```powershell
-# From the repository root (firebase-key.json is already under backend/)
+# From the repository root (place backend/firebase-key.json first — local only, not in git)
 docker compose up --build
 ```
 
@@ -21,9 +21,13 @@ Verify:
 
 | Check | URL | Expected |
 |-------|-----|----------|
-| Liveness | http://localhost:8000/health | 200 OK |
+| Readiness | http://localhost:8000/health | **200** when Firestore + gated model are live; **503** if either dependency is down |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
-| Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedArtifactReadiness -q` | `1 passed` |
+| Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q` | `3 passed` |
+| Full backend suite | `cd backend && python -m pytest tests/ -v` | `252 passed` |
+| ML policy / parity | `cd ML_model && python -m pytest tests/ -v` | `12 passed` |
+
+CI runs backend + ML_model pytest on every push/PR that touches `backend/`, `ML_model/`, or `.github/workflows/backend-tests.yml`.
 
 > **Security (demo):** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=demo`.
 
@@ -31,7 +35,7 @@ From the Android emulator (unchanged): `http://10.0.2.2:8000/` — see `ApiClien
 
 ---
 
-> **Note:** If `backend/firebase-key.json` was missing on a first run, Docker may have created an empty **directory** with that name. Remove it (`Remove-Item -Recurse -Force backend\firebase-key.json` on Windows) and restore the JSON file from the repo before `docker compose up --build` again.
+> **Note:** If `backend/firebase-key.json` was missing on a first run, Docker may have created an empty **directory** with that name. Remove it (`Remove-Item -Recurse -Force backend\firebase-key.json` on Windows) and put your Firebase service-account JSON back at `backend/firebase-key.json` before `docker compose up --build` again.
 
 ---
 
@@ -89,13 +93,13 @@ volumes:
 | `ImportError` / xgboost at startup | Image missing `libgomp1` — rebuild with current `Dockerfile` |
 | Firestore errors / null client | Missing or invalid `firebase-key.json` |
 | `"status": "Blocked"` on `/status/ml` | Manifest gate failed — check `gate_reason` in response |
-| Healthcheck unhealthy | Wait for `start_period` (20s); check logs: `docker compose logs backend` |
+| Healthcheck unhealthy | Wait for `start_period` (20s); `/health` returns **503** when Firestore or the ML gate is down — check logs: `docker compose logs backend` |
 
 ## Related documentation
 
 | Document | Content |
 |----------|---------|
 | [README.md](../README.md) | Project overview, run, API, tests |
-| [docs/HLD_PROJECT.md](HLD_PROJECT.md) | Full project HLD |
-| [docs/LLD_PROJECT.md](LLD_PROJECT.md) | Full project LLD |
+| [docs/HLD.md](HLD.md) | Full project HLD |
+| [docs/LLD.md](LLD.md) | Full project LLD |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

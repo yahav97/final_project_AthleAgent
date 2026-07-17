@@ -8,7 +8,10 @@ from ml.model_loader import get_model, get_model_gate_reason
 from schemas.enums import ModelGateReason
 from schemas.inference import InjuryPredictionRequest
 from services.history.inference_bundle import fetch_inference_firestore_bundle
-from services.history.persist import save_daily_prediction_result
+from services.history.persist import (
+    load_cached_daily_prediction,
+    save_daily_prediction_result_with_retries,
+)
 from services.nutrition_defaults import resolve_request_nutrition
 from services.profile_defaults import resolve_request_age
 from services.prediction.bundle import resolve_model_bundle
@@ -118,12 +121,33 @@ def predict_injury_risk_from_firestore(user_id: str, date_key: str) -> dict[str,
     )
 
 
-def persist_prediction_result_or_raise(
-    user_id: str,
-    date_key: str,
-    result: dict[str, Any],
-) -> None:
-    """Write inference output to Firestore; fail the request if persistence returns false."""
-    saved = save_daily_prediction_result(user_id, date_key, result)
-    if not saved:
-        raise DatabaseError("Prediction persist failed", code="prediction_persist_failed")
+def run_daily_prediction(user_id: str, date_key: str) -> dict[str, Any]:
+    """
+    Idempotent daily prediction: cache hit → return; else infer → persist (retries).
+
+    Persist failures are logged but do **not** fail the HTTP response — the client
+    already has a computed score and can retry safely (cache hit after a later persist).
+    """
+    cached = load_cached_daily_prediction(user_id, date_key)
+    if cached is not None:
+        logger.info(
+            "predict_daily_cache_hit userId=%s date=%s risk_level=%s",
+            user_id,
+            date_key,
+            cached.get("risk_level"),
+            extra={"event": "predict_daily_cache_hit"},
+        )
+        return cached
+
+    result = predict_injury_risk_from_firestore(user_id, date_key)
+    persisted = save_daily_prediction_result_with_retries(user_id, date_key, result)
+    if not persisted:
+        logger.warning(
+            "prediction_persist_failed userId=%s date=%s risk_level=%s risk_score=%.4f",
+            user_id,
+            date_key,
+            result.get("risk_level"),
+            float(result.get("risk_score") or 0.0),
+            extra={"event": "prediction_persist_failed"},
+        )
+    return result

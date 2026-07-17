@@ -1,5 +1,7 @@
 """Integration tests for POST /predict/daily — production inference contract."""
 
+from typing import Any
+
 import pytest
 
 from utils.exceptions import DatabaseError
@@ -89,16 +91,75 @@ class TestPredictDailyErrors:
         assert "Firestore request timed out" in data["detail"]
         assert data["code"] == "firestore_timeout"
 
-    def test_persist_failure_returns_503(self, api_client, mock_daily_prediction_pipeline):
-        mock_daily_prediction_pipeline(
-            persist_raises=DatabaseError("Firestore write failed", code="write_failed")
+    def test_persist_failure_still_returns_prediction(self, api_client, monkeypatch):
+        from services.prediction import service as prediction_service
+
+        monkeypatch.setattr(
+            prediction_service,
+            "load_cached_daily_prediction",
+            lambda uid, d: None,
         )
+        monkeypatch.setattr(
+            prediction_service,
+            "predict_injury_risk_from_firestore",
+            lambda uid, d: {
+                "risk_level": "Medium",
+                "risk_score": 0.42,
+                "prediction_confidence": 72.5,
+            },
+        )
+        monkeypatch.setattr(
+            prediction_service,
+            "save_daily_prediction_result_with_retries",
+            lambda uid, d, r, **kw: False,
+        )
+
         response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
 
-        assert response.status_code == 503
+        assert response.status_code == 200
         data = response.json()
-        assert "Firestore write failed" in data["detail"]
-        assert data["code"] == "write_failed"
+        assert data["risk_level"] == "Medium"
+        assert abs(float(data["risk_score"]) - 0.42) < 1e-9
+        assert float(data["prediction_confidence"]) == pytest.approx(72.5)
+
+    def test_idempotent_retry_returns_cached_prediction_without_re_inference(
+        self, api_client, monkeypatch
+    ):
+        from services.prediction import service as prediction_service
+
+        infer_calls = {"count": 0}
+
+        def _infer(uid: str, d: str) -> dict[str, Any]:
+            infer_calls["count"] += 1
+            return {
+                "risk_level": "Low",
+                "risk_score": 0.12,
+                "prediction_confidence": 80.0,
+            }
+
+        cached = {
+            "risk_level": "High",
+            "risk_score": 0.88,
+            "prediction_confidence": 91.0,
+        }
+        monkeypatch.setattr(
+            prediction_service,
+            "load_cached_daily_prediction",
+            lambda uid, d: dict(cached),
+        )
+        monkeypatch.setattr(prediction_service, "predict_injury_risk_from_firestore", _infer)
+        monkeypatch.setattr(
+            prediction_service,
+            "save_daily_prediction_result_with_retries",
+            lambda uid, d, r, **kw: True,
+        )
+
+        response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_level"] == "High"
+        assert infer_calls["count"] == 0
 
     def test_model_gate_blocks_inference(
         self,
@@ -107,14 +168,12 @@ class TestPredictDailyErrors:
         mock_model_gate,
         monkeypatch,
     ):
-        from api.routes import predict as predict_routes
-
         mock_firestore_snapshot()
         mock_model_gate(live=False, gate_reason="manifest_corrupted")
-        def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
-            return None
-
-        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: None,
+        )
 
         response = api_client.post("/predict/daily", json={"userId": "u1", "date": "2026-04-30"})
 
@@ -166,10 +225,10 @@ class TestPredictDailyErrors:
         bundle["estimator"] = _Estimator()
         monkeypatch.setattr("services.prediction.service.get_model", lambda: bundle)
 
-        def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
-            return None
-
-        monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
+        monkeypatch.setattr(
+            "services.prediction.service.save_daily_prediction_result_with_retries",
+            lambda uid, d, r, **kw: True,
+        )
 
         response = api_client.post("/predict/daily", json=DAILY_TRIGGER)
 

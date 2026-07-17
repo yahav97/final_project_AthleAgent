@@ -1,28 +1,24 @@
-"""Unit tests for history repository and rolling features."""
+"""Unit tests for history window, Firestore IO, and rolling features."""
 
 from __future__ import annotations
 
 import pytest
 import pandas as pd
 
-from services.feature_engineering import compute_derived_features
-from services.history.day_quality import (
+from services.history.firestore_io import read_firestore_documents
+from services.history.history_window import (
     count_watch_sync_signal_groups,
-    is_quality_history_day,
-)
-from services.history.history_merge import merge_wake_up_day_row
-from services.history.repository import (
-    fetch_inference_firestore_bundle,
     fetch_user_history,
     get_history_window_context,
     history_confidence_from_quality_days,
-    read_firestore_documents,
+    is_quality_history_day,
+    merge_wake_up_day_row,
 )
+from services.history.inference_bundle import fetch_inference_firestore_bundle
 from services.history.rolling_features import (
     compute_historical_derived_features,
     sleep_hours_from_doc,
 )
-from services.preprocessing.request_features import add_same_day_composite_features
 
 pytestmark = pytest.mark.unit
 
@@ -332,7 +328,7 @@ class TestFetchUserHistory:
                 return [ref.get() for ref in refs]
 
         monkeypatch.setattr("services.history.history_window.get_firestore_client", lambda: _Db())
-        fetch_user_history("u1", "2026-05-07", lookback_days=7, include_target_day=False)
+        fetch_user_history("u1", "2026-05-07", lookback_days=7)
 
         # Wake-up days D-7..D-1 plus physical docs one day earlier.
         assert requested_health_keys
@@ -341,6 +337,18 @@ class TestFetchUserHistory:
         assert "2026-04-30" in requested_health_keys
         # 7 wake + 7 physical + 7 checkin refs, with 6 overlapping health docs → 15 unique reads.
         assert batch_get_all_calls == [15]
+
+    def test_get_history_window_context_defaults_exclude_target_day(self, monkeypatch):
+        captured: dict[str, bool] = {}
+
+        def _fetch(uid: str, d: str, lookback_days: int, include_target_day: bool) -> list[dict]:
+            captured["include_target_day"] = include_target_day
+            return []
+
+        monkeypatch.setattr("services.history.history_window.fetch_user_history", _fetch)
+        get_history_window_context("u1", "2026-05-07")
+
+        assert captured["include_target_day"] is False
 
 
 class TestFetchInferenceFirestoreBundle:
@@ -440,24 +448,6 @@ class TestRollingMa7Parity:
         assert served["acwr_ratio_ma7"] == pytest.approx(expected_acwr_ma7, rel=1e-6)
         assert served["sleep_hours_ma7"] == pytest.approx(expected_sleep_ma7, rel=1e-6)
 
-    def test_same_day_proxy_used_before_history_enrichment(self):
-        base = {
-            "daily_distance_km": 6.0,
-            "sleep_hours": 7.5,
-            "active_calories_burned": 500.0,
-            "bmr_calories": 1600.0,
-            "hrv_score": 65.0,
-            "resting_hr": 52.0,
-            "total_calories_burned": 2100.0,
-            "daily_calories": 2200.0,
-            "max_speed": 12.0,
-            "avg_speed": 8.0,
-        }
-        derived = {**base, **compute_derived_features(base)}
-        composite = add_same_day_composite_features(derived)
-        assert composite["acwr_ratio_ma7"] == pytest.approx(composite["acwr_ratio"])
-        assert composite["sleep_hours_ma7"] == pytest.approx(composite["sleep_hours"])
-
 
 class TestFirestoreResilience:
     def test_fetch_inference_bundle_returns_empty_when_client_unavailable(self, monkeypatch):
@@ -512,3 +502,64 @@ class TestSaveDailyPredictionResult:
 
         monkeypatch.setattr("services.history.persist.get_firestore_client", lambda: None)
         assert save_daily_prediction_result("u1", "2026-05-09", {"risk_score": 0.1}) is False
+
+    def test_load_cached_daily_prediction_maps_firestore_doc(self, monkeypatch):
+        class _Snapshot:
+            exists = True
+
+            def to_dict(self) -> dict[str, float | str]:
+                return {
+                    "finalRiskScore": 42.0,
+                    "riskLevel": "Medium",
+                    "predictionConfidence": 72.5,
+                }
+
+        class _Doc:
+            def get(self, field_paths=None):
+                return _Snapshot()
+
+        class _HealthColl:
+            def document(self, key: str) -> _Doc:
+                return _Doc()
+
+        class _UserDoc:
+            def collection(self, name: str) -> _HealthColl:
+                return _HealthColl()
+
+        class _Users:
+            def document(self, uid: str) -> _UserDoc:
+                return _UserDoc()
+
+        class _Db:
+            def collection(self, name: str) -> _Users:
+                return _Users()
+
+        from services.history.persist import load_cached_daily_prediction
+
+        monkeypatch.setattr("services.history.persist.get_firestore_client", lambda: _Db())
+        cached = load_cached_daily_prediction("u1", "2026-05-09")
+        assert cached == {
+            "risk_level": "Medium",
+            "risk_score": 0.42,
+            "prediction_confidence": 72.5,
+        }
+
+    def test_save_daily_prediction_result_with_retries(self, monkeypatch):
+        attempts = {"count": 0}
+
+        def _save(uid: str, d: str, result: dict) -> bool:
+            attempts["count"] += 1
+            return attempts["count"] >= 2
+
+        from services.history.persist import save_daily_prediction_result_with_retries
+
+        monkeypatch.setattr("services.history.persist.save_daily_prediction_result", _save)
+        ok = save_daily_prediction_result_with_retries(
+            "u1",
+            "2026-05-09",
+            {"risk_score": 0.2},
+            max_attempts=3,
+            retry_delay_sec=0,
+        )
+        assert ok is True
+        assert attempts["count"] == 2

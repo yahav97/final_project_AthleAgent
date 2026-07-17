@@ -32,4 +32,4 @@ class TestOpenApiContract:
         spec = api_client.get("/openapi.json").json()
         operation = spec["paths"][path][method]
         assert operation.get("responses")
-        assert "200" in operation["responses"] or "422" in operation["responses"]
+        assert "200" in operation["responses"] or "422" in operation["responses"] or "503" in operation["responses"]

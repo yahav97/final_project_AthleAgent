@@ -61,32 +61,6 @@ def threshold_sweep(y_true: pd.Series, y_proba: np.ndarray, model_name: str) -> 
     return rows
 
 
-def select_best_operating_points(
-    threshold_rows: list[dict[str, float | str]],
-    min_recall: float | None = None,
-    min_precision: float | None = None,
-) -> pd.DataFrame:
-    policy = get_policy()
-    if min_recall is None:
-        min_recall = policy.TARGET_RECALL
-    if min_precision is None:
-        min_precision = policy.TARGET_PRECISION
-    df = pd.DataFrame(threshold_rows)
-    feasible = df[(df["Recall"] >= min_recall) & (df["Precision"] >= min_precision)]
-    if feasible.empty:
-        return (
-            df.sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
-            .groupby("Model")
-            .head(1)
-        )
-    return (
-        feasible.sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
-        .groupby("Model")
-        .head(1)
-        .sort_values(by=["F1", "Precision", "Recall", "FPR"], ascending=[False, False, False, True])
-    )
-
-
 def _rank_balanced_operating_points(model_df: pd.DataFrame) -> pd.DataFrame:
     return model_df.sort_values(
         by=["F1", "Precision", "FPR", "Recall", "Threshold"],

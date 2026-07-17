@@ -7,8 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Model-selection gates: ML_model/policy_config.py (notebook can override live).
-# Backend serving gate defaults: backend/config.py → ML_MIN_RECALL_HARD, ML_MIN_AUC_FOR_LIVE.
+# Model-selection gates: backend/data/ml_policy.json (via policy_config.py).
 RANDOM_STATE = 42
 DATASET_FILENAME = "athlete_injury_data.csv"
 BENCHMARK_RELPATH = Path("data") / "benchmark_holdout.csv"

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from policy_config import (
     DEFAULT_MIN_AUC_FOR_LIVE,
     DEFAULT_MIN_RECALL_HARD,
+    POLICY_PATH,
     evaluate_policy_gates,
     get_policy,
     policy_as_dict,
@@ -14,12 +17,19 @@ from policy_config import (
 )
 
 
-class TestPolicyConstants:
-    def test_recall_hard_gate_matches_backend_default(self):
-        assert DEFAULT_MIN_RECALL_HARD == pytest.approx(0.80)
+def _load_shared_policy() -> dict:
+    with POLICY_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
-    def test_auc_gate_matches_backend_default(self):
-        assert DEFAULT_MIN_AUC_FOR_LIVE == pytest.approx(0.68)
+
+class TestPolicyConstants:
+    def test_recall_hard_gate_matches_shared_policy_json(self):
+        gates = _load_shared_policy()["ml_gates"]
+        assert DEFAULT_MIN_RECALL_HARD == pytest.approx(float(gates["min_recall_hard"]))
+
+    def test_auc_gate_matches_shared_policy_json(self):
+        gates = _load_shared_policy()["ml_gates"]
+        assert DEFAULT_MIN_AUC_FOR_LIVE == pytest.approx(float(gates["min_auc_for_live"]))
 
     def test_policy_thresholds_keys_are_complete(self):
         keys = set(policy_thresholds().keys())
@@ -65,4 +75,11 @@ class TestPolicySerialization:
         data = policy_as_dict()
         assert data["recall_hard_min"] == pytest.approx(DEFAULT_MIN_RECALL_HARD)
         assert data["auc_min_for_live"] == pytest.approx(DEFAULT_MIN_AUC_FOR_LIVE)
+        assert data["recall_target"] == pytest.approx(
+            float(_load_shared_policy()["ml_gates"]["target_recall"])
+        )
         assert "fixed_comparison_threshold" in data
+
+    def test_policy_thresholds_is_alias_of_policy_as_dict(self):
+        assert policy_thresholds() == policy_as_dict()
+        assert policy_thresholds is policy_as_dict

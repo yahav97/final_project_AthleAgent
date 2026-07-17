@@ -13,7 +13,6 @@ from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.metrics import (
     auc,
-    balanced_accuracy_score,
     brier_score_loss,
     log_loss,
     precision_recall_curve,
@@ -34,20 +33,15 @@ from training.constants import (
 )
 from training.models import model_catalog
 from training.policy import (
+    build_operating_points_table,
     build_risk_bin_table,
     evaluate_with_threshold,
     pick_best_model,
     print_split_diagnostics,
-    select_best_operating_points,
     threshold_sweep,
     winner_operating_threshold,
 )
 from training.serve_parity import apply_train_serve_parity_augmentation
-
-
-# Medium risk band uses 60% of the injury threshold (floor 0.15) — matches backend bundle defaults.
-MEDIUM_RISK_THRESHOLD_FRACTION = 0.6
-MEDIUM_RISK_THRESHOLD_FLOOR = 0.15
 
 
 # --- data & features ---
@@ -321,9 +315,6 @@ def train_and_compare(
                 "PR-AUC": pr_auc,
                 "LogLoss": log_loss(split.y_test, y_proba, labels=[0, 1]),
                 "BrierScore": brier_score_loss(split.y_test, y_proba),
-                "BalancedAccuracy@Threshold": balanced_accuracy_score(
-                    split.y_test, (y_proba >= policy.THRESHOLD).astype(int)
-                ),
             }
         )
         results.append(metrics)
@@ -365,7 +356,7 @@ def train_and_compare(
     )
     risk_bins_df = build_risk_bin_table(split.y_test, winner_proba)
     importance_df = extract_feature_importance(best_model, split.feature_columns)
-    best_points = select_best_operating_points(threshold_rows)
+    best_points = build_operating_points_table(results_df, threshold_rows)
 
     return TrainResult(
         results_df=results_df,
@@ -415,10 +406,6 @@ def save_training_artifacts(
         "estimator": estimator_for_serving,
         "feature_columns": split.feature_columns,
         "threshold": result.best_operating_threshold,
-        "medium_threshold": max(
-            MEDIUM_RISK_THRESHOLD_FLOOR,
-            result.best_operating_threshold * MEDIUM_RISK_THRESHOLD_FRACTION,
-        ),
         "policy": policy_as_dict(),
         "winner": result.best_model_name,
     }
@@ -447,7 +434,6 @@ def save_training_artifacts(
         "threshold": result.best_operating_threshold,
         "policy": model_bundle["policy"],
         "winner": result.best_model_name,
-        "athlete_cv_splits": ATHLETE_CV_SPLITS if cv_result is not None else None,
         "selection_protocol": {
             "athlete_cv_splits": ATHLETE_CV_SPLITS if cv_result is not None else None,
             "metrics_source": "fixed_holdout_evaluation",
@@ -464,23 +450,15 @@ def save_training_artifacts(
             "ROC-AUC": float(result.best_row["ROC-AUC"]),
             "LogLoss": float(result.best_row["LogLoss"]),
         },
-        "risk_bins": [
-            {
-                "bin": str(row["bin"]),
-                "samples": int(row["samples"]),
-                "injury_rate": float(row["injury_rate"]),
-            }
-            for _, row in result.risk_bins_df.iterrows()
-        ],
     }
     manifest_path = artifacts_dir / "run_manifest.json"
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    if result.importance_df is not None:
-        result.importance_df.to_csv(artifacts_dir / "feature_importance.csv", index=False)
-    if serving_importance_df is not None:
-        serving_importance_df.to_csv(artifacts_dir / "feature_importance_serving.csv", index=False)
+    # Prefer full-data refit importance when available (matches the served estimator).
+    importance_to_save = serving_importance_df if serving_importance_df is not None else result.importance_df
+    if importance_to_save is not None:
+        importance_to_save.to_csv(artifacts_dir / "feature_importance.csv", index=False)
     if cv_result is not None:
         cv_result.fold_details.to_csv(artifacts_dir / "athlete_cv_folds.csv", index=False)
         cv_result.summary.to_csv(artifacts_dir / "athlete_cv_summary.csv", index=False)
@@ -551,7 +529,7 @@ def run_training_pipeline(
         print(result.results_df.to_string(index=False))
         print("\nThreshold sweep summary:")
         print(pd.DataFrame(result.threshold_rows).sort_values(by=["Model", "Threshold"]).to_string(index=False))
-        print("\nBest operating points per model:")
+        print("\nBest operating points per model (tiered policy):")
         print(result.best_points.to_string(index=False))
         print(f"\nSelected winner: {result.best_model_name}")
         print(

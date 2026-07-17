@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 RiskLevel = Literal["Low", "Medium", "High"]
 
 DATE_KEY_FORMAT = "%Y-%m-%d"
+MAX_DATE_FUTURE_DAYS = 1
+MAX_DATE_PAST_DAYS = 730
 
 
 def validate_date_key(value: object) -> object:
@@ -17,5 +19,10 @@ def validate_date_key(value: object) -> object:
     if not isinstance(value, str):
         raise TypeError("date must be a string")
     normalized = value.strip()
-    datetime.strptime(normalized, DATE_KEY_FORMAT)
+    parsed = datetime.strptime(normalized, DATE_KEY_FORMAT).date()
+    today = date.today()
+    if parsed > today + timedelta(days=MAX_DATE_FUTURE_DAYS):
+        raise ValueError("date must not be in the future")
+    if parsed < today - timedelta(days=MAX_DATE_PAST_DAYS):
+        raise ValueError("date is too far in the past")
     return normalized

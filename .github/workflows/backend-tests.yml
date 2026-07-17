@@ -1,4 +1,4 @@
-name: Backend tests
+name: Backend and ML tests
 
 on:
   push:
@@ -33,6 +33,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Run pytest
+      - name: Run backend pytest
         working-directory: backend
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Run ML_model pytest
+        working-directory: ML_model
         run: python -m pytest tests/ -v --tb=short

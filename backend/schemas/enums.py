@@ -34,7 +34,6 @@ class ModelGateReason(str, Enum):
     MISSING_ESTIMATOR = "missing_estimator"
     MISSING_FEATURE_COLUMNS = "missing_feature_columns"
     INVALID_THRESHOLD = "invalid_threshold"
-    INVALID_MEDIUM_THRESHOLD = "invalid_medium_threshold"
 
 
 class ModelLiveStatus(str, Enum):
@@ -55,3 +54,4 @@ class HealthStatus(str, Enum):
 
     OK = "ok"
     HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"

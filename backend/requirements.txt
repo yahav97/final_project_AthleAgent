@@ -34,5 +34,5 @@ httpx>=0.25.0
 google-auth>=2.23.0
 firebase-admin>=6.5.0
 
-# --- Tests (pytest run from backend/) ---
+# --- Tests (pytest: backend/tests/ and ML_model/tests/ — see README.md) ---
 pytest>=7.4.0

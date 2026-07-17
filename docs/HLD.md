@@ -7,7 +7,7 @@
 | **Date** | 2026-07-11 |
 | **Authors** | Yahav Simon, Tzuf Feldon |
 | **Audience** | Developers, course evaluators, technical stakeholders |
-| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
+| **Related documents** | [LLD.md](LLD.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -435,7 +435,7 @@ For course evaluation, place credentials locally (do **not** commit or zip the A
 | **Model** | `XGBoostCalibratedTuned` |
 | **Operating threshold** | ~0.10 |
 | **Feature count** | 35 (see `backend/data/model_feature_contract.json`) |
-| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
+| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 (from `backend/data/ml_policy.json`) |
 | **Promotion pointer** | `ML_model/artifacts/promoted.json` → run `20260709_104916` |
 
 > ML detail: [MODEL_SELECTION.md](MODEL_SELECTION.md)
@@ -465,7 +465,7 @@ final_project_AthleAgent/
 | Cloud | Firebase Auth, Cloud Firestore |
 | AI | Google Gemini (client-side only) |
 | Health | Google Health Connect SDK |
-| CI/Tests | pytest (backend), JUnit (Android placeholder) |
+| CI/Tests | pytest — backend (252) + `ML_model` (12) via [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml); Android JUnit placeholder (build only) |
 
 ---
 
@@ -498,6 +498,6 @@ final_project_AthleAgent/
 | Document | Content |
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
-| [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
+| [LLD.md](LLD.md) | Low-level design — full project |
 | [README.md](../README.md) | Run locally / Docker, API, tests |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

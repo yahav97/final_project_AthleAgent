@@ -150,6 +150,11 @@ class TestApplyHistoryConfidenceFallback:
             assert float(out[column].iloc[0]) == pytest.approx(
                 float(DEFAULT_FEATURE_VALUES[column])
             )
+        expected_lri = (
+            float(DEFAULT_FEATURE_VALUES["acwr_ratio"])
+            * float(DEFAULT_FEATURE_VALUES["sleep_debt_3d"])
+        )
+        assert float(out["load_recovery_imbalance"].iloc[0]) == pytest.approx(expected_lri)
 
     def test_low_confidence_without_features_uses_defaults(self, monkeypatch):
         monkeypatch.setattr(
@@ -173,7 +178,7 @@ class TestApplyHistoryConfidenceFallback:
         payload = InjuryPredictionRequest(userId="u1", date="2026-04-30", age=28)
         out, confidence = apply_history_confidence_fallback(_base_frame(), payload)
 
-        assert confidence == HistoryConfidence.HIGH
+        assert confidence == HistoryConfidence.LOW
         for column in HISTORY_ROLLING_FEATURES:
             assert float(out[column].iloc[0]) == pytest.approx(
                 float(DEFAULT_FEATURE_VALUES[column])

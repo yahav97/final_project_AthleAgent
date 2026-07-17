@@ -8,8 +8,8 @@ import pandas as pd
 
 from config import settings
 from services.feature_engineering import (
-    acwr_baseline_from_weekly_stats,
-    acwr_ratio_bounded,
+    acwr_features_from_distance_history,
+    sleep_debt_3d_from_sleep_hours,
 )
 from services.field_transforms import (
     daily_distance_km_from_doc,
@@ -63,23 +63,19 @@ def compute_historical_derived_features(
 
     # Align windows with ML_model/generation/postprocess.py (7d ACWR, 3d sleep debt).
     frame = pd.DataFrame(rows).sort_values("date_key")
-    frame["acute_load_7d"] = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
-    weekly_mean = frame["daily_distance_km"].rolling(7, min_periods=1).mean()
-    weekly_std = frame["daily_distance_km"].rolling(7, min_periods=1).std().fillna(0.0)
-    baseline = pd.Series(
-        [
-            acwr_baseline_from_weekly_stats(float(mean), float(std))
-            for mean, std in zip(weekly_mean, weekly_std, strict=True)
-        ],
-        index=frame.index,
-    )
-    frame["acwr_ratio"] = [
-        acwr_ratio_bounded(float(acute), float(base))
-        for acute, base in zip(frame["acute_load_7d"], baseline, strict=True)
-    ]
+    distances = frame["daily_distance_km"].tolist()
+    acute_series: list[float] = []
+    acwr_series: list[float] = []
+    for index in range(len(distances)):
+        acute, acwr = acwr_features_from_distance_history(distances[: index + 1])
+        acute_series.append(acute)
+        acwr_series.append(acwr)
+    frame["acute_load_7d"] = acute_series
+    frame["acwr_ratio"] = acwr_series
 
     sleep_target = float(settings.SLEEP_TARGET_HOURS)
-    frame["sleep_debt_3d"] = (sleep_target - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
+    daily_deficit = (sleep_target - frame["sleep_hours"]).clip(lower=0.0)
+    frame["sleep_debt_3d"] = daily_deficit.rolling(3, min_periods=1).sum()
     frame["hrv_rolling_7d"] = frame["hrv_score"].rolling(7, min_periods=1).mean()
     frame["hrv_drop"] = (frame["hrv_score"] - frame["hrv_rolling_7d"]).clip(lower=-15.0, upper=15.0)
     frame["acwr_ratio_ma7"] = frame["acwr_ratio"].rolling(7, min_periods=1).mean()

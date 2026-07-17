@@ -12,9 +12,9 @@ from services.prediction.confidence import count_defaulted_critical_features
 from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
 from services.prediction.service import (
-    persist_prediction_result_or_raise,
     predict_injury_risk,
     predict_injury_risk_from_firestore,
+    run_daily_prediction,
 )
 from services.preprocessing import injury_request_to_model_dataframe
 from utils.exceptions import DatabaseError, MLModelError
@@ -53,20 +53,17 @@ class TestResolveModelBundle:
         assert bundle.estimator is None
         assert bundle.gate_status == "invalid_threshold"
 
-    def test_derives_medium_threshold_when_absent(self, mock_model_bundle):
+    def test_accepts_bundle_without_medium_threshold(self, mock_model_bundle):
         del mock_model_bundle["medium_threshold"]
         mock_model_bundle["threshold"] = 0.40
         bundle = resolve_model_bundle(mock_model_bundle)
         assert bundle.gate_status == "none"
-        assert bundle.injury_threshold == pytest.approx(0.40)
-        assert bundle.medium_risk_threshold == pytest.approx(max(0.15, 0.40 * 0.6))
+        assert bundle.estimator is mock_model_bundle["estimator"]
 
     def test_valid_bundle_returns_all_fields(self, mock_model_bundle):
         bundle = resolve_model_bundle(mock_model_bundle)
         assert bundle.estimator is mock_model_bundle["estimator"]
         assert bundle.feature_columns == MODEL_FEATURE_COLUMNS
-        assert bundle.injury_threshold == pytest.approx(0.35)
-        assert bundle.medium_risk_threshold == pytest.approx(0.20)
         assert bundle.model_name == "ExtraTrees"
         assert bundle.gate_status == "none"
 
@@ -86,8 +83,8 @@ class TestDefaultedCriticalFeatures:
             )
         )
         count = count_defaulted_critical_features(df)
-        # sleep_hours_ma7 and hrv_drop match population defaults; others come from same-day load.
-        assert count == 2
+        # 7h sleep → sleep_debt_3d=1.0 (population default); sleep_hours_ma7 and hrv_drop too.
+        assert count == 3
 
     def test_counts_all_six_when_frame_uses_population_defaults(self):
         df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
@@ -292,13 +289,44 @@ class TestPredictInjuryRisk:
         with pytest.raises(DatabaseError, match="Firestore snapshot unavailable"):
             predict_injury_risk_from_firestore("u1", "2026-05-09")
 
-    def test_persist_raises_on_write_failure(self, monkeypatch):
-        def _save_failed(user_id: str, date_key: str, result: dict) -> bool:
-            return False
+    def test_run_daily_prediction_returns_cached_without_inference(self, monkeypatch):
+        cached = {
+            "risk_level": "High",
+            "risk_score": 0.9,
+            "prediction_confidence": 88.0,
+        }
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: dict(cached),
+        )
+
+        def _should_not_infer(uid: str, d: str) -> dict:
+            raise AssertionError("inference should be skipped on cache hit")
 
         monkeypatch.setattr(
-            "services.prediction.service.save_daily_prediction_result",
-            _save_failed,
+            "services.prediction.service.predict_injury_risk_from_firestore",
+            _should_not_infer,
         )
-        with pytest.raises(DatabaseError, match="Prediction persist failed"):
-            persist_prediction_result_or_raise("u1", "2026-05-09", {"risk_score": 0.3})
+        out = run_daily_prediction("u1", "2026-05-09")
+        assert out == cached
+
+    def test_run_daily_prediction_returns_result_when_persist_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: None,
+        )
+        monkeypatch.setattr(
+            "services.prediction.service.predict_injury_risk_from_firestore",
+            lambda uid, d: {
+                "risk_level": "Medium",
+                "risk_score": 0.4,
+                "prediction_confidence": 70.0,
+            },
+        )
+        monkeypatch.setattr(
+            "services.prediction.service.save_daily_prediction_result_with_retries",
+            lambda uid, d, r, **kw: False,
+        )
+        out = run_daily_prediction("u1", "2026-05-09")
+        assert out["risk_level"] == "Medium"
+        assert out["risk_score"] == pytest.approx(0.4)

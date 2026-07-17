@@ -30,7 +30,7 @@ cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Check: [http://localhost:8000/health](http://localhost:8000/health) and [http://localhost:8000/status/ml](http://localhost:8000/status/ml) (`"status": "Live"`).
+Check: [http://localhost:8000/health](http://localhost:8000/health) (readiness — Firestore + live model; **503** if either is down) and [http://localhost:8000/status/ml](http://localhost:8000/status/ml) (`"status": "Live"`).
 
 ### Android
 
@@ -51,6 +51,16 @@ docs/                     HLD / LLD / Docker / ML selection
 
 ## Extra
 
-- Tests: `cd backend && python -m pytest tests/ -v`
+### Tests
+
+| Suite | Command | Count (approx.) |
+| --- | --- | --- |
+| Backend | `cd backend && python -m pytest tests/ -v` | 252 |
+| ML policy / parity | `cd ML_model && python -m pytest tests/ -v` | 12 |
+
+**CI:** GitHub Actions workflow [`.github/workflows/backend-tests.yml`](.github/workflows/backend-tests.yml) runs both suites on changes under `backend/`, `ML_model/`, or the workflow file.
+
+**Layout:** `backend/tests/unit/` (domain + ML contract) · `backend/tests/integration/` (HTTP routes, OpenAPI, real-model smoke when `injury_model.pkl` is present) · `ML_model/tests/` (policy gates vs `backend/data/ml_policy.json`, train-serve parity).
+
 - Retrain: `python ML_model/run_pipeline.py`, then restart the backend
 - Docker: [docs/DOCKER.md](docs/DOCKER.md)

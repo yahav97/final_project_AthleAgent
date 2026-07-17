@@ -6,7 +6,7 @@
 | **Version** | 1.1 |
 | **Date** | 2026-07-11 |
 | **Audience** | Developers |
-| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
+| **Related documents** | [HLD.md](HLD.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -232,7 +232,7 @@ flowchart TD
 | Method | Path | Handler | Response |
 |--------|------|---------|----------|
 | GET | `/` | `health.py` | metadata |
-| GET | `/health` | `health.py` | `{status: "healthy"}` |
+| GET | `/health` | `health.py` | Readiness: `{status, checks}` — **200** when Firestore + live model OK, **503** otherwise |
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
 | POST | `/api/v1/observability/client-events` | `observability.py` | 202 Accepted |
@@ -242,34 +242,43 @@ flowchart TD
 ```
 POST /predict/daily {userId, date}
     │
-    ├─ fetch_inference_firestore_bundle()              [history/inference_bundle]
-    │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1} + history window
+    ├─ run_daily_prediction()                            [prediction/service]
+    │     ├─ load_cached_daily_prediction()              [history/persist] → return on cache hit
+    │     │
+    │     ├─ predict_injury_risk_from_firestore()
+    │     │     ├─ fetch_inference_firestore_bundle()    [history/inference_bundle]
+    │     │     │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1} + history window
+    │     │     │
+    │     │     ├─ injury_prediction_request_from_firestore_snapshot()
+    │     │     │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
+    │     │     │
+    │     │     ├─ resolve_request_nutrition()             [nutrition_defaults]
+    │     │     │
+    │     │     ├─ injury_request_to_model_dataframe()   [preprocessing/]
+    │     │     │     preprocessing + feature_engineering
+    │     │     │
+    │     │     ├─ apply_history_confidence_fallback()   [prediction/confidence]
+    │     │     │     7-day rolling: ACWR, sleep_debt, hrv_drop  [history/rolling_features]
+    │     │     │
+    │     │     ├─ calculate_data_quality_score()          [preprocessing/quality]
+    │     │     │
+    │     │     ├─ compute_prediction_confidence_percent() [prediction/confidence]
+    │     │     │
+    │     │     └─ model.predict_proba() → proba           [prediction/bundle]
+    │     │           classify_risk_level via risk_levels + RISK_*_CUTOFF (not bundle thresholds)
+    │     │           Low ≤ 20%, Medium 21–70%, High > 70%
+    │     │
+    │     └─ save_daily_prediction_result_with_retries()   [history/persist]
+    │           merge → daily_health/{date}; persist failure is logged only (HTTP still 200)
     │
-    ├─ injury_prediction_request_from_firestore_snapshot()
-    │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
-    │
-    ├─ resolve_request_nutrition()                       [nutrition_defaults]
-    │
-    ├─ injury_request_to_model_dataframe()               [preprocessing/]
-    │     preprocessing + feature_engineering
-    │
-    ├─ apply_history_confidence_fallback()             [prediction/confidence]
-    │     7-day rolling: ACWR, sleep_debt, hrv_drop    [history/rolling_features]
-    │
-    ├─ calculate_data_quality_score()                    [preprocessing/quality]
-    │
-    ├─ compute_prediction_confidence_percent()         [prediction/confidence]
-    │
-    ├─ model.predict_proba() → proba                     [prediction/bundle]
-    │     classify_risk_level: Low ≤ 20%, Medium 21–70%, High > 70%
-    │
-    └─ save_daily_prediction_result()
-          merge → daily_health/{date}
+    └─ InjuryPredictionResponse
 ```
 
 ### 3.3 Model Features (35 columns)
 
-Source of truth: `backend/services/model_features.py`
+Source of truth: `backend/services/model_features.py` (contract: `backend/data/model_feature_contract.json`)
+
+Train-serve parity: ACWR baseline uses **distance-only** 7-day history (`acwr_features_from_distance_history`); `sleep_debt_3d` is a rolling sum of clipped daily sleep deficits; history window defaults `include_target_day=False`.
 
 | Category | Features |
 |----------|----------|
@@ -308,18 +317,24 @@ The `estimator` field holds the winning model from the promoted training run —
 {
     "estimator": <sklearn-compatible model from promoted run>,  # e.g. XGBoostCalibratedTuned
     "feature_columns": [...],  # 35 names
-    "threshold": "<from run_manifest.json>",
-    "medium_threshold": 0.11,
-    "winner": "<from run_manifest.json>"  # e.g. "XGBoostCalibratedTuned"
+    "threshold": "<from run_manifest.json>",  # required contract gate at serve
+    "winner": "<from run_manifest.json>",  # e.g. "XGBoostCalibratedTuned"
+    "policy": {...},  # selection gates snapshot
 }
 ```
 
+Serve (`prediction/bundle.resolve_model_bundle`) validates that `threshold` is present and numeric, then classifies risk with `services/risk_levels.py` + `RISK_HIGH_CUTOFF` / `RISK_MEDIUM_CUTOFF` so Android UI bands stay aligned.
+
 ### 4.3 Live Gates (`model_loader.py`)
+
+Gate thresholds are defined in `backend/data/ml_policy.json` (`ml_gates`) and loaded via `backend/services/ml_policy.py` / `ML_model/policy_config.py`.
 
 | Gate | Threshold |
 |------|-----------|
 | Recall@Threshold | ≥ 0.80 |
 | ROC-AUC | ≥ 0.68 |
+
+Run manifests are normalized at load time (`backend/ml/manifest.py`); legacy fields can be repaired with `python ML_model/normalize_artifacts.py`.
 
 ### 4.4 Promotion
 
@@ -414,7 +429,8 @@ sequenceDiagram
 |-----------|------|--------|
 | Model blocked | 503 | `model_not_live:*` |
 | Firestore unavailable | 503 | `firestore_snapshot_unavailable` |
-| Persist failed | 503 | `prediction_persist_failed` |
+| Readiness probe failed | 503 | `/health` → `status: "unhealthy"` (missing Firestore or blocked model) |
+| Persist failed (after inference) | **200** | Score returned to client; failure logged server-side; safe to retry (`load_cached_daily_prediction` on later success) |
 
 ---
 
@@ -439,10 +455,11 @@ No `.env` file is required. Defaults are defined in `backend/config.py` (pydanti
 | `MODEL_PATH` | `None` → resolves via `ML_model/artifacts/promoted.json`, then `backend/injury_model.pkl` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` (local only; auto-resolved when present) |
 | `CORS_ORIGINS` | localhost ports |
+| ML gates / sleep target | `backend/data/ml_policy.json` (override live gates via `ML_MIN_RECALL_HARD`, `ML_MIN_AUC_FOR_LIVE`, `SLEEP_TARGET_HOURS`) |
 
 ### 7.3 Emulator Networking
 
-- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `8000:8000`)
+- Android emulator: `10.0.2.2:8000` → host `localhost:8000` (works with Docker port mapping `127.0.0.1:8000:8000`)
 - Physical device: host machine IP address
 
 ### 7.4 Backend Deployment (Local)
@@ -458,14 +475,55 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Th
 
 ## 8. Testing
 
-| Layer | Framework | Key files |
-|-------|-----------|-----------|
-| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
-| Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
+### 8.1 Overview
 
-**Run backend tests:**
+| Suite | Framework | Tests | CI |
+|-------|-----------|-------|-----|
+| Backend | pytest | 252 | [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml) |
+| ML_model | pytest | 12 | same workflow (second step) |
+| Android | JUnit | placeholder only (`ExampleUnitTest.kt`) — not in CI | — |
+
+Markers in `backend/pytest.ini`: `unit` (no network / Firestore / real artifacts) · `integration` (FastAPI routes).
+
+### 8.2 Backend layout
+
+| Layer | Path | Focus |
+|-------|------|--------|
+| Unit | `backend/tests/unit/` | Feature engineering, preprocessing, prediction service, model loader gates, history window / Firestore IO, confidence fallback, config ↔ `ml_policy.json`, schemas, risk bands |
+| Integration | `backend/tests/integration/` | HTTP contract (`/predict/daily`, `/health`, `/status/ml`), OpenAPI surface, request-id / client-events, real-model smoke (`test_prediction_model_columns.py` when `injury_model.pkl` exists) |
+
+**Representative files:**
+
+| Area | Key tests |
+|------|-----------|
+| ML gates / loader | `tests/unit/test_model_loader.py`, `tests/unit/test_manifest.py` |
+| Inference pipeline | `tests/unit/test_prediction_service.py`, `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py` |
+| History / confidence | `tests/unit/test_history_repository.py`, `tests/unit/test_confidence_fallback.py` |
+| Health (dependency logic) | `tests/unit/test_health_status.py` — Firestore down / model blocked → 503 |
+| HTTP predict | `tests/integration/test_routes_predict_daily.py` — validation, cache, persist, **real model gate** (no mock on `run_daily_prediction`) |
+| HTTP health / ML status | `tests/integration/test_routes_health.py` (smoke), `tests/integration/test_routes_ml_status.py` (schema + blocked state) |
+| API contract | `tests/integration/test_openapi_contract.py` |
+
+Removed duplicates (2026-07): `test_profile_defaults.py` (covered by prediction service); health 503 failure paths only in unit tests; ACWR same-day case only in `test_feature_engineering.py`.
+
+### 8.3 ML_model layout
+
+| File | Focus |
+|------|--------|
+| `ML_model/tests/test_policy_config.py` | Policy constants match `backend/data/ml_policy.json`; gate boundary evaluation |
+| `ML_model/tests/test_serve_parity.py` | Cold-start rows use contract rolling defaults (train-serve parity) |
+
+### 8.4 Run locally
+
 ```bash
 cd backend && python -m pytest tests/ -v
+cd ML_model && python -m pytest tests/ -v
+```
+
+Pre-demo smoke (promoted model path resolution):
+
+```bash
+cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q
 ```
 
 ---
@@ -490,9 +548,10 @@ cd backend && python -m pytest tests/ -v
 | Meal | `AnalyzingMealActivity.kt` | — |
 | Predict trigger | `ApiClient.kt` | `predict.py` |
 | Inference | — | `prediction/service.py` |
-| Features | — | `preprocessing/`, `history/day_quality.py`, `feature_engineering.py`, `model_features.py` |
+| Features | — | `preprocessing/`, `history/history_window.py`, `feature_engineering.py`, `model_features.py` |
 | Confidence | — | `prediction/confidence.py`, `preprocessing/quality.py` |
-| Persist | — | `history/persist.save_daily_prediction_result` |
+| Persist | — | `history/persist.py` (`load_cached_daily_prediction`, `save_daily_prediction_result_with_retries`) |
+| Firestore IO | — | `history/firestore_io.py` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |
 | Train | — | `ML_model/training/pipeline.py` (CLI: `train_model.py`) |
@@ -504,5 +563,5 @@ cd backend && python -m pytest tests/ -v
 | Document | Content |
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
-| [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
+| [HLD.md](HLD.md) | Full-project HLD |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |
