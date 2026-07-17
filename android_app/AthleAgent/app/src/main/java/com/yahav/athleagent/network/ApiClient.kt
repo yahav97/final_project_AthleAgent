@@ -11,6 +11,21 @@ object ApiClient {
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(CorrelationIdInterceptor())
+        .addInterceptor { chain ->
+            val request = chain.request()
+            var response = chain.proceed(request)
+            var tryCount = 0
+            val maxLimit = 3
+
+            while (!response.isSuccessful && response.code == 503 && tryCount < maxLimit) {
+                tryCount++
+                // Wait 2 seconds before retrying
+                Thread.sleep(2000)
+                response.close()
+                response = chain.proceed(request)
+            }
+            response
+        }
         .build()
 
     private val retrofit: Retrofit by lazy {

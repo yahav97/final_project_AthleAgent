@@ -157,7 +157,12 @@ class DailyCheckInActivity : AppCompatActivity() {
                                             eventReporter.reportEvent("ml_trigger_success", "Prediction triggered successfully", metadata)
                                         }
                                     } else {
-                                        eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
+                                        if (response.code() == 503) {
+                                            android.widget.Toast.makeText(this@DailyCheckInActivity, "Server is busy, analyzing data in background...", android.widget.Toast.LENGTH_LONG).show()
+                                            eventReporter.reportEvent("ml_service_unavailable", "Received 503 from prediction API")
+                                        } else {
+                                            eventReporter.reportEvent("error", "Prediction API error: ${response.code()}")
+                                        }
                                     }
                                 }
                                 override fun onFailure(call: Call<ApiService.PredictionResponse>, t: Throwable) {
