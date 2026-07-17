@@ -33,7 +33,8 @@ class TestRequestLoggingMiddleware:
         finally:
             logging_module.logger.removeFilter(_capture)
 
-        assert response.status_code == 200
+        # Logging middleware skips /health regardless of dependency readiness (200 or 503).
+        assert response.status_code in (200, 503)
         assert "X-Request-ID" not in response.headers
         assert not any(getattr(r, "event", None) == "http_request_completed" for r in captured)
 
