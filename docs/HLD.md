@@ -7,7 +7,7 @@
 | **Date** | 2026-07-11 |
 | **Authors** | Yahav Simon, Tzuf Feldon |
 | **Audience** | Developers, course evaluators, technical stakeholders |
-| **Related documents** | [LLD_PROJECT.md](LLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
+| **Related documents** | [LLD.md](LLD.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -498,6 +498,6 @@ final_project_AthleAgent/
 | Document | Content |
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
-| [LLD_PROJECT.md](LLD_PROJECT.md) | Low-level design — full project |
+| [LLD.md](LLD.md) | Low-level design — full project |
 | [README.md](../README.md) | Run locally / Docker, API, tests |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

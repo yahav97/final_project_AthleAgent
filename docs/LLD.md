@@ -6,7 +6,7 @@
 | **Version** | 1.1 |
 | **Date** | 2026-07-11 |
 | **Audience** | Developers |
-| **Related documents** | [HLD_PROJECT.md](HLD_PROJECT.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
+| **Related documents** | [HLD.md](HLD.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
 
 ---
 
@@ -522,5 +522,5 @@ cd backend && python -m pytest tests/ -v
 | Document | Content |
 |----------|---------|
 | [DOCKER.md](DOCKER.md) | Backend + ML — Docker |
-| [HLD_PROJECT.md](HLD_PROJECT.md) | Full-project HLD |
+| [HLD.md](HLD.md) | Full-project HLD |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |

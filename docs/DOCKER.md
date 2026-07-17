@@ -96,6 +96,6 @@ volumes:
 | Document | Content |
 |----------|---------|
 | [README.md](../README.md) | Project overview, run, API, tests |
-| [docs/HLD_PROJECT.md](HLD_PROJECT.md) | Full project HLD |
-| [docs/LLD_PROJECT.md](LLD_PROJECT.md) | Full project LLD |
+| [docs/HLD.md](HLD.md) | Full project HLD |
+| [docs/LLD.md](LLD.md) | Full project LLD |
 | [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |
