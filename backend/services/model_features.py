@@ -5,8 +5,11 @@ The JSON is the single source of truth for:
 - ``MODEL_FEATURE_COLUMNS`` — column order passed to ``predict_proba``
 - ``DEFAULT_FEATURE_VALUES`` — population defaults when history is thin
   (``age`` overridden at load time from ``settings.PROFILE_DEFAULT_AGE``)
-- ``TRAINING_CSV_EXCLUDE_COLUMNS`` — columns derived only at serve time
 - ``INTEGER_FEATURE_COLUMNS`` — features stored as whole numbers (train + serve)
+
+Rolling MA7 columns (``acwr_ratio_ma7``, ``sleep_hours_ma7``) are model inputs in
+both training (``ML_model/training/pipeline.add_sequential_features``) and serve
+(``services/history/rolling_features`` or same-day proxies / population defaults).
 """
 
 from __future__ import annotations
@@ -57,10 +60,6 @@ def default_feature_values_from_contract() -> dict[str, float]:
     return resolved
 
 
-def training_csv_exclude_columns_from_contract() -> tuple[str, ...]:
-    return tuple(str(column) for column in _optional_list(load_model_feature_contract(), "training_csv_exclude_columns"))
-
-
 def integer_feature_columns_from_contract() -> tuple[str, ...]:
     return tuple(str(column) for column in _optional_list(load_model_feature_contract(), "integer_feature_columns"))
 
@@ -76,5 +75,4 @@ def coerce_whole_number_features(features: dict[str, float]) -> dict[str, float]
 
 MODEL_FEATURE_COLUMNS: list[str] = list(feature_column_names_from_contract())
 DEFAULT_FEATURE_VALUES: dict[str, float] = default_feature_values_from_contract()
-TRAINING_CSV_EXCLUDE_COLUMNS: tuple[str, ...] = training_csv_exclude_columns_from_contract()
 INTEGER_FEATURE_COLUMNS: tuple[str, ...] = integer_feature_columns_from_contract()

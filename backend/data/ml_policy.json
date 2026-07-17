@@ -1,0 +1,19 @@
+{
+  "ml_gates": {
+    "min_recall_hard": 0.80,
+    "min_auc_for_live": 0.68,
+    "max_fpr_operating": 0.55,
+    "target_recall": 0.80,
+    "target_precision": 0.13,
+    "target_f1": 0.22,
+    "fixed_comparison_threshold": 0.18
+  },
+  "feature_defaults": {
+    "sleep_target_hours": 8.0
+  },
+  "train_serve_parity": {
+    "cold_start_augment_fraction": 0.25,
+    "cold_start_first_n_days": 7,
+    "nutrition_mask_fraction": 0.25
+  }
+}

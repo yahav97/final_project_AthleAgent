@@ -8,7 +8,11 @@ from typing import Annotated, Any
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from services.ml_policy import ml_gate_defaults, sleep_target_hours_default
+
 _BACKEND_DIR = Path(__file__).resolve().parent
+
+_ML_GATES = ml_gate_defaults()
 
 
 def _project_root() -> Path:
@@ -41,10 +45,10 @@ class Settings(BaseSettings):
     PORT: int = 8000
     API_V1_PREFIX: str = "/api/v1"
 
-    # ML gates — keep aligned with ML_model/policy_config.py
+    # ML gates — defaults from backend/data/ml_policy.json (override via env)
     MODEL_PATH: Path | None = None
-    ML_MIN_RECALL_HARD: float = 0.80
-    ML_MIN_AUC_FOR_LIVE: float = 0.68
+    ML_MIN_RECALL_HARD: float = _ML_GATES["min_recall_hard"]
+    ML_MIN_AUC_FOR_LIVE: float = _ML_GATES["min_auc_for_live"]
 
     # Risk bands — aligned with Android UI
     RISK_HIGH_CUTOFF: float = 0.70
@@ -56,9 +60,8 @@ class Settings(BaseSettings):
     HISTORY_CONFIDENCE_MEDIUM_MIN_DAYS: int = 4
     HISTORY_MIN_WATCH_SYNC_SIGNAL_GROUPS: int = 3
 
-    # Sleep / recovery features — aligned with ML_model/policy_config.py
-    SLEEP_TARGET_HOURS: float = 8.0
-    SLEEP_DEBT_SINGLE_DAY_PROXY_SCALE: float = 1.25
+    # Sleep / recovery features — default from backend/data/ml_policy.json
+    SLEEP_TARGET_HOURS: float = sleep_target_hours_default()
 
     # Prediction confidence blend
     CONFIDENCE_HISTORY_WEIGHT: float = 0.6

@@ -10,6 +10,7 @@ import joblib
 
 from config import settings
 from schemas.enums import ModelGateReason, ModelLiveStatus
+from ml.manifest import normalize_run_manifest
 from utils.logging import logger
 
 _estimator: Optional[Any] = None
@@ -231,11 +232,13 @@ def load_model(
 
     try:
         with manifest_candidate.open("r", encoding="utf-8") as f:
-            manifest = json.load(f)
+            raw_manifest = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Manifest read failed at %s: %s", manifest_candidate, exc)
         _set_model_blocked(ModelGateReason.MANIFEST_CORRUPTED)
         return None
+
+    manifest = normalize_run_manifest(raw_manifest) if isinstance(raw_manifest, dict) else raw_manifest
 
     valid, reason = _validate_manifest_for_live(manifest, path)
     if not valid:

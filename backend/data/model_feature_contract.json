@@ -1,8 +1,4 @@
 {
-  "training_csv_exclude_columns": [
-    "acwr_ratio_ma7",
-    "sleep_hours_ma7"
-  ],
   "integer_feature_columns": [
     "age",
     "history_injury_count",

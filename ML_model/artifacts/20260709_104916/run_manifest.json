@@ -4,19 +4,18 @@
   "artifacts_dir": "ML_model/artifacts/20260709_104916",
   "dataset_path": "ML_model/athlete_injury_data.csv",
   "dataset_rows": 340000,
-  "benchmark_path": "ML_model/benchmark_holdout.csv",
+  "benchmark_path": "ML_model/data/benchmark_holdout.csv",
   "threshold": 0.1,
   "policy": {
     "recall_hard_min": 0.8,
-    "recall_min": 0.8,
-    "fpr_max_operating": 0.55,
+    "recall_target": 0.8,
     "precision_min": 0.13,
     "f1_min": 0.22,
-    "auc_min_for_live": 0.68,
-    "fixed_comparison_threshold": 0.18
+    "fpr_max_operating": 0.55,
+    "fixed_comparison_threshold": 0.18,
+    "auc_min_for_live": 0.68
   },
   "winner": "XGBoostCalibratedTuned",
-  "athlete_cv_splits": 2,
   "selection_protocol": {
     "athlete_cv_splits": 2,
     "metrics_source": "fixed_holdout_evaluation",
@@ -53,22 +52,5 @@
     "BrierScore": 0.11139500382384482,
     "ROC-AUC": 0.7827366754956389,
     "LogLoss": 0.36619189731175883
-  },
-  "risk_bins": [
-    {
-      "bin": "green_0_20",
-      "samples": 52281,
-      "injury_rate": 0.0923279967865955
-    },
-    {
-      "bin": "yellow_20_50",
-      "samples": 11217,
-      "injury_rate": 0.30881697423553534
-    },
-    {
-      "bin": "red_50_100",
-      "samples": 4502,
-      "injury_rate": 0.6261661483784985
-    }
-  ]
+  }
 }

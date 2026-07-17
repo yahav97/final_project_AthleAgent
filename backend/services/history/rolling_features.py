@@ -79,7 +79,8 @@ def compute_historical_derived_features(
     ]
 
     sleep_target = float(settings.SLEEP_TARGET_HOURS)
-    frame["sleep_debt_3d"] = (sleep_target - frame["sleep_hours"]).rolling(3, min_periods=1).sum()
+    daily_deficit = (sleep_target - frame["sleep_hours"]).clip(lower=0.0)
+    frame["sleep_debt_3d"] = daily_deficit.rolling(3, min_periods=1).sum()
     frame["hrv_rolling_7d"] = frame["hrv_score"].rolling(7, min_periods=1).mean()
     frame["hrv_drop"] = (frame["hrv_score"] - frame["hrv_rolling_7d"]).clip(lower=-15.0, upper=15.0)
     frame["acwr_ratio_ma7"] = frame["acwr_ratio"].rolling(7, min_periods=1).mean()

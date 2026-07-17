@@ -121,3 +121,14 @@ class TestHrvScore:
         out = compute_historical_derived_features(rows)
         assert out is not None
         assert out["hrv_drop"] == pytest.approx(-10.0)
+
+    def test_historical_sleep_debt_clips_oversleep_and_matches_training(self):
+        rows = [
+            {"date_key": "2026-05-01", "hrvRmssd": 60.0, "distanceMeters": 1000, "sleepMinutes": 540},
+            {"date_key": "2026-05-02", "hrvRmssd": 60.0, "distanceMeters": 1000, "sleepMinutes": 420},
+            {"date_key": "2026-05-03", "hrvRmssd": 60.0, "distanceMeters": 1000, "sleepMinutes": 360},
+        ]
+        out = compute_historical_derived_features(rows)
+        assert out is not None
+        # 9h + 7h + 6h vs 8h target → 0 + 1 + 2 = 3
+        assert out["sleep_debt_3d"] == pytest.approx(3.0)

@@ -83,8 +83,8 @@ class TestDefaultedCriticalFeatures:
             )
         )
         count = count_defaulted_critical_features(df)
-        # sleep_hours_ma7 and hrv_drop match population defaults; others come from same-day load.
-        assert count == 2
+        # 7h sleep → sleep_debt_3d=1.0 (population default); sleep_hours_ma7 and hrv_drop too.
+        assert count == 3
 
     def test_counts_all_six_when_frame_uses_population_defaults(self):
         df = pd.DataFrame([dict(DEFAULT_FEATURE_VALUES)], columns=MODEL_FEATURE_COLUMNS)
