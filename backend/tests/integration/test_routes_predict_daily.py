@@ -168,20 +168,12 @@ class TestPredictDailyErrors:
         mock_model_gate,
         monkeypatch,
     ):
-        from api.routes import predict as predict_routes
-
-        from utils.exceptions import MLModelError
-
         mock_firestore_snapshot()
         mock_model_gate(live=False, gate_reason="manifest_corrupted")
-
-        def _blocked(uid: str, d: str) -> dict[str, Any]:
-            raise MLModelError(
-                "Model is not live: manifest_corrupted",
-                code="model_not_live:manifest_corrupted",
-            )
-
-        monkeypatch.setattr(predict_routes, "run_daily_prediction", _blocked)
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: None,
+        )
 
         response = api_client.post("/predict/daily", json={"userId": "u1", "date": "2026-04-30"})
 

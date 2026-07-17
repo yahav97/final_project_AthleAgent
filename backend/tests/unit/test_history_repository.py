@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 import pandas as pd
 
-from services.feature_engineering import acwr_features_from_distance_history, compute_derived_features
 from services.history.firestore_io import read_firestore_documents
 from services.history.history_window import (
     count_watch_sync_signal_groups,
@@ -20,7 +19,6 @@ from services.history.rolling_features import (
     compute_historical_derived_features,
     sleep_hours_from_doc,
 )
-from services.preprocessing.request_features import add_same_day_composite_features
 
 pytestmark = pytest.mark.unit
 
@@ -449,27 +447,6 @@ class TestRollingMa7Parity:
         expected_acwr_ma7, expected_sleep_ma7 = _training_style_ma7(acwr_series, sleep_series)
         assert served["acwr_ratio_ma7"] == pytest.approx(expected_acwr_ma7, rel=1e-6)
         assert served["sleep_hours_ma7"] == pytest.approx(expected_sleep_ma7, rel=1e-6)
-
-    def test_same_day_acwr_uses_distance_only_before_history_enrichment(self):
-        base = {
-            "daily_distance_km": 6.0,
-            "sleep_hours": 7.5,
-            "active_calories_burned": 500.0,
-            "bmr_calories": 1600.0,
-            "hrv_score": 65.0,
-            "resting_hr": 52.0,
-            "total_calories_burned": 2100.0,
-            "daily_calories": 2200.0,
-            "max_speed": 12.0,
-            "avg_speed": 8.0,
-        }
-        derived = {**base, **compute_derived_features(base)}
-        composite = add_same_day_composite_features(derived)
-        expected_acute, expected_acwr = acwr_features_from_distance_history([6.0])
-        assert derived["acute_load_7d"] == pytest.approx(expected_acute)
-        assert derived["acwr_ratio"] == pytest.approx(expected_acwr)
-        assert composite["acwr_ratio_ma7"] == pytest.approx(composite["acwr_ratio"])
-        assert composite["sleep_hours_ma7"] == pytest.approx(composite["sleep_hours"])
 
 
 class TestFirestoreResilience:

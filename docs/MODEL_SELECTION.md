@@ -107,6 +107,7 @@ ML_model/artifacts/<run_id>/
 - [x] Feature importance
 - [x] Full-data refit before serving
 - [x] Promotion gates + backend live gate
+- [x] Regression tests — `ML_model/tests/test_policy_config.py` (gates ↔ `ml_policy.json`); `backend/tests/unit/test_config.py` + `test_model_loader.py` (backend sync)
 
 ## Deferred (not in scope now)
 

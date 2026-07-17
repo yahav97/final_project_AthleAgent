@@ -45,9 +45,8 @@ def test_predict_daily_with_loaded_model_no_500(monkeypatch):
             "/predict/daily",
             json={"userId": "u1", "date": "2026-04-30"},
         )
-    if r.status_code == 503:
-        assert "Model is not live" in r.json()["detail"]
-        return
-    assert r.status_code == 200
+    assert r.status_code == 200, r.json()
     data = r.json()
+    assert data["risk_level"] in ("Low", "Medium", "High")
     assert 0.0 <= float(data["risk_score"]) <= 1.0
+    assert 0.0 <= float(data["prediction_confidence"]) <= 100.0

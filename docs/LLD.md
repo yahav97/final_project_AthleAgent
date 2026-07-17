@@ -475,14 +475,55 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Th
 
 ## 8. Testing
 
-| Layer | Framework | Key files |
-|-------|-----------|-----------|
-| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/unit/test_health_status.py`, `tests/unit/test_manifest.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_routes_health.py`, `tests/integration/test_openapi_contract.py` |
-| Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
+### 8.1 Overview
 
-**Run backend tests:**
+| Suite | Framework | Tests | CI |
+|-------|-----------|-------|-----|
+| Backend | pytest | 252 | [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml) |
+| ML_model | pytest | 12 | same workflow (second step) |
+| Android | JUnit | placeholder only (`ExampleUnitTest.kt`) — not in CI | — |
+
+Markers in `backend/pytest.ini`: `unit` (no network / Firestore / real artifacts) · `integration` (FastAPI routes).
+
+### 8.2 Backend layout
+
+| Layer | Path | Focus |
+|-------|------|--------|
+| Unit | `backend/tests/unit/` | Feature engineering, preprocessing, prediction service, model loader gates, history window / Firestore IO, confidence fallback, config ↔ `ml_policy.json`, schemas, risk bands |
+| Integration | `backend/tests/integration/` | HTTP contract (`/predict/daily`, `/health`, `/status/ml`), OpenAPI surface, request-id / client-events, real-model smoke (`test_prediction_model_columns.py` when `injury_model.pkl` exists) |
+
+**Representative files:**
+
+| Area | Key tests |
+|------|-----------|
+| ML gates / loader | `tests/unit/test_model_loader.py`, `tests/unit/test_manifest.py` |
+| Inference pipeline | `tests/unit/test_prediction_service.py`, `tests/unit/test_preprocessing.py`, `tests/unit/test_feature_engineering.py` |
+| History / confidence | `tests/unit/test_history_repository.py`, `tests/unit/test_confidence_fallback.py` |
+| Health (dependency logic) | `tests/unit/test_health_status.py` — Firestore down / model blocked → 503 |
+| HTTP predict | `tests/integration/test_routes_predict_daily.py` — validation, cache, persist, **real model gate** (no mock on `run_daily_prediction`) |
+| HTTP health / ML status | `tests/integration/test_routes_health.py` (smoke), `tests/integration/test_routes_ml_status.py` (schema + blocked state) |
+| API contract | `tests/integration/test_openapi_contract.py` |
+
+Removed duplicates (2026-07): `test_profile_defaults.py` (covered by prediction service); health 503 failure paths only in unit tests; ACWR same-day case only in `test_feature_engineering.py`.
+
+### 8.3 ML_model layout
+
+| File | Focus |
+|------|--------|
+| `ML_model/tests/test_policy_config.py` | Policy constants match `backend/data/ml_policy.json`; gate boundary evaluation |
+| `ML_model/tests/test_serve_parity.py` | Cold-start rows use contract rolling defaults (train-serve parity) |
+
+### 8.4 Run locally
+
 ```bash
 cd backend && python -m pytest tests/ -v
+cd ML_model && python -m pytest tests/ -v
+```
+
+Pre-demo smoke (promoted model path resolution):
+
+```bash
+cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q
 ```
 
 ---

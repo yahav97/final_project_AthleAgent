@@ -465,7 +465,7 @@ final_project_AthleAgent/
 | Cloud | Firebase Auth, Cloud Firestore |
 | AI | Google Gemini (client-side only) |
 | Health | Google Health Connect SDK |
-| CI/Tests | pytest (backend), JUnit (Android placeholder) |
+| CI/Tests | pytest — backend (252) + `ML_model` (12) via [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml); Android JUnit placeholder (build only) |
 
 ---
 
