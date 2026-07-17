@@ -5,23 +5,25 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
+import java.util.TimeZone
 
 class CalculationUtilsTest {
 
     @Test
     fun `getRiskLevel returns correct labels for score ranges`() {
         assertEquals("Low", CalculationUtils.getRiskLevel(10))
-        assertEquals("Low", CalculationUtils.getRiskLevel(20))
-        assertEquals("Medium", CalculationUtils.getRiskLevel(35))
-        assertEquals("Medium", CalculationUtils.getRiskLevel(50))
-        assertEquals("High", CalculationUtils.getRiskLevel(65))
-        assertEquals("High", CalculationUtils.getRiskLevel(70))
-        assertEquals("Critical", CalculationUtils.getRiskLevel(85))
+        assertEquals("Low", CalculationUtils.getRiskLevel(35))
+        assertEquals("Medium", CalculationUtils.getRiskLevel(36))
+        assertEquals("Medium", CalculationUtils.getRiskLevel(55))
+        assertEquals("High", CalculationUtils.getRiskLevel(56))
+        assertEquals("High", CalculationUtils.getRiskLevel(75))
+        assertEquals("Critical", CalculationUtils.getRiskLevel(76))
+        assertEquals("Critical", CalculationUtils.getRiskLevel(100))
     }
 
     @Test
     fun `formatDateToKey returns correct yyyy-MM-dd format`() {
-        val calendar = Calendar.getInstance()
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         calendar.set(2023, Calendar.OCTOBER, 25)
         val date = calendar.time
         

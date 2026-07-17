@@ -6,8 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-class ClientEventReporter(private val api: ObservabilityApi) {
-    private val scope = CoroutineScope(Dispatchers.IO)
+class ClientEventReporter(
+    private val api: ObservabilityApi,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+) {
 
     fun reportEvent(eventType: String, message: String, metadata: Map<String, String>? = null) {
         Timber.tag("AthleAgentLogs").d("Event: $eventType | Message: $message")
