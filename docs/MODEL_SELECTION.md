@@ -1,7 +1,7 @@
 # Model selection protocol
 
 Single source of truth for how AthleAgent picks and ships an injury model.  
-**Code:** `ML_model/training/pipeline.py` (CLI: `train_model.py`) · **Demo notebook:** [`model_improvement_journey.ipynb`](../ML_model/notebooks/model_improvement_journey.ipynb) (see below) · **Gates:** `backend/config.py` / `ML_model/policy_config.py`
+**Code:** `ML_model/training/pipeline.py` (CLI: `train_model.py`) · **Demo notebook:** [`model_improvement_journey.ipynb`](../ML_model/notebooks/model_improvement_journey.ipynb) (see below) · **Gates:** `backend/data/ml_policy.json` (loaded by `backend/services/ml_policy.py` and `ML_model/policy_config.py`)
 
 ## Pipeline (production = notebook = `run_pipeline.py`)
 
@@ -37,7 +37,7 @@ Constants (change in one place):
 | `ATHLETE_CV_SPLITS` | `2` | `training/constants.py` |
 | `RANDOM_STATE` | `42` | `training/constants.py` |
 | Holdout ratio | `0.20` | `create_benchmark_set.py`, notebook `DEMO_CONFIG` |
-| Policy gates | Recall, FPR, F1, … | `policy_config.py` |
+| Policy gates | Recall, FPR, F1, … | `backend/data/ml_policy.json` → `policy_config.py` |
 | Model candidates | 5 names | `training/models.py` |
 
 ## Model candidates (`MODEL_CANDIDATE_NAMES`)
@@ -70,7 +70,7 @@ Tiered threshold search per candidate, then rank by:
 1. Operating tier (0 = all gates pass → 3 = fallback)
 2. F1 → Precision → FPR → Recall → ROC-AUC → Brier
 
-Gates (defaults in `policy_config.py`):
+Gates (defaults in `backend/data/ml_policy.json`):
 
 | Gate | Default | Promotion | Backend live |
 |------|---------|-----------|--------------|

@@ -1,4 +1,4 @@
-"""In-memory rate limiting for client telemetry ingestion."""
+"""In-memory rate limiting for client telemetry (single process — not shared across workers)."""
 
 from __future__ import annotations
 

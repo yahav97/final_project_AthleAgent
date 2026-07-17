@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from utils.exceptions import ValidationError
+from utils.logging import logger
 
 
 class ModelServingContract(NamedTuple):
@@ -57,7 +58,14 @@ def coerce_finite_float_row(frame: pd.DataFrame) -> pd.DataFrame:
     """Cast to float64 and replace NaN / non-finite values with 0.0."""
     aligned = frame.astype("float64").fillna(0.0)
     values = aligned.to_numpy(dtype="float64", copy=True)
-    values[~np.isfinite(values)] = 0.0
+    bad_mask = ~np.isfinite(values)
+    if bad_mask.any():
+        logger.warning(
+            "feature_vector_coerced_non_finite count=%d",
+            int(bad_mask.sum()),
+            extra={"event": "feature_vector_coerced_non_finite"},
+        )
+    values[bad_mask] = 0.0
     return pd.DataFrame(values, columns=aligned.columns, index=aligned.index, dtype="float64")
 
 

@@ -21,7 +21,7 @@ Verify:
 
 | Check | URL | Expected |
 |-------|-----|----------|
-| Liveness | http://localhost:8000/health | 200 OK |
+| Readiness | http://localhost:8000/health | **200** when Firestore + gated model are live; **503** if either dependency is down |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
 | Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q` | `3 passed` |
 
@@ -89,7 +89,7 @@ volumes:
 | `ImportError` / xgboost at startup | Image missing `libgomp1` — rebuild with current `Dockerfile` |
 | Firestore errors / null client | Missing or invalid `firebase-key.json` |
 | `"status": "Blocked"` on `/status/ml` | Manifest gate failed — check `gate_reason` in response |
-| Healthcheck unhealthy | Wait for `start_period` (20s); check logs: `docker compose logs backend` |
+| Healthcheck unhealthy | Wait for `start_period` (20s); `/health` returns **503** when Firestore or the ML gate is down — check logs: `docker compose logs backend` |
 
 ## Related documentation
 

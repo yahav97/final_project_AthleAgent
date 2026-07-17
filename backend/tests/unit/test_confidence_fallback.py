@@ -178,7 +178,7 @@ class TestApplyHistoryConfidenceFallback:
         payload = InjuryPredictionRequest(userId="u1", date="2026-04-30", age=28)
         out, confidence = apply_history_confidence_fallback(_base_frame(), payload)
 
-        assert confidence == HistoryConfidence.HIGH
+        assert confidence == HistoryConfidence.LOW
         for column in HISTORY_ROLLING_FEATURES:
             assert float(out[column].iloc[0]) == pytest.approx(
                 float(DEFAULT_FEATURE_VALUES[column])

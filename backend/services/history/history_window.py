@@ -40,6 +40,10 @@ WATCH_SYNC_SIGNAL_GROUPS: dict[str, WatchSyncFieldNames] = {
     "energy": ENERGY_FIELD_NAMES,
 }
 
+# Rolling features for prediction date D use wake-up days D-7..D-1 (exclude D).
+# Same window as ``fetch_inference_firestore_bundle`` / production inference.
+DEFAULT_HISTORY_INCLUDE_TARGET_DAY = False
+
 
 def to_date_key(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d")
@@ -167,7 +171,7 @@ def fetch_user_history(
     user_id: str,
     date_key: str,
     lookback_days: int = 7,
-    include_target_day: bool = True,
+    include_target_day: bool = DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
 ) -> list[dict[str, Any]]:
     """
     Fetch logical wake-up-day history rows for the prediction window.
@@ -246,10 +250,13 @@ def get_history_window_context(
     user_id: str,
     date_key: str,
     lookback_days: int | None = None,
-    include_target_day: bool = True,
+    include_target_day: bool = DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
 ) -> dict[str, Any]:
     """
     Return historical feature context with quality metadata for fallback decisions.
+
+    Default ``include_target_day=False`` matches production inference: for prediction
+    date ``D``, rolling features use wake-up days ``D-7 … D-1`` only.
 
     confidence policy (see config.settings):
     - high:   HISTORY_CONFIDENCE_HIGH_MIN_DAYS+ usable days

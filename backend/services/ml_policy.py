@@ -43,12 +43,3 @@ def ml_gate_defaults() -> dict[str, float]:
 def sleep_target_hours_default() -> float:
     defaults = _require_mapping(load_ml_policy(), "feature_defaults")
     return float(defaults["sleep_target_hours"])
-
-
-def train_serve_parity_defaults() -> dict[str, float | int]:
-    parity = _require_mapping(load_ml_policy(), "train_serve_parity")
-    return {
-        "cold_start_augment_fraction": float(parity["cold_start_augment_fraction"]),
-        "cold_start_first_n_days": int(parity["cold_start_first_n_days"]),
-        "nutrition_mask_fraction": float(parity["nutrition_mask_fraction"]),
-    }

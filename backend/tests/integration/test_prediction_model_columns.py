@@ -15,7 +15,6 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[2]
     reason="injury_model.pkl not present",
 )
 def test_predict_daily_with_loaded_model_no_500(monkeypatch):
-    from api.routes import predict as predict_routes
     from main import app
 
     monkeypatch.setattr(
@@ -32,10 +31,14 @@ def test_predict_daily_with_loaded_model_no_500(monkeypatch):
         },
     )
 
-    def _persist_noop(user_id: str, date_key: str, result: dict) -> None:
-        return None
-
-    monkeypatch.setattr(predict_routes, "persist_prediction_result_or_raise", _persist_noop)
+    monkeypatch.setattr(
+        "services.prediction.service.load_cached_daily_prediction",
+        lambda uid, d: None,
+    )
+    monkeypatch.setattr(
+        "services.prediction.service.save_daily_prediction_result_with_retries",
+        lambda uid, d, r, **kw: True,
+    )
 
     with TestClient(app) as client:
         r = client.post(

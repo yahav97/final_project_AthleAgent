@@ -7,10 +7,7 @@ from schemas.inference import (
     DailyPredictionTriggerRequest,
     InjuryPredictionResponse,
 )
-from services.prediction.service import (
-    persist_prediction_result_or_raise,
-    predict_injury_risk_from_firestore,
-)
+from services.prediction.service import run_daily_prediction
 from utils.request_context import user_id_var
 
 router = APIRouter(tags=["Prediction"])
@@ -26,12 +23,7 @@ def predict_injury_daily(trigger: DailyPredictionTriggerRequest) -> InjuryPredic
     Demo deployments should bind to localhost only (see docker-compose.yml).
     """
     user_id_var.set(trigger.userId)
-    result = predict_injury_risk_from_firestore(trigger.userId, trigger.date)
-    persist_prediction_result_or_raise(
-        trigger.userId,
-        trigger.date,
-        result,
-    )
+    result = run_daily_prediction(trigger.userId, trigger.date)
     return InjuryPredictionResponse(
         risk_level=result["risk_level"],
         risk_score=result["risk_score"],

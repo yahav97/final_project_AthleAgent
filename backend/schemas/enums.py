@@ -54,3 +54,4 @@ class HealthStatus(str, Enum):
 
     OK = "ok"
     HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"

@@ -12,9 +12,9 @@ from services.prediction.confidence import count_defaulted_critical_features
 from services.nutrition_defaults import resolve_request_nutrition
 from services.prediction.firestore_mapping import injury_prediction_request_from_firestore_snapshot
 from services.prediction.service import (
-    persist_prediction_result_or_raise,
     predict_injury_risk,
     predict_injury_risk_from_firestore,
+    run_daily_prediction,
 )
 from services.preprocessing import injury_request_to_model_dataframe
 from utils.exceptions import DatabaseError, MLModelError
@@ -289,13 +289,44 @@ class TestPredictInjuryRisk:
         with pytest.raises(DatabaseError, match="Firestore snapshot unavailable"):
             predict_injury_risk_from_firestore("u1", "2026-05-09")
 
-    def test_persist_raises_on_write_failure(self, monkeypatch):
-        def _save_failed(user_id: str, date_key: str, result: dict) -> bool:
-            return False
+    def test_run_daily_prediction_returns_cached_without_inference(self, monkeypatch):
+        cached = {
+            "risk_level": "High",
+            "risk_score": 0.9,
+            "prediction_confidence": 88.0,
+        }
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: dict(cached),
+        )
+
+        def _should_not_infer(uid: str, d: str) -> dict:
+            raise AssertionError("inference should be skipped on cache hit")
 
         monkeypatch.setattr(
-            "services.prediction.service.save_daily_prediction_result",
-            _save_failed,
+            "services.prediction.service.predict_injury_risk_from_firestore",
+            _should_not_infer,
         )
-        with pytest.raises(DatabaseError, match="Prediction persist failed"):
-            persist_prediction_result_or_raise("u1", "2026-05-09", {"risk_score": 0.3})
+        out = run_daily_prediction("u1", "2026-05-09")
+        assert out == cached
+
+    def test_run_daily_prediction_returns_result_when_persist_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            "services.prediction.service.load_cached_daily_prediction",
+            lambda uid, d: None,
+        )
+        monkeypatch.setattr(
+            "services.prediction.service.predict_injury_risk_from_firestore",
+            lambda uid, d: {
+                "risk_level": "Medium",
+                "risk_score": 0.4,
+                "prediction_confidence": 70.0,
+            },
+        )
+        monkeypatch.setattr(
+            "services.prediction.service.save_daily_prediction_result_with_retries",
+            lambda uid, d, r, **kw: False,
+        )
+        out = run_daily_prediction("u1", "2026-05-09")
+        assert out["risk_level"] == "Medium"
+        assert out["risk_score"] == pytest.approx(0.4)

@@ -58,7 +58,7 @@ def build_cold_start_mask(
     Mark rows that mimic thin history at serve time.
 
     Always flags the first ``first_n_days`` per athlete, then samples more days
-    until roughly ``target_fraction`` of rows (default ~15–20%) are cold-start.
+    until roughly ``target_fraction`` of rows (default 25%) are cold-start.
     """
     cold_start = pd.Series(False, index=df.index)
     rng = np.random.default_rng(seed)

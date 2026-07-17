@@ -13,6 +13,7 @@ from services.history.firestore_io import (
     read_firestore_documents,
 )
 from services.history.history_window import (
+    DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
     build_history_window_context,
     date_keys_in_range,
     history_date_window,
@@ -94,7 +95,7 @@ def fetch_inference_firestore_bundle(
     date_key: str,
     *,
     lookback_days: int | None = None,
-    include_target_day: bool = False,
+    include_target_day: bool = DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
 ) -> dict[str, Any]:
     """
     Single batch read for production inference: snapshot inputs + history window.

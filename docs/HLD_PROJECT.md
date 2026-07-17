@@ -435,7 +435,7 @@ For course evaluation, place credentials locally (do **not** commit or zip the A
 | **Model** | `XGBoostCalibratedTuned` |
 | **Operating threshold** | ~0.10 |
 | **Feature count** | 35 (see `backend/data/model_feature_contract.json`) |
-| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
+| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 (from `backend/data/ml_policy.json`) |
 | **Promotion pointer** | `ML_model/artifacts/promoted.json` → run `20260709_104916` |
 
 > ML detail: [MODEL_SELECTION.md](MODEL_SELECTION.md)

@@ -232,7 +232,7 @@ flowchart TD
 | Method | Path | Handler | Response |
 |--------|------|---------|----------|
 | GET | `/` | `health.py` | metadata |
-| GET | `/health` | `health.py` | `{status: "healthy"}` |
+| GET | `/health` | `health.py` | Readiness: `{status, checks}` — **200** when Firestore + live model OK, **503** otherwise |
 | POST | `/predict/daily` | `predict.py` | `InjuryPredictionResponse` |
 | GET | `/status/ml` | `predict.py` | model status |
 | POST | `/api/v1/observability/client-events` | `observability.py` | 202 Accepted |
@@ -242,35 +242,43 @@ flowchart TD
 ```
 POST /predict/daily {userId, date}
     │
-    ├─ fetch_inference_firestore_bundle()              [history/inference_bundle]
-    │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1} + history window
+    ├─ run_daily_prediction()                            [prediction/service]
+    │     ├─ load_cached_daily_prediction()              [history/persist] → return on cache hit
+    │     │
+    │     ├─ predict_injury_risk_from_firestore()
+    │     │     ├─ fetch_inference_firestore_bundle()    [history/inference_bundle]
+    │     │     │     profile, health{D}, health{D-1}, checkins{D}, nutrition{D-1} + history window
+    │     │     │
+    │     │     ├─ injury_prediction_request_from_firestore_snapshot()
+    │     │     │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
+    │     │     │
+    │     │     ├─ resolve_request_nutrition()             [nutrition_defaults]
+    │     │     │
+    │     │     ├─ injury_request_to_model_dataframe()   [preprocessing/]
+    │     │     │     preprocessing + feature_engineering
+    │     │     │
+    │     │     ├─ apply_history_confidence_fallback()   [prediction/confidence]
+    │     │     │     7-day rolling: ACWR, sleep_debt, hrv_drop  [history/rolling_features]
+    │     │     │
+    │     │     ├─ calculate_data_quality_score()          [preprocessing/quality]
+    │     │     │
+    │     │     ├─ compute_prediction_confidence_percent() [prediction/confidence]
+    │     │     │
+    │     │     └─ model.predict_proba() → proba           [prediction/bundle]
+    │     │           classify_risk_level via risk_levels + RISK_*_CUTOFF (not bundle thresholds)
+    │     │           Low ≤ 20%, Medium 21–70%, High > 70%
+    │     │
+    │     └─ save_daily_prediction_result_with_retries()   [history/persist]
+    │           merge → daily_health/{date}; persist failure is logged only (HTTP still 200)
     │
-    ├─ injury_prediction_request_from_firestore_snapshot()
-    │     merge policy: sleep@D, physical@D-1, survey@D, nutrition@D-1
-    │
-    ├─ resolve_request_nutrition()                       [nutrition_defaults]
-    │
-    ├─ injury_request_to_model_dataframe()               [preprocessing/]
-    │     preprocessing + feature_engineering
-    │
-    ├─ apply_history_confidence_fallback()             [prediction/confidence]
-    │     7-day rolling: ACWR, sleep_debt, hrv_drop    [history/rolling_features]
-    │
-    ├─ calculate_data_quality_score()                    [preprocessing/quality]
-    │
-    ├─ compute_prediction_confidence_percent()         [prediction/confidence]
-    │
-    ├─ model.predict_proba() → proba                     [prediction/bundle]
-    │     classify_risk_level via risk_levels + RISK_*_CUTOFF (not bundle thresholds)
-    │     Low ≤ 20%, Medium 21–70%, High > 70%
-    │
-    └─ save_daily_prediction_result()                    [history/persist]
-          merge → daily_health/{date}
+    └─ InjuryPredictionResponse
 ```
 
 ### 3.3 Model Features (35 columns)
 
-Source of truth: `backend/services/model_features.py`
+Source of truth: `backend/services/model_features.py` (contract: `backend/data/model_feature_contract.json`)
+
+Train-serve parity: ACWR baseline uses **distance-only** 7-day history (`acwr_features_from_distance_history`); `sleep_debt_3d` is a rolling sum of clipped daily sleep deficits; history window defaults `include_target_day=False`.
 
 | Category | Features |
 |----------|----------|
@@ -319,10 +327,14 @@ Serve (`prediction/bundle.resolve_model_bundle`) validates that `threshold` is p
 
 ### 4.3 Live Gates (`model_loader.py`)
 
+Gate thresholds are defined in `backend/data/ml_policy.json` (`ml_gates`) and loaded via `backend/services/ml_policy.py` / `ML_model/policy_config.py`.
+
 | Gate | Threshold |
 |------|-----------|
 | Recall@Threshold | ≥ 0.80 |
 | ROC-AUC | ≥ 0.68 |
+
+Run manifests are normalized at load time (`backend/ml/manifest.py`); legacy fields can be repaired with `python ML_model/normalize_artifacts.py`.
 
 ### 4.4 Promotion
 
@@ -417,7 +429,8 @@ sequenceDiagram
 |-----------|------|--------|
 | Model blocked | 503 | `model_not_live:*` |
 | Firestore unavailable | 503 | `firestore_snapshot_unavailable` |
-| Persist failed | 503 | `prediction_persist_failed` |
+| Readiness probe failed | 503 | `/health` → `status: "unhealthy"` (missing Firestore or blocked model) |
+| Persist failed (after inference) | **200** | Score returned to client; failure logged server-side; safe to retry (`load_cached_daily_prediction` on later success) |
 
 ---
 
@@ -442,6 +455,7 @@ No `.env` file is required. Defaults are defined in `backend/config.py` (pydanti
 | `MODEL_PATH` | `None` → resolves via `ML_model/artifacts/promoted.json`, then `backend/injury_model.pkl` |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | `backend/firebase-key.json` (local only; auto-resolved when present) |
 | `CORS_ORIGINS` | localhost ports |
+| ML gates / sleep target | `backend/data/ml_policy.json` (override live gates via `ML_MIN_RECALL_HARD`, `ML_MIN_AUC_FOR_LIVE`, `SLEEP_TARGET_HOURS`) |
 
 ### 7.3 Emulator Networking
 
@@ -463,7 +477,7 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Th
 
 | Layer | Framework | Key files |
 |-------|-----------|-----------|
-| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_openapi_contract.py` |
+| Backend | pytest | `tests/unit/test_preprocessing.py`, `tests/unit/test_model_loader.py`, `tests/unit/test_history_repository.py`, `tests/unit/test_health_status.py`, `tests/unit/test_manifest.py`, `tests/integration/test_routes_predict_daily.py`, `tests/integration/test_routes_health.py`, `tests/integration/test_openapi_contract.py` |
 | Android | JUnit | `ExampleUnitTest.kt` (placeholder) |
 
 **Run backend tests:**
@@ -495,7 +509,7 @@ cd backend && python -m pytest tests/ -v
 | Inference | — | `prediction/service.py` |
 | Features | — | `preprocessing/`, `history/history_window.py`, `feature_engineering.py`, `model_features.py` |
 | Confidence | — | `prediction/confidence.py`, `preprocessing/quality.py` |
-| Persist | — | `history/persist.save_daily_prediction_result` |
+| Persist | — | `history/persist.py` (`load_cached_daily_prediction`, `save_daily_prediction_result_with_retries`) |
 | Firestore IO | — | `history/firestore_io.py` |
 | Dashboard | `AthleteDashboardActivity.kt` | — |
 | Coach view | `CoachDashboardActivity.kt` | — |

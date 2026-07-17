@@ -27,6 +27,14 @@ class TestDateKeyValidation:
         with pytest.raises(ValidationError):
             DailyPredictionTriggerRequest(userId="u1", date="2026-13-40")
 
+    def test_rejects_future_date(self):
+        with pytest.raises(ValidationError):
+            DailyPredictionTriggerRequest(userId="u1", date="2099-01-01")
+
+    def test_rejects_date_too_far_in_past(self):
+        with pytest.raises(ValidationError):
+            DailyPredictionTriggerRequest(userId="u1", date="1990-01-01")
+
     def test_optional_date_allows_none(self):
         req = InjuryPredictionRequest(userId="u1")
         assert req.date is None
