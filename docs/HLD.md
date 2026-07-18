@@ -386,11 +386,12 @@ erDiagram
 
 **No `.env` file is required to run the backend.** Sensible defaults are defined in `backend/config.py`; optional overrides are documented in `backend/.env.example`.
 
-For course evaluation, place credentials locally (do **not** commit or zip the Admin key):
+For course evaluation, place credentials locally (do **not** commit secrets to the public repository):
 - `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore); provide separately to evaluators
+- `GEMINI_API_KEY` in `android_app/AthleAgent/local.properties` — Gemini Vision for meal-photo analysis; provide separately to evaluators
 - `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (already in the repo)
 
-> **Security:** Keep the Admin service-account key out of public archives. Prefer a private hand-off for that file only.
+> **Security:** Keep the Admin service-account key and Gemini API key out of public archives. Prefer a private hand-off for those credentials.
 
 ---
 
