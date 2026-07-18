@@ -3,6 +3,6 @@
 
 sdk.dir=C\:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
 
-## Optional: meal photo analysis (Gemini Vision). Risk scoring works without this.
-## Free key: https://aistudio.google.com/apikey
+## Meal photo analysis (Gemini Vision). Provided with the project submission — not committed.
+## Risk scoring works without this key; meal-photo analysis requires it.
 GEMINI_API_KEY=

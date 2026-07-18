@@ -444,7 +444,7 @@ Copy from `android_app/AthleAgent/local.properties.example`. No `.env` file is r
 GEMINI_API_KEY=...
 ```
 
-Risk scoring works without a Gemini key; meal photo analysis requires it.
+Meal-photo analysis requires `GEMINI_API_KEY` (provided with the submission; see root README). Risk scoring works without it.
 
 ### 7.2 Backend (environment variables)
 

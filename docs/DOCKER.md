@@ -57,7 +57,7 @@ No code changes required. With `127.0.0.1:8000:8000` published on the host, the 
 On the app side:
 
 - `google-services.json` is already under `android_app/AthleAgent/app/`
-- `GEMINI_API_KEY` in `local.properties` is optional (meal analysis only) — see `local.properties.example`
+- `GEMINI_API_KEY` in `local.properties` — required for meal-photo analysis (Gemini Vision); key is provided with the submission (see root README)
 
 ## Local development (without Docker)
 
