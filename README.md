@@ -84,13 +84,4 @@ Continuous integration: [`.github/workflows/backend-tests.yml`](.github/workflow
 
 Test layout: `backend/tests/unit/`, `backend/tests/integration/`, `ML_model/tests/`.
 
-## Retraining the model (optional)
-
-```powershell
-pip install -r backend/requirements.txt
-python ML_model/run_pipeline.py
-```
-
-Restart the backend afterward (`docker compose up --build` or restart `uvicorn`).
-
 Further Docker documentation: [docs/DOCKER.md](docs/DOCKER.md).
