@@ -19,13 +19,25 @@ A root `.env` file is not required. Default settings in `backend/config.py` are 
 | --- | --- | --- |
 | `backend/firebase-key.json` | Yes | Firebase Admin SDK service-account key (not included in the repository) |
 | `android_app/AthleAgent/app/google-services.json` | Yes | Firebase client configuration (included in the repository) |
-| `GEMINI_API_KEY` in `local.properties` | No | Required only for meal-photo analysis; see `android_app/AthleAgent/local.properties.example` |
+| `GEMINI_API_KEY` in `local.properties` | Yes (meal photos) | Gemini API key for meal-photo analysis (not included in the repository) |
 
 ### Obtaining `firebase-key.json`
 
 1. Open the [Firebase Console](https://console.firebase.google.com/) and select the project that matches `google-services.json`.
 2. Go to **Project settings** → **Service accounts** → **Generate new private key**.
 3. Save the downloaded file as `backend/firebase-key.json`.
+
+### Obtaining `GEMINI_API_KEY`
+
+1. Open [Google AI Studio](https://aistudio.google.com/apikey) and create an API key.
+2. In `android_app/AthleAgent/`, ensure `local.properties` exists (Android Studio creates it on first open; otherwise copy from `local.properties.example`).
+3. Add or update the line:
+
+```properties
+GEMINI_API_KEY=your_api_key_here
+```
+
+4. Sync Gradle / rebuild the app so `BuildConfig.GEMINI_API_KEY` is updated.
 
 ## Running the project
 
@@ -61,8 +73,6 @@ Verification:
 5. Sign in as an athlete or a coach.
 
 For a physical device, set `BASE_URL` in `ApiClient.kt` to the host machine’s LAN address (for example `http://192.168.x.x:8000/`). The device and the host must be on the same network. Prefer the local Python backend (`uvicorn` on `0.0.0.0`) when testing on a physical device, because Docker publishes port 8000 on `127.0.0.1` only.
-
-Optional meal-photo analysis: copy `local.properties.example` to `local.properties` and set `GEMINI_API_KEY`.
 
 ## Project structure
 
