@@ -15,27 +15,27 @@ A root `.env` file is not required. Default settings in `backend/config.py` are 
 
 ## Files provided separately (not in the repository)
 
-These secrets are supplied with the project submission (ZIP / private hand-off). Place them as follows before running:
-
 | File / value | Destination | Purpose |
 | --- | --- | --- |
-| `firebase-key.json` | `backend/firebase-key.json` | Backend → Firestore (Firebase Admin SDK) |
-| Gemini API key | `GEMINI_API_KEY=...` in `android_app/AthleAgent/local.properties` | Meal-photo analysis (Gemini Vision) |
+| `firebase-key.json` | `backend/firebase-key.json` | Backend → Firestore (Firebase Admin SDK); supplied with the submission |
+| Gemini API key | `GEMINI_API_KEY=...` in `android_app/AthleAgent/local.properties` | Meal-photo analysis and AI recommendations; **create your own key** (see below) |
 
 `android_app/AthleAgent/app/google-services.json` is already in the repository (Firebase client config for the Android app).
 
 ### Setting up the Gemini API key
 
-Meal-photo analysis uses Gemini Vision. The API key is provided with the submission.
+A personal Gemini API key is **not** included in the submission. Create a free key in [Google AI Studio](https://aistudio.google.com/apikey), then:
 
 1. Open the project in Android Studio so `android_app/AthleAgent/local.properties` is created (or copy from `local.properties.example`).
-2. Add the provided key:
+2. Add your key:
 
 ```properties
-GEMINI_API_KEY=<provided_key>
+GEMINI_API_KEY=<your_key_from_Google_AI_Studio>
 ```
 
 3. Sync Gradle / rebuild the app.
+
+Without this key, risk scoring, Health Connect sync, surveys, and coach/athlete dashboards still work. Meal-photo analysis and Gemini text recommendations will show an offline/error state.
 
 ## Running the project
 
@@ -65,7 +65,7 @@ Verification:
 
 ### Android application
 
-1. Place the Gemini API key in `local.properties` as described above.
+1. Optionally place a Gemini API key in `local.properties` as described above (needed only for meal analysis / AI recommendations).
 2. Open `android_app/AthleAgent` in Android Studio.
 3. Allow Gradle sync to complete and install any requested SDK components.
 4. Create an emulator with API 26+ (Device Manager), or connect a physical device with USB debugging enabled.

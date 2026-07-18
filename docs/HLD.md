@@ -388,7 +388,7 @@ erDiagram
 
 For course evaluation, place credentials locally (do **not** commit secrets to the public repository):
 - `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore); provide separately to evaluators
-- `GEMINI_API_KEY` in `android_app/AthleAgent/local.properties` — Gemini Vision for meal-photo analysis; provide separately to evaluators
+- `GEMINI_API_KEY` in `android_app/AthleAgent/local.properties` — Gemini for meal-photo analysis and recommendations; evaluator creates their own free key (Google AI Studio)
 - `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (already in the repo)
 
 > **Security:** Keep the Admin service-account key and Gemini API key out of public archives. Prefer a private hand-off for those credentials.
