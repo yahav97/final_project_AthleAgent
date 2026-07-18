@@ -1,26 +1,43 @@
 # AthleAgent
 
-Android app + FastAPI backend that estimates daily injury risk for athletes (and shows scores to coaches), from check-ins, Health Connect, and optional meal photos.
+Android application and FastAPI backend that estimates daily injury risk for athletes and presents scores to coaches, using daily check-ins, Health Connect data, and optional meal photos.
 
-## Run it
+## Prerequisites
 
-No `.env` needed; defaults in `backend/config.py` are enough.
-
-| Credential | Notes |
+| Tool | Requirement |
 | --- | --- |
-| `backend/firebase-key.json` | Required for Firestore — place locally (not in the repo) |
-| `android_app/.../google-services.json` | Already in the repo |
-| `GEMINI_API_KEY` in `local.properties` | Optional; only for meal photos |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Required for the Docker-based backend; must be running before `docker compose` |
+| [Python](https://www.python.org/downloads/) | 3.11 or newer (local backend / tests without Docker) |
+| [Android Studio](https://developer.android.com/studio) | JDK 17 (the JDK bundled with Android Studio is sufficient) |
+| Android emulator or device | API level 26 or higher |
+
+A root `.env` file is not required. Default settings in `backend/config.py` are sufficient for a local run.
+
+## Configuration files
+
+| File | Required | Description |
+| --- | --- | --- |
+| `backend/firebase-key.json` | Yes | Firebase Admin SDK service-account key (not included in the repository) |
+| `android_app/AthleAgent/app/google-services.json` | Yes | Firebase client configuration (included in the repository) |
+| `GEMINI_API_KEY` in `local.properties` | No | Required only for meal-photo analysis; see `android_app/AthleAgent/local.properties.example` |
+
+### Obtaining `firebase-key.json`
+
+1. Open the [Firebase Console](https://console.firebase.google.com/) and select the project that matches `google-services.json`.
+2. Go to **Project settings** → **Service accounts** → **Generate new private key**.
+3. Save the downloaded file as `backend/firebase-key.json`.
+
+## Running the project
 
 ### Backend
 
-From the repo root (with [Docker Desktop](https://www.docker.com/products/docker-desktop/) running):
+From the repository root, with Docker Desktop running:
 
 ```powershell
 docker compose up --build
 ```
 
-Or locally with Python 3.11+:
+Alternatively, run locally with Python 3.11+:
 
 ```powershell
 python -m venv .venv
@@ -30,37 +47,50 @@ cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Check: [http://localhost:8000/health](http://localhost:8000/health) (readiness — Firestore + live model; **503** if either is down) and [http://localhost:8000/status/ml](http://localhost:8000/status/ml) (`"status": "Live"`).
+Verification:
 
-### Android
+- http://localhost:8000/health — returns HTTP 200 when Firestore and the ML model are available; HTTP 503 otherwise
+- http://localhost:8000/status/ml — response includes `"status": "Live"`
 
-1. Open `android_app/AthleAgent` in Android Studio (JDK 17).
-2. Run on an emulator (API 26+). Base URL is already `http://10.0.2.2:8000/`.
-3. Sign in as athlete or coach.
+### Android application
 
-On a physical device, point `BASE_URL` in `ApiClient.kt` at your PC’s LAN IP.
+1. Open `android_app/AthleAgent` in Android Studio.
+2. Allow Gradle sync to complete and install any requested SDK components.
+3. Create an emulator with API 26+ (Device Manager), or connect a physical device with USB debugging enabled.
+4. Run the application. On the emulator, the backend URL is `http://10.0.2.2:8000/`.
+5. Sign in as an athlete or a coach.
 
-## Layout
+For a physical device, set `BASE_URL` in `ApiClient.kt` to the host machine’s LAN address (for example `http://192.168.x.x:8000/`). The device and the host must be on the same network. Prefer the local Python backend (`uvicorn` on `0.0.0.0`) when testing on a physical device, because Docker publishes port 8000 on `127.0.0.1` only.
+
+Optional meal-photo analysis: copy `local.properties.example` to `local.properties` and set `GEMINI_API_KEY`.
+
+## Project structure
 
 ```
 android_app/AthleAgent/   Android client
-backend/                  FastAPI + tests
-ML_model/                 Training + promoted artifacts
-docs/                     HLD / LLD / Docker / ML selection
+backend/                  FastAPI backend and tests
+ML_model/                 Model training and promoted artifacts
+docs/                     Design documentation (HLD, LLD, Docker, model selection)
 ```
 
-## Extra
+## Tests
 
-### Tests
-
-| Suite | Command | Count (approx.) |
+| Suite | Command | Approximate count |
 | --- | --- | --- |
 | Backend | `cd backend && python -m pytest tests/ -v` | 252 |
 | ML policy / parity | `cd ML_model && python -m pytest tests/ -v` | 12 |
 
-**CI:** GitHub Actions workflow [`.github/workflows/backend-tests.yml`](.github/workflows/backend-tests.yml) runs both suites on changes under `backend/`, `ML_model/`, or the workflow file.
+Continuous integration: [`.github/workflows/backend-tests.yml`](.github/workflows/backend-tests.yml) runs both suites when `backend/`, `ML_model/`, or the workflow file change.
 
-**Layout:** `backend/tests/unit/` (domain + ML contract) · `backend/tests/integration/` (HTTP routes, OpenAPI, real-model smoke when `injury_model.pkl` is present) · `ML_model/tests/` (policy gates vs `backend/data/ml_policy.json`, train-serve parity).
+Test layout: `backend/tests/unit/`, `backend/tests/integration/`, `ML_model/tests/`.
 
-- Retrain: `python ML_model/run_pipeline.py`, then restart the backend
-- Docker: [docs/DOCKER.md](docs/DOCKER.md)
+## Retraining the model (optional)
+
+```powershell
+pip install -r backend/requirements.txt
+python ML_model/run_pipeline.py
+```
+
+Restart the backend afterward (`docker compose up --build` or restart `uvicorn`).
+
+Further Docker documentation: [docs/DOCKER.md](docs/DOCKER.md).
