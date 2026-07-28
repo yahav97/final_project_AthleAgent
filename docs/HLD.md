@@ -1,13 +1,16 @@
 # AthleAgent — High-Level Design (HLD)
+
 ## Full-Project High-Level Design Document
 
-| Field | Value |
-|-------|-------|
-| **Version** | 1.1 |
-| **Date** | 2026-07-11 |
-| **Authors** | Yahav Simon, Tzuf Feldon |
-| **Audience** | Developers, course evaluators, technical stakeholders |
+
+| Field                 | Value                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| **Version**           | 1.2                                                                                  |
+| **Date**              | 2026-07-22                                                                           |
+| **Authors**           | Yahav Simon, Tzuf Feldon                                                             |
+| **Audience**          | Developers, course evaluators, technical stakeholders                                |
 | **Related documents** | [LLD.md](LLD.md) · [DOCKER.md](DOCKER.md) · [MODEL_SELECTION.md](MODEL_SELECTION.md) |
+
 
 ---
 
@@ -16,6 +19,7 @@
 **AthleAgent** is a sports-injury prevention platform. The system collects daily data from multiple sources — self-reported check-ins, a smartwatch (via Health Connect), and optional AI-powered meal analysis — and computes a **Daily Injury Risk Score**.
 
 The system serves two user roles:
+
 - **Athlete** — submits data, views personal risk, and receives recommendations.
 - **Coach** — manages a team, approves join requests, and monitors aggregate roster risk.
 
@@ -25,23 +29,47 @@ The system serves two user roles:
 
 ### 2.1 Business Goals
 
-| Goal | Success Metric |
-|------|----------------|
-| Early injury-risk detection | Daily score 0–100 + Low/Medium/High band |
-| Reduced manual data entry | Automatic watch sync + optional AI meal analysis |
-| Coach visibility | Real-time team dashboard |
-| Continuous improvement | `run_pipeline.py` — retrain on synthetic data + promote |
+
+| Goal                        | Success Metric                                          |
+| --------------------------- | ------------------------------------------------------- |
+| Early injury-risk detection | Daily score 0–100 + Low/Medium/High band                |
+| Reduced manual data entry   | Automatic watch sync + optional AI meal analysis        |
+| Coach visibility            | Real-time team dashboard                                |
+| Continuous improvement      | `run_pipeline.py` — retrain on synthetic data + promote |
+
 
 ### 2.2 Non-Functional Requirements
 
-| Requirement | Current Implementation |
-|-------------|------------------------|
-| **Availability** | Cloud Firestore (managed) + stateless FastAPI |
-| **Performance** | Prediction < 2 s (Firestore read + XGBoost inference) |
-| **Reliability** | Defaults for missing data; confidence score |
-| **Security** | Firebase Auth on client; **no auth on prediction API** (see §8) |
-| **Maintainability** | Modular layout: Android / Backend / ML_model |
-| **Privacy** | Health Connect permissions; `PrivacyPolicyActivity` |
+#### Reliability & Availability
+
+
+| Requirement                     | Implementation                                                                                                                                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Automatic retry**             | On HTTP **503**, the Android client (`ApiClient.kt`) retries the request up to **3** times with a **2 s** delay between attempts                                                                                                                                          |
+| **Robustness to missing input** | The ML inference path auto-fills missing features (e.g. nutrition) from population defaults in the feature contract (`backend/data/model_feature_contract.json` / `nutrition_defaults.py`); imputed fields lower `prediction_confidence` instead of crashing the pipeline |
+| **Availability**                | Cloud Firestore (managed) + stateless FastAPI; readiness via `GET /health` (200 healthy / 503 unhealthy)                                                                                                                                                                  |
+|                                 |                                                                                                                                                                                                                                                                           |
+
+
+#### Security & Access Control
+
+
+| Requirement               | Implementation                                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Authentication**        | Access to app data and Cloud Firestore is gated on Firebase Authentication (Google + email/password)                                            |
+| **Authorization**         | At the application layer: a **coach** may access only athletes registered on their team; an **athlete** may access only their own personal data |
+| **Prediction API caveat** | `POST /predict/daily` currently has **no** token auth (`userId` in body) — see §8                                                               |
+
+
+#### Maintainability & Low Coupling
+
+
+| Requirement                  | Implementation                                                                                                                                                                                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Layer separation**         | Low coupling across three independent layers: **Android app**, **FastAPI inference server**, and **offline ML pipeline** (`ML_model/`)                                                                                                         |
+| **Transparent model update** | Retrain and promote a new artifact (`promoted.json` → `injury_model.pkl`) without changing Android app code, as long as the feature contract is preserved; backend loads the promoted artifact at startup (restart to pick up a new promotion) |
+| **Privacy**                  | Health Connect permissions; `PrivacyPolicyActivity`                                                                                                                                                        
+
 
 ---
 
@@ -68,6 +96,8 @@ C4Context
     Rel(healthconnect, wearables, "Sync")
     Rel(athleagent, gemini, "Meal analysis, recommendations")
 ```
+
+
 
 ---
 
@@ -118,6 +148,8 @@ flowchart TB
     Artifacts --> ML
 ```
 
+
+
 ### 4.1 Core Principle: Firestore as Source of Truth
 
 - The Android app **writes** daily data to Cloud Firestore.
@@ -127,12 +159,14 @@ flowchart TB
 
 ### 4.2 Separation of Responsibilities
 
-| Component | Responsibility | Not Responsible For |
-|-----------|----------------|---------------------|
-| **Android** | UX, data collection, client-side Gemini, prediction trigger | ML inference |
-| **Backend** | Firestore read/write, feature engineering, ML inference | UI, meal vision |
-| **ML_model** | Training, validation, promotion | Runtime serving |
-| **Firestore** | Persistent storage | Computation |
+
+| Component     | Responsibility                                              | Not Responsible For |
+| ------------- | ----------------------------------------------------------- | ------------------- |
+| **Android**   | UX, data collection, client-side Gemini, prediction trigger | ML inference        |
+| **Backend**   | Firestore read/write, feature engineering, ML inference     | UI, meal vision     |
+| **ML_model**  | Training, validation, promotion                             | Runtime serving     |
+| **Firestore** | Persistent storage                                          | Computation         |
+
 
 ---
 
@@ -161,7 +195,7 @@ sequenceDiagram
         A->>FS: daily_nutrition/{today}
     end
 
-    Note over A,BE: cross-trigger: check-in waits for sleepMinutes / sync waits for energyLevel
+    Note over A,BE: cross-trigger: either screen may call /predict/daily when gate passes (sleep>0 + yesterday steps>0 + survey)
     A->>BE: POST /predict/daily {userId, date}
     BE->>FS: read snapshot + history
     BE->>BE: XGBoost predict_proba
@@ -173,12 +207,19 @@ sequenceDiagram
     A->>A: AthleteDashboard
 ```
 
+
+
 **Cross-trigger conditions:**
 
-| Screen | Triggers prediction when |
-|--------|--------------------------|
-| `DailyCheckInActivity` | `sleepMinutes` exists in `daily_health/{today}` |
-| `WearableSyncActivity` | `energyLevel` exists in `daily_checkins/{today}` |
+Both `DailyCheckInActivity` and `WearableSyncActivity` run the same client gate after their write (`checkAndTriggerPredictionInBackground`). Either path may run first; `POST /predict/daily` fires only when **all** of the following hold:
+
+| Condition | Source |
+| --------- | ------ |
+| `sleepMinutes > 0` | `daily_health/{today}` |
+| `steps > 0` | `daily_health/{yesterday}` (prior-day load) |
+| Check-in present with `energyLevel` | `daily_checkins/{today}` exists and contains `energyLevel` |
+
+If any value is missing or zero, the app skips the API call (Logcat: `ML_Trigger` / “Skipping trigger”).
 
 `MealAnalysisActivity` saves nutrition only — it does **not** call `POST /predict/daily`.
 
@@ -188,7 +229,7 @@ sequenceDiagram
 
 **Diagram type:** UML Activity Diagram (flowchart) · **Direction:** top → bottom · **UC:** 01 + 05
 
-Cross-trigger: either path may run first; prediction fires only when both sleep and check-in exist.
+Cross-trigger: either path may run first; prediction fires only when the shared Android gate passes (`sleepMinutes > 0` on D, `steps > 0` on D-1, and today’s check-in with `energyLevel`).
 
 ```mermaid
 %%{init: {"flowchart": {"htmlLabels": true, "curve": "linear", "nodeSpacing": 40, "rankSpacing": 45}, "theme": "base"}}%%
@@ -199,17 +240,17 @@ flowchart TB
     %% --- Path UC-05 ---
     Fork -->|left: UC-05 Wearable sync| Sync[① Read Health Connect]
     Sync --> WriteH[② Write daily_health<br/>sleep → D · load → D-1]
-    WriteH --> Q1{③ Check-in already done?<br/>energyLevel in daily_checkins/D}
+    WriteH --> Q1{③ Gate ready?<br/>sleep>0 · D-1 steps>0 · energyLevel}
     Q1 -->|YES →| Predict
-    Q1 -->|NO →| Prompt1[/Prompt: complete morning survey/]
+    Q1 -->|NO →| Prompt1[/Prompt: complete morning survey<br/>or wait for non-zero HC data/]
     Prompt1 --> Survey
 
     %% --- Path UC-01 ---
     Fork -->|right: UC-01 Morning survey| Survey[① Fill survey<br/>energy · soreness · stress · injuredYesterday]
     Survey --> WriteC[② Write daily_checkins/D]
-    WriteC --> Q2{③ Watch already synced?<br/>sleepMinutes in daily_health/D}
+    WriteC --> Q2{③ Gate ready?<br/>sleep>0 · D-1 steps>0 · energyLevel}
     Q2 -->|YES →| Predict
-    Q2 -->|NO →| Prompt2[/Prompt: sync wearable/]
+    Q2 -->|NO →| Prompt2[/Prompt: sync wearable<br/>need sleep>0 and D-1 steps>0/]
     Prompt2 --> Sync
 
     %% --- Shared prediction pipeline ---
@@ -235,6 +276,8 @@ flowchart TB
     class Predict,BE,Save,Gem system
     class Prompt1,Prompt2 prompt
 ```
+
+
 
 ### 5.3 Coach — Team Join Activity Diagram (UC-04 + UC-07)
 
@@ -299,6 +342,8 @@ flowchart TB
     class Err,Empty error
 ```
 
+
+
 ### 5.4 Coach — Screen Flow
 
 ```mermaid
@@ -310,6 +355,8 @@ flowchart LR
     CR -->|approve| FS[(teams.athletes[])]
     CD -->|read| FS2[daily_health per athlete]
 ```
+
+
 
 ---
 
@@ -336,9 +383,12 @@ erDiagram
         string date PK
         int sleepMinutes
         int steps
+        int distanceMeters
+        float hrvRmssd
         float finalRiskScore
         string riskLevel
         float predictionConfidence
+        string aiRecommendation
     }
 
     DAILY_CHECKINS {
@@ -347,6 +397,22 @@ erDiagram
         int muscleSoreness
         int stressLevel
         int injuredYesterday
+    }
+
+    DAILY_NUTRITION {
+        string date PK
+        float totalCalories
+        float totalProtein
+        float totalCarbs
+        int mealsLoggedCount
+        bool imputed
+    }
+
+    MEALS {
+        string mealId PK
+        int calories
+        int protein
+        int carbs
     }
 
     TEAMS {
@@ -358,27 +424,33 @@ erDiagram
     }
 ```
 
-> Field-level contract: `backend/data/model_feature_contract.json`
+
+
+> Field-level contract: `backend/data/model_feature_contract.json` · full `daily_health` / `daily_nutrition` fields: [LLD.md §2.7](LLD.md#27-firestore--app-writes)
 
 ---
 
 ## 7. External Integrations
 
-| Service | Direction | Usage | Code Location |
-|---------|-----------|-------|---------------|
-| **Firebase Auth** | Client → Google | Login, register, role routing | `LoginActivity.kt` |
-| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | All application data | Activities, `history/inference_bundle.py` + `persist.py` |
-| **Health Connect** | Device → Client | sleep, steps, HR, HRV, VO2 | `WearableSyncActivity.kt` |
-| **Gemini API** | Client → Google | Meal vision, coaching text (optional) | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
-| **FastAPI Backend** | Client → Server | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/` |
-| **XGBoost** | Server (in-process) | Injury probability | `prediction/service.py` |
+
+| Service             | Direction                       | Usage                                                             | Code Location                                             |
+| ------------------- | ------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------- |
+| **Firebase Auth**   | Client → Google                 | Login, register, role routing                                     | `LoginActivity.kt`                                        |
+| **Cloud Firestore** | Client ↔ Cloud, Backend ↔ Cloud | All application data                                              | Activities, `history/inference_bundle.py` + `persist.py`  |
+| **Health Connect**  | Device → Client                 | sleep, steps, HR, HRV, VO2                                        | `WearableSyncActivity.kt`                                 |
+| **Gemini API**      | Client → Google                 | Meal vision, coaching text (optional)                             | `AnalyzingMealActivity.kt`, `AthleteDashboardActivity.kt` |
+| **FastAPI Backend** | Client → Server                 | `POST /predict/daily`, `POST /api/v1/observability/client-events` | `ApiClient.kt`, `observability/`                          |
+| **XGBoost**         | Server (in-process)             | Injury probability                                                | `prediction/service.py`                                   |
+
 
 ### 7.1 Local Execution (Backend + ML)
 
-| Path | Command | When to Use |
-|------|---------|-------------|
-| **Docker** | `docker compose up --build` (repository root) | Evaluators, quick setup |
-| **Python** | `uvicorn main:app` from `backend/` | Development with `--reload` |
+
+| Path       | Command                                       | When to Use                 |
+| ---------- | --------------------------------------------- | --------------------------- |
+| **Docker** | `docker compose up --build` (repository root) | Evaluators, quick setup     |
+| **Python** | `uvicorn main:app` from `backend/`            | Development with `--reload` |
+
 
 > Docker guide: [DOCKER.md](DOCKER.md) · Android emulator → `http://10.0.2.2:8000` (no code changes required)
 
@@ -387,6 +459,7 @@ erDiagram
 **No `.env` file is required to run the backend.** Sensible defaults are defined in `backend/config.py`; optional overrides are documented in `backend/.env.example`.
 
 For course evaluation, place credentials locally (do **not** commit secrets to the public repository):
+
 - `backend/firebase-key.json` — Firebase Admin SDK service account (backend → Firestore); provide separately to evaluators
 - `GEMINI_API_KEY` in `android_app/AthleAgent/local.properties` — Gemini for meal-photo analysis and recommendations; evaluator creates their own free key (Google AI Studio)
 - `android_app/AthleAgent/app/google-services.json` — Firebase client configuration (already in the repo)
@@ -399,12 +472,14 @@ For course evaluation, place credentials locally (do **not** commit secrets to t
 
 ### 8.1 Current State
 
-| Layer | Mechanism |
-|-------|-----------|
-| User authentication | Firebase Auth (Google + email/password) |
-| Data authorization | Firestore Security Rules (assumed in Firebase project) |
-| Prediction API | **No authentication** — `userId` supplied in request body |
-| Backend → Firestore | Firebase Admin SDK (service account) |
+
+| Layer               | Mechanism                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| User authentication | Firebase Auth (Google + email/password)                                                                                                    |
+| Data authorization  | App-layer scoping (coach → team athletes only; athlete → own docs); Firestore Security Rules assumed/recommended for production (see §8.3) |
+| Prediction API      | **No authentication** — `userId` supplied in request body                                                                                  |
+| Backend → Firestore | Firebase Admin SDK (service account)                                                                                                       |
+
 
 ### 8.2 Known Risks
 
@@ -421,23 +496,27 @@ For course evaluation, place credentials locally (do **not** commit secrets to t
 
 ## 9. ML — High-Level Overview
 
-| Stage | Tool | Output |
-|-------|------|--------|
-| Synthetic data | `ML_model/generation/simulator.py` (CLI: `data_generator.py`) | `athlete_injury_data.csv` |
-| Training | `ML_model/training/pipeline.py` (CLI: `train_model.py`) | `injury_model.pkl` + manifest |
-| Quality gates | `validate_metrics.py`, `model_loader.py` | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
-| Promotion | `run_pipeline.py` | `artifacts/promoted.json` |
-| Serving | `POST /predict/daily` | Probability → risk bands |
+
+| Stage          | Tool                                                          | Output                        |
+| -------------- | ------------------------------------------------------------- | ----------------------------- |
+| Synthetic data | `ML_model/generation/simulator.py` (CLI: `data_generator.py`) | `athlete_injury_data.csv`     |
+| Training       | `ML_model/training/pipeline.py` (CLI: `train_model.py`)       | `injury_model.pkl` + manifest |
+| Quality gates  | `validate_metrics.py`, `model_loader.py`                      | Recall ≥ 0.80, ROC-AUC ≥ 0.68 |
+| Promotion      | `run_pipeline.py`                                             | `artifacts/promoted.json`     |
+| Serving        | `POST /predict/daily`                                         | Probability → risk bands      |
+
 
 ### 9.1 Promoted Production Model (July 2026)
 
-| Property | Value |
-|----------|-------|
-| **Model** | `XGBoostCalibratedTuned` |
-| **Operating threshold** | ~0.10 |
-| **Feature count** | 35 (see `backend/data/model_feature_contract.json`) |
-| **Quality gates** | Recall ≥ 0.80, ROC-AUC ≥ 0.68 (from `backend/data/ml_policy.json`) |
-| **Promotion pointer** | `ML_model/artifacts/promoted.json` → run `20260709_104916` |
+
+| Property                | Value                                                              |
+| ----------------------- | ------------------------------------------------------------------ |
+| **Model**               | `XGBoostCalibratedTuned`                                           |
+| **Operating threshold** | ~0.10                                                              |
+| **Feature count**       | 35 (see `backend/data/model_feature_contract.json`)                |
+| **Quality gates**       | Recall ≥ 0.80, ROC-AUC ≥ 0.68 (from `backend/data/ml_policy.json`) |
+| **Promotion pointer**   | `ML_model/artifacts/promoted.json` → run `20260709_104916`         |
+
 
 > ML detail: [MODEL_SELECTION.md](MODEL_SELECTION.md)
 
@@ -459,46 +538,101 @@ final_project_AthleAgent/
 
 ## 11. Dependencies and Technologies
 
-| Layer | Stack |
-|-------|-------|
-| Mobile | Kotlin, Android SDK, View Binding, Material, Retrofit, Gson, MPAndroidChart |
-| Backend | Python 3.x, FastAPI, Uvicorn, Pydantic, pandas, scikit-learn, XGBoost, firebase-admin |
-| Cloud | Firebase Auth, Cloud Firestore |
-| AI | Google Gemini (client-side only) |
-| Health | Google Health Connect SDK |
-| CI/Tests | pytest — backend (252) + `ML_model` (12) via [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml); Android JUnit placeholder (build only) |
+
+| Layer    | Stack                                                                                                                                                                |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mobile   | Kotlin, Android SDK, View Binding, Material, Retrofit, Gson, MPAndroidChart                                                                                          |
+| Backend  | Python 3.x, FastAPI, Uvicorn, Pydantic, pandas, scikit-learn, XGBoost, firebase-admin                                                                                |
+| Cloud    | Firebase Auth, Cloud Firestore                                                                                                                                       |
+| AI       | Google Gemini (client-side only)                                                                                                                                     |
+| Health   | Google Health Connect SDK                                                                                                                                            |
+| CI/Tests | pytest — backend (252) + `ML_model` (12) via `[.github/workflows/backend-tests.yml](../.github/workflows/backend-tests.yml)`; Android JUnit placeholder (build only) |
+
 
 ---
 
-## 12. Known Limitations and Gaps
+## 12. Observability and Logging
 
-| Topic | Description |
-|-------|-------------|
-| **Android architecture** | Activity-centric + View Binding; no ViewModel/Repository layer (see README) |
-| **Date-split sync** | Implemented: sleep on `{D}`, load on `{D-1}`; **gap:** front-end gate does not verify `{D-1}` load > 0 |
-| **Missing nutrition** | Imputed from `nutrition_defaults.py` (2600 kcal, 130 g P, 300 g C); `nutritionImputed` lowers confidence |
-| **Backend auth** | Not implemented on production routes |
-| **Gemini on backend** | API key may exist in config but no routes — Gemini runs client-side only |
-| **Prediction API auth** | No authentication; `userId` in request body is a known limitation |
-| **UI data source** | Dashboard reads `finalRiskScore` from Firestore, not primarily from the HTTP response |
+Cross-cutting concern: correlate Android client actions with backend inference without a separate APM stack.
+
+
+| Layer | Mechanism | Where |
+| ----- | --------- | ----- |
+| **Backend logs** | Structured `athleagent` logger → stdout + rotating file `logs/athleagent.log` | `backend/utils/logging.py` |
+| **HTTP correlation** | `X-Request-ID` on every request; duration + status logged | `middleware/request_logging.py` |
+| **Android → backend** | `POST /api/v1/observability/client-events` (errors, screen views, ML trigger, sync) | `ClientEventReporter.kt` → `observability.py` |
+| **Client Logcat** | Local debug tags (e.g. `ML_Trigger` when prediction gate skips) | Activities / trigger helpers |
+
+**Design notes:**
+
+- Log records carry `request_id` and optional `user_id` for end-to-end tracing of a `/predict/daily` call.
+- Client events are rate-limited server-side (`client_event_limiter.py`) and accepted with **202**.
+- Persist failures after a successful inference are logged but do **not** fail the HTTP response (see LLD error table).
+- Pytest runs configure logging to stdout only — they do not append to `logs/athleagent.log`.
+
+> Field-level detail: [LLD.md § Observability](LLD.md#7-observability--logging) · [LLD.md § Testing](LLD.md#9-testing)
 
 ---
 
-## 13. Architectural Roadmap (Recommendations)
+## 13. Testing and CI
+
+Quality gates live next to the code they protect; CI runs on every relevant push.
+
+
+| Suite | Framework | Scope (high level) | CI |
+| ----- | --------- | ------------------ | --- |
+| **Backend unit** | pytest (`unit` marker) | Feature engineering, preprocessing, prediction service, model loader gates, history/confidence, schemas | [`.github/workflows/backend-tests.yml`](../.github/workflows/backend-tests.yml) |
+| **Backend integration** | pytest (`integration` marker) | `/predict/daily`, `/health`, `/status/ml`, OpenAPI contract, request-id / client-events, real-model smoke when artifact present | same workflow |
+| **ML_model** | pytest | Policy ↔ `ml_policy.json`, train–serve parity (cold-start rolling defaults) | same workflow (second step) |
+| **Android** | JUnit | Placeholder only — not in CI | — |
+
+**Local commands:**
+
+```bash
+cd backend && python -m pytest tests/ -v
+cd ML_model && python -m pytest tests/ -v
+```
+
+**ML quality gates (offline pipeline, not pytest):** Recall ≥ 0.80, ROC-AUC ≥ 0.68 — enforced by `validate_metrics.py` / `model_loader.py` before promotion.
+
+> Full file map and markers: [LLD.md §9 Testing](LLD.md#9-testing) · run book: [README.md](../README.md#tests)
+
+---
+
+## 14. Known Limitations and Gaps
+
+
+| Topic                    | Description                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Android architecture** | Activity-centric + View Binding; no ViewModel/Repository layer (see README)                              |
+| **Date-split sync**      | Implemented: sleep on `{D}`, load on `{D-1}`; **gap:** front-end gate does not verify `{D-1}` load > 0   |
+| **Missing nutrition**    | Imputed from `nutrition_defaults.py` (2600 kcal, 130 g P, 300 g C); `nutritionImputed` lowers confidence |
+| **Backend auth**         | Not implemented on production routes                                                                     |
+| **Gemini on backend**    | API key may exist in config but no routes — Gemini runs client-side only                                 |
+| **Prediction API auth**  | No authentication; `userId` in request body is a known limitation                                        |
+| **UI data source**       | Dashboard reads `finalRiskScore` from Firestore, not primarily from the HTTP response                    |
+
+
+---
+
+## 15. Architectural Roadmap (Recommendations)
 
 1. **API authentication** — Firebase token middleware.
 2. **Android Repository layer** — separate Firestore access from Activities.
-3. **Front-end trigger gate** — verify `sleepMinutes > 0` and `{D-1}` load before `/predict/daily`.
+3. **Front-end trigger gate** — already enforced in app (`sleepMinutes > 0`, `{D-1}.steps > 0`, check-in `energyLevel`); keep in sync if feature inputs change.
 4. **Cloud deployment** — backend on Cloud Run / Render (image buildable from existing `Dockerfile`).
 5. **Firestore Rules** — hardening before production.
 
 ---
 
-## 14. Document Map
+## 16. Document Map
 
-| Document | Content |
-|----------|---------|
-| [DOCKER.md](DOCKER.md) | Backend + ML — Docker (evaluators) |
-| [LLD.md](LLD.md) | Low-level design — full project |
-| [README.md](../README.md) | Run locally / Docker, API, tests |
-| [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol |
+
+| Document                                 | Content                                              |
+| ---------------------------------------- | ---------------------------------------------------- |
+| [DOCKER.md](DOCKER.md)                   | Backend + ML — Docker (evaluators)                   |
+| [LLD.md](LLD.md)                         | Low-level design — APIs, pipelines, tests, logging   |
+| [README.md](../README.md)                | Run locally / Docker, API, tests                     |
+| [MODEL_SELECTION.md](MODEL_SELECTION.md) | Model selection protocol                             |
+
+

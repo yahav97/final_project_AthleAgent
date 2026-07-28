@@ -352,8 +352,8 @@ class TestFetchUserHistory:
 
 
 class TestFetchInferenceFirestoreBundle:
-    def test_single_batch_read_for_snapshot_and_history(self, monkeypatch):
-        batch_sizes: list[int] = []
+    def test_reads_each_inference_ref_sequentially(self, monkeypatch):
+        read_counts: list[int] = []
         field_paths_used: list[tuple[str, ...] | None] = []
 
         class _Snapshot:
@@ -369,6 +369,11 @@ class TestFetchInferenceFirestoreBundle:
                 self.collection = collection
                 self.key = key
 
+            def get(self, field_paths=None) -> _Snapshot:
+                read_counts.append(1)
+                field_paths_used.append(tuple(field_paths) if field_paths else None)
+                return _Snapshot(False)
+
         class _Collection:
             def __init__(self, name: str) -> None:
                 self.name = name
@@ -382,6 +387,11 @@ class TestFetchInferenceFirestoreBundle:
             def collection(self, name: str) -> _Collection:
                 return _Collection(name)
 
+            def get(self, field_paths=None) -> _Snapshot:
+                read_counts.append(1)
+                field_paths_used.append(tuple(field_paths) if field_paths else None)
+                return _Snapshot(False)
+
         class _Db:
             def collection(self, name: str):
                 class _Users:
@@ -390,16 +400,11 @@ class TestFetchInferenceFirestoreBundle:
 
                 return _Users()
 
-            def get_all(self, refs: list[_DocRef], field_paths=None) -> list[_Snapshot]:
-                batch_sizes.append(len(refs))
-                field_paths_used.append(tuple(field_paths) if field_paths else None)
-                return [_Snapshot(False) for _ in refs]
-
         monkeypatch.setattr("services.history.inference_bundle.get_firestore_client", lambda: _Db())
         bundle = fetch_inference_firestore_bundle("u1", "2026-05-07")
 
         # Snapshot (profile + D + D-1 + checkin + nutrition) + history window, deduped.
-        assert batch_sizes == [20]
+        assert len(read_counts) == 20
         assert field_paths_used[0] is not None
         assert "finalRiskScore" not in field_paths_used[0]
         assert "steps" in field_paths_used[0]

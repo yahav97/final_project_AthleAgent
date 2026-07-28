@@ -10,7 +10,7 @@ from services.history.firestore_io import (
     INFERENCE_FIELD_PATHS,
     doc_to_dict,
     get_firestore_client,
-    read_firestore_documents,
+    read_firestore_document,
 )
 from services.history.history_window import (
     DEFAULT_HISTORY_INCLUDE_TARGET_DAY,
@@ -118,11 +118,12 @@ def fetch_inference_firestore_bundle(
             lookback_days=resolved_lookback,
             include_target_day=include_target_day,
         )
-        snapshots = read_firestore_documents(
-            db,
-            [doc_ref for _, doc_ref in ref_entries],
-            field_paths=INFERENCE_FIELD_PATHS,
-        )
+        doc_refs = [doc_ref for _, doc_ref in ref_entries]
+        # Read each ref individually: get_all deduplicates identical doc paths in one batch.
+        snapshots = [
+            read_firestore_document(doc_ref, field_paths=INFERENCE_FIELD_PATHS)
+            for doc_ref in doc_refs
+        ]
     except Exception as exc:
         logger.warning(
             "fetch_inference_firestore_bundle failed for user_id=%s date=%s: %s",
