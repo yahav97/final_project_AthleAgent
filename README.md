@@ -68,7 +68,7 @@ Verification:
 1. Optionally place a Gemini API key in `local.properties` as described above (needed only for meal analysis / AI recommendations).
 2. Open `android_app/AthleAgent` in Android Studio.
 3. Allow Gradle sync to complete and install any requested SDK components.
-4. Create an emulator with API 26+ (Device Manager), or connect a physical device with USB debugging enabled.
+4. Create an emulator with API 34+ (Device Manager), or connect a physical device with USB debugging enabled.
 5. Run the application. On the emulator, the backend URL is `http://10.0.2.2:8000/`.
 6. Sign in as an athlete or a coach.
 
