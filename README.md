@@ -87,10 +87,10 @@ docs/                     Design documentation (HLD, LLD, Docker, model selectio
 
 | Suite | Command | Approximate count |
 | --- | --- | --- |
-| Backend | `cd backend && python -m pytest tests/ -v` | 252 |
+| Backend | `cd backend && python -m pytest tests/ -v` | 253 |
 | ML policy / parity | `cd ML_model && python -m pytest tests/ -v` | 12 |
 
-Continuous integration: [`.github/workflows/backend-tests.yml`](.github/workflows/backend-tests.yml) runs both suites when `backend/`, `ML_model/`, or the workflow file change.
+Continuous integration: [`.github/workflows/backend-tests.yml`](.github/workflows/backend-tests.yml) runs both suites on Python 3.12 (the same version as the Docker image) when `backend/`, `ML_model/`, or the workflow file change. It can also be started manually from the Actions tab.
 
 Test layout: `backend/tests/unit/`, `backend/tests/integration/`, `ML_model/tests/`.
 

@@ -1,0 +1,76 @@
+name: Backend and ML tests
+
+on:
+  push:
+    branches: [main, ml-backend, ml-data]
+    paths:
+      - "backend/**"
+      - "ML_model/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "ML_model/**"
+      - ".github/workflows/backend-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (backend + ML_model)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # libgomp1 is required by xgboost on Linux — mirrors the Dockerfile.
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgomp1
+
+      # 3.12 matches python:3.12-slim in the Dockerfile, so CI tests the runtime we ship.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      # Fails fast with a clear message if the promoted artifact is not committed,
+      # instead of surfacing as confusing model-loader test failures.
+      - name: Verify promoted model artifact is committed
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          promoted = Path("ML_model/artifacts/promoted.json")
+          if not promoted.exists():
+              sys.exit("Missing ML_model/artifacts/promoted.json")
+
+          model_path = Path(json.loads(promoted.read_text())["model_path"])
+          if not model_path.exists():
+              sys.exit(f"promoted.json points to a missing artifact: {model_path}")
+
+          print(f"Promoted artifact OK: {model_path}")
+          PY
+
+      - name: Run backend pytest
+        working-directory: backend
+        run: python -m pytest tests/ -v
+
+      - name: Run ML_model pytest
+        working-directory: ML_model
+        run: python -m pytest tests/ -v

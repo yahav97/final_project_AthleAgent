@@ -727,7 +727,7 @@ Both paths load the model from `ML_model/artifacts/promoted.json` at startup. Th
 
 | Suite    | Framework | Tests                                               | CI                                                                              |
 | -------- | --------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Backend  | pytest    | 252                                                 | `[.github/workflows/backend-tests.yml](../.github/workflows/backend-tests.yml)` |
+| Backend  | pytest    | 253                                                 | `[.github/workflows/backend-tests.yml](../.github/workflows/backend-tests.yml)` |
 | ML_model | pytest    | 12                                                  | same workflow (second step)                                                     |
 | Android  | JUnit     | placeholder only (`ExampleUnitTest.kt`) — not in CI | —                                                                               |
 

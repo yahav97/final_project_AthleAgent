@@ -36,9 +36,9 @@ class TestDomainDefaults:
 
 class TestEnvOverrides:
     def test_app_env_from_environ(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("APP_ENV", "demo")
+        monkeypatch.setenv("APP_ENV", "production")
         s = Settings()
-        assert s.APP_ENV == "demo"
+        assert s.APP_ENV == "production"
         assert s.openapi_enabled is False
 
     def test_log_dir_from_environ(self, monkeypatch: pytest.MonkeyPatch):

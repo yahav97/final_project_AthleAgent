@@ -157,7 +157,7 @@ class TestPromotedPointerResolution:
 
         monkeypatch.setattr(model_loader, "_project_root", lambda: project_root)
         monkeypatch.setattr(model_loader, "_fallback_model_path", lambda: fallback_model)
-        monkeypatch.setattr("ml.model_loader.settings.APP_ENV", "demo")
+        monkeypatch.setattr("ml.model_loader.settings.APP_ENV", "production")
         result = model_loader.load_model(fallback_model)
         assert result is None
         assert model_loader.get_model_gate_reason() == "ungated_fallback_blocked"

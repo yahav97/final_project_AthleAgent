@@ -24,12 +24,12 @@ Verify:
 | Readiness | http://localhost:8000/health | **200** when Firestore + gated model are live; **503** if either dependency is down |
 | Model | http://localhost:8000/status/ml | `"status": "Live"` |
 | Pre-demo check | `cd backend && python -m pytest tests/unit/test_model_loader.py::TestPromotedPointerResolution -q` | `3 passed` |
-| Full backend suite | `cd backend && python -m pytest tests/ -v` | `252 passed` |
+| Full backend suite | `cd backend && python -m pytest tests/ -v` | `253 passed` |
 | ML policy / parity | `cd ML_model && python -m pytest tests/ -v` | `12 passed` |
 
-CI runs backend + ML_model pytest on every push/PR that touches `backend/`, `ML_model/`, or `.github/workflows/backend-tests.yml`.
+CI runs backend + ML_model pytest on every push/PR that touches `backend/`, `ML_model/`, or `.github/workflows/backend-tests.yml`. The workflow pins Python 3.12 and installs `libgomp1`, matching this image, so a green CI run and a green container exercise the same runtime.
 
-> **Security (demo):** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=demo`.
+> **Security:** Docker publishes port **8000 on 127.0.0.1 only** — not reachable from other machines on the network. Swagger UI (`/docs`) is disabled when `APP_ENV=production` (as set in `docker-compose.yml`).
 
 From the Android emulator (unchanged): `http://10.0.2.2:8000/` — see `ApiClient.kt`.
 

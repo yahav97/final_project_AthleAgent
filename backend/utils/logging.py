@@ -10,14 +10,15 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from config import settings
-from utils.request_context import request_id_var, user_id_var
+from utils.request_context import get_or_create_request_id, request_id_var, user_id_var
 
 
 class ContextFilter(logging.Filter):
     """Add request id and user id to log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.request_id = request_id_var.get()
+        # CLI / background paths skip HTTP middleware; still always emit a request_id.
+        record.request_id = request_id_var.get() or get_or_create_request_id(None)
         record.user_id = user_id_var.get()
         record.service = settings.PROJECT_NAME
         record.version = settings.VERSION

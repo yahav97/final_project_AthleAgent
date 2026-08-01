@@ -40,7 +40,9 @@ def main() -> int:
         from config import settings
         from ml.model_loader import load_model
         from services.prediction.service import predict_injury_risk_from_firestore
+        from utils.request_context import user_id_var
 
+        user_id_var.set(athlete_id)
         load_model(settings.MODEL_PATH)
         result = predict_injury_risk_from_firestore(athlete_id, date_key)
     except Exception as exc:

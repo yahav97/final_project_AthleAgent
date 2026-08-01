@@ -1,13 +1,15 @@
 """
 Seed fixed demo athlete with 7 days of history (overwrites existing data).
 
-Writes wearable/check-in/nutrition data, then runs production inference for each
-wake-up day (D-7 … D) and persists finalRiskScore / riskLevel / predictionConfidence
-to users/{uid}/daily_health/{date} — same fields as POST /predict/daily.
+Writes wearable/check-in/nutrition data for D-7 … D, then runs production inference
+for prior wake-up days (D-7 … D-1) and persists finalRiskScore / riskLevel /
+predictionConfidence — same fields as POST /predict/daily.
+Day D is left without a score so scripts/dev_predict.py (or the API) can run it live.
 
 Usage:
   cd backend
   python scripts/seed_demo_athlete.py
+  python scripts/dev_predict.py
   python scripts/seed_demo_athlete.py --date 2026-07-22
 """
 
@@ -84,7 +86,7 @@ def _get_db():
 
 
 def _seed_historical_predictions(athlete_id: str, date_key: str) -> list[dict[str, Any]]:
-    """Run production inference for each wake-up day and persist scores to daily_health."""
+    """Run production inference for D-7 … D-1 and persist scores (skip day D)."""
     from config import settings
     from ml.model_loader import load_model
     from services.history.persist import save_daily_prediction_result
@@ -93,7 +95,7 @@ def _seed_historical_predictions(athlete_id: str, date_key: str) -> list[dict[st
     load_model(settings.MODEL_PATH)
 
     saved: list[dict[str, Any]] = []
-    for index in range(8):
+    for index in range(7):
         wake_day = _offset_day(date_key, index - 7)
         result = predict_injury_risk_from_firestore(athlete_id, wake_day)
         save_daily_prediction_result(athlete_id, wake_day, result)
@@ -102,7 +104,7 @@ def _seed_historical_predictions(athlete_id: str, date_key: str) -> list[dict[st
 
 
 def seed_demo_athlete(date_key: str) -> list[dict[str, Any]]:
-    """Upsert fixed demo athlete, overwrite history, run per-day predictions."""
+    """Upsert fixed demo athlete, overwrite history, run predictions for D-7 … D-1."""
     from firebase_admin import firestore as fa_firestore
 
     db = _get_db()
@@ -180,14 +182,14 @@ def main() -> int:
         return 1
 
     print(f"Athlete: {DEMO_ATHLETE_ID}  |  date={args.date}")
-    print("Predictions saved to users/{uid}/daily_health/{date}:")
+    print("Data seeded for D-7 … D; historical predictions saved for D-7 … D-1:")
     for row in predictions:
         score_pct = round(float(row["risk_score"]) * 100, 2)
         print(
             f"  {row['date']}: {row['risk_level']} ({score_pct}%) "
             f"confidence={row['prediction_confidence']}"
         )
-    print("Run:     python scripts/dev_predict.py")
+    print(f"Day D ({args.date}) has inputs only — run: python scripts/dev_predict.py")
     return 0
 
 
